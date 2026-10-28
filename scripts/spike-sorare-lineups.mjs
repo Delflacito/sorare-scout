@@ -35,11 +35,14 @@ async function sample(name, query) {
 }
 
 // Un match joué récent de PSG (ou du premier club de Ligue 1)
-const clubs = await gql('{ football { competition(slug: "ligue-1-fr") { clubs(first: 50) { nodes { slug } } } } }');
+const clubs = await gql('{ football { competition(slug: "ligue-1-fr") { clubs(first: 50) { nodes { slug name } } } } }');
 const nodes = clubs.data?.football?.competition?.clubs?.nodes ?? [];
-const clubSlug = nodes.find((c) => /paris-saint-germain/.test(c.slug))?.slug ?? nodes[0]?.slug;
+out.allClubs = nodes;
+const clubSlug = nodes.find((c) => /paris/i.test(c.name) && /saint/i.test(c.name))?.slug ?? nodes[0]?.slug;
 const games = await gql(`{ football { club(slug: "${clubSlug}") { latestGames(first: 3) { nodes { id date statusTyped } } } } }`);
-const fullId = games.data?.football?.club?.latestGames?.nodes?.find((g) => g.statusTyped === 'played')?.id;
+const played = (games.data?.football?.club?.latestGames?.nodes ?? []).filter((g) => g.statusTyped === 'played');
+out.playedGames = played;
+const fullId = played[0]?.id;
 const uuid = fullId?.replace(/^Game:/, '');
 out.clubSlug = clubSlug;
 out.gameId = fullId;
@@ -49,25 +52,23 @@ for (const id of [uuid, fullId]) await sample(`game-id-${id === uuid ? 'uuid' : 
 const idOk = out.samples['game-id-uuid']?.football ? uuid : fullId;
 const G = (sel) => `{ football { game(id: "${idOk}") { ${sel} } } }`;
 
-// Noms volontairement approximatifs : Sorare répond « Did you mean … » avec les vrais champs proches.
-await probe('TeamFormation', (c) => G(`homeFormation { ${c} }`), [
-  'startingLineup', 'startingLineUp', 'starters', 'starting', 'bench', 'benchPlayers', 'substitutes', 'subs',
-  'formation', 'formationName', 'formationType', 'display', 'code', 'type', 'value', 'shape', 'system', 'tactic',
-  'lineup', 'lineups', 'players', 'rows', 'lines', 'positions', 'slots', 'grid', 'team', 'id', 'xyz',
-]);
 await probe('PlayerGameScore', (c) => G(`playerGameScores { ${c} }`), [
-  'score', 'scoreStatus', 'positionTyped', 'position', 'formationPlace', 'detailedScore { category }', 'xyz',
+  'decisiveScore', 'allAroundStats', 'allAroundScore', 'totalScore', 'xyzScore',
+  'detailedScore { category stat statValue points score totalScore }',
 ]);
-await probe('AnyPlayerGameStats', (c) => G(`playerGameScores { anyPlayerGameStats { ${c} } }`), [
-  'minsPlayed', 'formationPlace', 'formationPosition', 'position', 'positionTyped', 'fieldPosition', 'gameStarted',
-  'onGameSheet', 'substituteIn', 'team', 'teamSlug', 'xyz',
+await probe('PlayerGameStats', (c) => G(`playerGameScores { anyPlayerGameStats { ... on PlayerGameStats { ${c} } } }`), [
+  'minsPlayed', 'formationPlace', 'gameStarted', 'onGameSheet', 'team', 'teamId', 'xyz',
 ]);
-await probe('AnyPlayer', (c) => G(`playerGameScores { anyPlayer { ${c} } }`), ['slug', 'displayName', 'anyPositions', 'position', 'positionTyped', 'xyz']);
-
-// Échantillons bruts avec les champs les plus probables
-await sample('formation-raw', G(`homeTeam { slug } homeFormation { startingLineup { slug displayName } bench { slug displayName } }`));
-await sample('formation-raw-any', G(`homeFormation { startingLineup { ... on Player { slug displayName } } }`));
-await sample('scores-raw', G(`playerGameScores { score anyPlayer { slug displayName anyPositions } anyPlayerGameStats { ... on PlayerGameStats { minsPlayed formationPlace } } }`));
+// Repères : compo PSG (Hakimi latéral droit, Nuno Mendes latéral gauche) sur les 3 derniers matchs joués
+for (const g of played.slice(0, 3)) {
+  const id = g.id.replace(/^Game:/, '');
+  await sample(`lineup-${g.date}`, `{ football { game(id: "${id}") {
+    homeTeam { slug } awayTeam { slug }
+    homeFormation { startingLineup { slug displayName } }
+    awayFormation { startingLineup { slug displayName } }
+    playerGameScores { score anyPlayer { slug } anyPlayerGameStats { ... on PlayerGameStats { minsPlayed formationPlace } } }
+  } } }`);
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
