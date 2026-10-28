@@ -60,8 +60,8 @@ describe('/joueurs/[slug]', () => {
     render(await Page(params('nuno-mendes')));
     const table = screen.getByRole('table', { name: 'Prochains matchs' });
     const rows = within(table).getAllByRole('row').slice(1);
-    // 60 × (0,6 × (1 + 0,2 × 5/10) + 0,4 × (1 + 0 × 20/25)) × 1,03 = 65,5
-    expect(within(rows[0]).getByText('65.5')).toBeInTheDocument();
+    // 60 × (0,4 × (1 + 0,2 × 5/10) + 0,6 × (1 + 0 × 20/25)) × 1,03 = 64,3
+    expect(within(rows[0]).getByText('64.3')).toBeInTheDocument();
     expect(within(rows[0]).getByRole('link', { name: /Olympique de Marseille/ })).toHaveAttribute('href', '/equipes/om');
     expect(within(rows[0]).getByText('120')).toBeInTheDocument();
     // adversaire sans données : forme × extérieur

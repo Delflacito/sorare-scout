@@ -26,10 +26,10 @@ describe('projectedScore', () => {
   it('à l’extérieur : forme − 3 %', () => {
     expect(projectedScore({ ...base, isHome: false })).toBeCloseTo(58.2, 1);
   });
-  it('combine poste (60 %) et qualité générale (40 %), après rétrécissement', () => {
+  it('combine qualité générale (60 %) et poste (40 %), après rétrécissement', () => {
     // poste : 1 + 0,15 × 10/15 = 1,10 ; équipe : 1 + 0,05 × 20/25 = 1,04
     const r = projectedScore({ ...base, positionIndex: 1.15, positionObs: 10, teamIndex: 1.05, teamObs: 20 });
-    expect(r).toBeCloseTo(60 * (0.6 * 1.1 + 0.4 * 1.04) * 1.03, 1);
+    expect(r).toBeCloseTo(60 * (0.4 * 1.1 + 0.6 * 1.04) * 1.03, 1);
   });
   it('plafonné à 100', () => {
     expect(projectedScore({ ...base, form: 99, positionIndex: 2, positionObs: 100 })).toBe(100);

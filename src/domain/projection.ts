@@ -1,7 +1,7 @@
 /** Observations à partir desquelles un indice adverse compte pour moitié (rétrécissement vers 1). */
 export const SHRINK_K = 5;
-export const POSITION_WEIGHT = 0.6;
-export const TEAM_WEIGHT = 0.4;
+export const POSITION_WEIGHT = 0.4;
+export const TEAM_WEIGHT = 0.6;
 export const HOME_FACTOR = 1.03;
 export const AWAY_FACTOR = 0.97;
 
