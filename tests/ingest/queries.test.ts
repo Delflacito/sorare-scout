@@ -82,3 +82,37 @@ describeDb('fiche joueur', () => {
     ]);
   });
 });
+
+describeDb('fiche équipe', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('getTeam', async () => {
+    expect(await q.getTeam('om')).toEqual({ id: ids.om, name: 'Olympique de Marseille', slug: 'om', competition: 'Ligue 1' });
+    expect(await q.getTeam('inconnu')).toBeNull();
+  });
+
+  it('getConceded par fenêtre', async () => {
+    const rows = await q.getConceded(ids.om, 5);
+    expect(rows).toEqual([{ position: 'LB', average: 55, leagueAverage: 60, index: 55 / 60, observations: 2, lowSample: true }]);
+    expect(await q.getConceded(ids.om, 7)).toEqual([]);
+  });
+
+  it('getTeamFixtures : derniers matchs complets', async () => {
+    const f = await q.getTeamFixtures(ids.ol, 5);
+    expect(f.map((x) => [x.opponent, x.isHome, x.goalsFor, x.goalsAgainst])).toEqual([
+      ['Olympique de Marseille', true, 1, 0],
+      ['Olympique de Marseille', false, 0, 1],
+      ['Paris Saint-Germain', false, 0, 1],
+    ]);
+    expect(await q.getTeamFixtures(ids.ol, 1)).toHaveLength(1);
+  });
+});

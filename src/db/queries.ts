@@ -46,6 +46,12 @@ export interface PlayerGameView {
   status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
 }
 
+export interface TeamView { id: number; name: string; slug: string; competition: string | null }
+export interface TeamFixtureView {
+  fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
+  goalsFor: number | null; goalsAgainst: number | null;
+}
+
 const toConceded = (r: postgres.Row): ConcededView => ({
   position: r.detailed_position, average: r.average, leagueAverage: r.league_average, index: r.index,
   observations: r.observations, lowSample: r.low_sample,
@@ -158,6 +164,34 @@ export function createQueries(sql: postgres.Sql) {
         status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
         position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
       }));
+    },
+
+    async getTeam(slug: string): Promise<TeamView | null> {
+      const [r] = await sql`select t.id, t.name, t.sorare_slug, c.name as competition
+        from teams t left join competitions c on c.id = t.competition_id where t.sorare_slug = ${slug}`;
+      return r ? { id: r.id, name: r.name, slug: r.sorare_slug, competition: r.competition } : null;
+    },
+
+    async getConceded(teamId: number, window: number): Promise<ConcededView[]> {
+      const rows = await sql`select * from team_conceded_by_position where team_id = ${teamId} and window_size = ${window}`;
+      return rows.map(toConceded);
+    },
+
+    /** Derniers matchs complets de l'équipe (ceux qui entrent dans la fenêtre du concédé). */
+    async getTeamFixtures(teamId: number, limit: number): Promise<TeamFixtureView[]> {
+      const rows = await sql`
+        select f.id, f.date, f.home_team_id, f.home_goals, f.away_goals, o.name as opponent, o.sorare_slug as opponent_slug
+        from fixtures f
+        join teams o on o.id = case when f.home_team_id = ${teamId} then f.away_team_id else f.home_team_id end
+        where ${teamId} in (f.home_team_id, f.away_team_id) and f.status = 'played' and f.lineups_imported
+        order by f.date desc limit ${limit}`;
+      return rows.map((r) => {
+        const isHome = r.home_team_id === teamId;
+        return {
+          fixtureId: r.id, date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome,
+          goalsFor: isHome ? r.home_goals : r.away_goals, goalsAgainst: isHome ? r.away_goals : r.home_goals,
+        };
+      });
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
