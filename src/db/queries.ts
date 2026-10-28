@@ -9,6 +9,7 @@ export const PAGE_SIZE = 50;
 export interface SearchFilters {
   q?: string;
   competition?: string;
+  team?: string;
   position?: GenericPosition;
   detailedPosition?: DetailedPosition;
   sort: Sort;
@@ -95,6 +96,7 @@ export function createQueries(sql: postgres.Sql) {
         where true
           ${f.q ? sql`and unaccent(p.name) ilike unaccent(${`%${f.q}%`})` : sql``}
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.position ? sql`and p.position = ${f.position}` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
@@ -229,6 +231,12 @@ export function createQueries(sql: postgres.Sql) {
       const [r] = await sql`select finished_at from import_runs where status in ('ok', 'quota_exhausted') and finished_at is not null
         order by finished_at desc limit 1`;
       return r ? (r.finished_at as Date).toISOString() : null;
+    },
+
+    /** Clubs actuellement rattachés à une compétition suivie. */
+    async listTeams(): Promise<{ slug: string; name: string }[]> {
+      const rows = await sql`select sorare_slug, name from teams where competition_id is not null order by name`;
+      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name }));
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {

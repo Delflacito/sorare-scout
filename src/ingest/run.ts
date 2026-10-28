@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { getSql } from '@/db/client';
 import { createRepo } from '@/db/repo';
 import { createSorareClient } from '@/sources/sorare';
-import { createApiFootballClient } from '@/sources/apiFootball';
+import { createApiFootballClient, QuotaExhaustedError } from '@/sources/apiFootball';
 import { importClubs } from './clubs';
 import { importFixtures } from './fixtures';
 import { recomputeAggregates } from './aggregates';
@@ -20,16 +20,19 @@ async function main() {
   const season = currentSeason();
   const runId = await repo.startRun();
   try {
-    if (process.argv.includes('--clubs') || !(await repo.allTeams()).length) {
-      const clubs = await importClubs(deps, season);
-      console.log(`Clubs appariés : ${clubs.matched}`);
-      for (const u of clubs.unmatched) console.log(`  non apparié (${u.source}) : ${u.name}`);
-    }
-    const result = await importFixtures(deps, season);
+    // Chaque jour : suit les promotions / relégations ; les matchs API-Football récupérés sont réutilisés ensuite.
+    const clubs = await importClubs(deps, season);
+    console.log(`Clubs appariés : ${clubs.matched}`);
+    for (const u of clubs.unmatched) console.log(`  non apparié (${u.source}) : ${u.name}`);
+    const result = await importFixtures(deps, season, undefined, clubs.afFixtures);
     const agg = await recomputeAggregates(repo);
     await repo.finishRun(runId, result.status, result.fixturesImported, result.errors);
     console.log(`Matchs importés : ${result.fixturesImported} (${result.status}), joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
   } catch (e) {
+    if (e instanceof QuotaExhaustedError) {
+      await repo.finishRun(runId, 'quota_exhausted', 0, [e.message]);
+      return;
+    }
     await repo.finishRun(runId, 'error', 0, [(e as Error).message]);
     throw e;
   } finally {

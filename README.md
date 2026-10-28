@@ -26,7 +26,7 @@ cp .env.example .env.local   # puis renseigner les clés et DATABASE_URL
 ```
 
 Appliquer les migrations (`supabase/migrations/*.sql`, dans l'ordre) : via `supabase db push`, ou
-`psql "$DATABASE_URL" -f supabase/migrations/0001_init.sql -f supabase/migrations/0002_unaccent.sql`.
+`for f in supabase/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done`.
 
 ## Vérifier les API (à faire une fois)
 
@@ -41,12 +41,13 @@ Le script écrit les réponses brutes dans `spike-output/`. Il sert à confirmer
 ## Import des données
 
 ```bash
-npm run ingest            # import incrémental : clubs (1re fois), matchs, compos, scores, agrégats
-npm run ingest -- --clubs # refaire la correspondance des clubs
+npm run ingest   # clubs (promotions / relégations), matchs, compos, scores, agrégats
 ```
 
-L'offre gratuite d'API-Football étant limitée (~100 requêtes/jour), l'import s'arrête proprement quand le quota est
-atteint et reprend au lancement suivant sans doublon. Les premiers jours servent donc à rattraper l'historique de la saison.
+L'offre gratuite d'API-Football étant limitée (~100 requêtes/jour, ~10/minute), l'import espace ses requêtes, s'arrête
+proprement quand le quota est atteint et reprend au lancement suivant sans doublon. Les premiers jours servent donc à
+rattraper l'historique de la saison. Un match dont la compo reste introuvable est abandonné après 5 tentatives.
+Les clubs non appariés et les formations inconnues sont visibles dans `/admin/rapprochement` et dans le journal d'import.
 
 Import automatique : le workflow `.github/workflows/ingest.yml` tourne chaque jour à 05:17 UTC. Créer dans GitHub
 (Settings → Secrets and variables → Actions) les secrets `SORARE_API_KEY`, `API_FOOTBALL_KEY` et `DATABASE_URL`.

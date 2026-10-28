@@ -21,18 +21,20 @@ const FORMATIONS: Record<string, Line[]> = {
   '5-4-1': [['LWB', 'CB', 'CB', 'CB', 'RWB'], ['LW', 'CM', 'CM', 'RW'], ['ST']],
 };
 
+export const isKnownFormation = (formation: string) => formation in FORMATIONS;
+
 export function detailedPosition(
   formation: string | null,
   grid: string | null,
   col1Side: GridSide = GRID_COL1_SIDE,
 ): DetailedPosition | null {
-  if (!formation || !grid) return null;
-  const lines = FORMATIONS[formation];
-  const m = /^(\d+):(\d+)$/.exec(grid);
-  if (!lines || !m) return null;
+  const m = grid ? /^(\d+):(\d+)$/.exec(grid) : null;
+  if (!m) return null;
   const row = Number(m[1]);
   const col = Number(m[2]);
   if (row === 1) return col === 1 ? 'GK' : null;
+  const lines = formation ? FORMATIONS[formation] : undefined;
+  if (!lines) return null;
   const line = lines[row - 2];
   if (!line || col < 1 || col > line.length) return null;
   return col1Side === 'left' ? line[col - 1] : line[line.length - col];

@@ -1,4 +1,4 @@
-import { detailedPosition } from '@/domain/positions';
+import { detailedPosition, isKnownFormation } from '@/domain/positions';
 import type { DetailedPosition } from '@/domain/types';
 
 const TABLE: Record<string, string[]> = {
@@ -25,6 +25,11 @@ describe('detailedPosition', () => {
     });
   }
   it('gardien', () => expect(detailedPosition('4-4-2', '1:1')).toBe('GK'));
+  it('gardien même avec une formation inconnue', () => expect(detailedPosition('4-3-1-2', '1:1')).toBe('GK'));
+  it('isKnownFormation', () => {
+    expect(isKnownFormation('4-2-3-1')).toBe(true);
+    expect(isKnownFormation('4-3-1-2')).toBe(false);
+  });
   it('grille en miroir quand la colonne 1 est à droite', () => {
     expect(detailedPosition('4-3-3', '2:1', 'right')).toBe('RB');
     expect(detailedPosition('4-3-3', '4:3', 'right')).toBe('LW');

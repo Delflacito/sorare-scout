@@ -33,7 +33,7 @@ function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): Conceded
 
 /**
  * Matchs d'équipe à prendre en compte pour un joueur : pour chaque club, de sa première participation pour ce club
- * (ou du début de saison pour le premier club) jusqu'à sa première participation pour le club suivant.
+ * jusqu'à sa première participation pour le club suivant (les matchs d'avant son arrivée ne comptent pas).
  */
 function playerTeamGames(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>, fixturesByTeam: Map<number, CompletedFixture[]>): TeamGame[] {
   const stints: { teamId: number; from: number }[] = [];
@@ -42,7 +42,7 @@ function playerTeamGames(apps: AppearanceRow[], fixtureById: Map<number, Complet
     if (stints.at(-1)?.teamId !== a.teamId) stints.push({ teamId: a.teamId, from: Date.parse(fixtureById.get(a.fixtureId)!.date) });
   }
   return stints.flatMap((s, i) => {
-    const from = i === 0 ? -Infinity : s.from;
+    const from = s.from;
     const to = stints[i + 1]?.from ?? Infinity;
     return (fixturesByTeam.get(s.teamId) ?? [])
       .filter((f) => Date.parse(f.date) >= from && Date.parse(f.date) < to)

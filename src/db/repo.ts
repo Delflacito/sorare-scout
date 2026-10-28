@@ -32,6 +32,13 @@ export interface AppearanceRow {
 }
 export interface TeamRow { id: number; name: string; sorareSlug: string; apifootballId: number | null }
 
+/** Nombre de requêtes de compo API-Football tentées pour un match avant de l'abandonner. */
+export const MAX_LINEUP_ATTEMPTS = 5;
+
+/** Lignes par insert groupé : reste sous la limite de 65 534 paramètres Postgres. */
+const INSERT_CHUNK = 2000;
+const chunks = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / INSERT_CHUNK) }, (_, i) => xs.slice(i * INSERT_CHUNK, (i + 1) * INSERT_CHUNK));
+
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 function createBaseRepo(sql: Sql) {
@@ -57,12 +64,18 @@ function createBaseRepo(sql: Sql) {
       return r.id;
     },
 
+    /** Détache de la compétition les clubs qui n'y figurent plus (relégués). */
+    async detachTeams(competitionId: number, keepSorareSlugs: string[]): Promise<void> {
+      await sql`update teams set competition_id = null
+        where competition_id = ${competitionId} and not (sorare_slug = any(${keepSorareSlugs}))`;
+    },
+
     async upsertPlayer(p: PlayerInput): Promise<number> {
       const [r] = await sql`
         insert into players (name, sorare_slug, apifootball_id, position, team_id)
         values (${p.name}, ${p.sorareSlug}, ${p.apifootballId ?? null}, ${p.position}, ${p.teamId})
         on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
-          team_id = excluded.team_id, apifootball_id = coalesce(excluded.apifootball_id, players.apifootball_id)
+          team_id = excluded.team_id, apifootball_id = coalesce(players.apifootball_id, excluded.apifootball_id)
         returning id`;
       return r.id;
     },
@@ -78,7 +91,9 @@ function createBaseRepo(sql: Sql) {
     },
 
     async setFixtureApiFootballId(fixtureId: number, apifootballFixtureId: number): Promise<void> {
-      await sql`update fixtures set apifootball_fixture_id = ${apifootballFixtureId} where id = ${fixtureId}`;
+      // Un match reporté puis rejoué peut correspondre au même match API-Football : le premier lien est conservé.
+      await sql`update fixtures set apifootball_fixture_id = ${apifootballFixtureId}
+        where id = ${fixtureId} and not exists (select 1 from fixtures where apifootball_fixture_id = ${apifootballFixtureId})`;
     },
 
     async markLineupsImported(fixtureId: number, homeFormation: string | null, awayFormation: string | null): Promise<void> {
@@ -90,11 +105,24 @@ function createBaseRepo(sql: Sql) {
       const rows = await sql`
         select id, apifootball_fixture_id, sorare_game_id, home_team_id, away_team_id from fixtures
         where status = 'played' and not lineups_imported and apifootball_fixture_id is not null
+          and lineups_attempts < ${MAX_LINEUP_ATTEMPTS}
         order by date`;
       return rows.map((r) => ({
         id: r.id, apifootballFixtureId: r.apifootball_fixture_id, sorareGameId: r.sorare_game_id,
         homeTeamId: r.home_team_id, awayTeamId: r.away_team_id,
       }));
+    },
+
+    /** Compte une tentative d'import de compo infructueuse (au-delà de MAX_LINEUP_ATTEMPTS, le match est abandonné). */
+    async countLineupAttempt(fixtureId: number): Promise<void> {
+      await sql`update fixtures set lineups_attempts = lineups_attempts + 1 where id = ${fixtureId}`;
+    },
+
+    /** Joueur Sorare déjà associé à chacun de ces identifiants API-Football. */
+    async apiFootballOwners(afIds: number[]): Promise<Map<number, string>> {
+      if (!afIds.length) return new Map();
+      const rows = await sql`select apifootball_id, sorare_slug from players where apifootball_id in ${sql(afIds)}`;
+      return new Map(rows.map((r) => [r.apifootball_id as number, r.sorare_slug as string]));
     },
 
     async teamsByCompetition(competitionId: number): Promise<TeamRow[]> {
@@ -136,9 +164,8 @@ function createBaseRepo(sql: Sql) {
 
     async replaceConceded(rows: Conceded[]): Promise<void> {
       await sql`delete from team_conceded_by_position`;
-      if (!rows.length) return;
-      await sql`insert into team_conceded_by_position ${sql(
-        rows.map((r) => ({
+      for (const chunk of chunks(rows)) await sql`insert into team_conceded_by_position ${sql(
+        chunk.map((r) => ({
           team_id: Number(r.teamId), detailed_position: r.position, window_size: r.window, average: r.average,
           league_average: r.leagueAverage, index: r.index, observations: r.observations, low_sample: r.lowSample,
         })),
@@ -147,9 +174,8 @@ function createBaseRepo(sql: Sql) {
 
     async replacePlayerSummaries(rows: PlayerSummaryRow[]): Promise<void> {
       await sql`delete from player_summary`;
-      if (!rows.length) return;
-      await sql`insert into player_summary ${sql(
-        rows.map((r) => ({
+      for (const chunk of chunks(rows)) await sql`insert into player_summary ${sql(
+        chunk.map((r) => ({
           player_id: r.playerId, l5: r.l5, l15: r.l15, l40: r.l40, std_dev5: r.stdDev5,
           start_rate5: r.startRate5, avg_minutes5: r.avgMinutes5, start_rate15: r.startRate15, avg_minutes15: r.avgMinutes15,
           decisive5: r.decisive5, all_around5: r.allAround5, decisive15: r.decisive15, all_around15: r.allAround15,

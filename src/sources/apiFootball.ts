@@ -15,12 +15,29 @@ export interface AfLineup { teamId: number; formation: string | null; players: A
 
 interface RawLineupPlayer { player: { id: number; name: string; grid: string | null } }
 
-export function createApiFootballClient(apiKey: string, fetchImpl: typeof fetch = fetch, dailyBudget = 100) {
-  let remaining = dailyBudget;
+export interface ApiFootballOptions {
+  fetchImpl?: typeof fetch;
+  /** Requêtes autorisées par jour (offre gratuite : 100). */
+  dailyBudget?: number;
+  /** Écart minimal entre deux requêtes (offre gratuite : ~10 requêtes / minute). */
+  minIntervalMs?: number;
+  /** Attente avant de réessayer quand la limite par minute est atteinte. */
+  rateLimitWaitMs?: number;
+}
 
-  async function get<T>(path: string): Promise<T> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function createApiFootballClient(apiKey: string, opts: ApiFootballOptions = {}) {
+  const { fetchImpl = fetch, dailyBudget = 100, minIntervalMs = 6500, rateLimitWaitMs = 60_000 } = opts;
+  let remaining = dailyBudget;
+  let lastCall = 0;
+
+  async function get<T>(path: string, retried = false): Promise<T> {
     if (remaining <= 0) throw new QuotaExhaustedError();
     remaining--;
+    const wait = lastCall + minIntervalMs - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastCall = Date.now();
     const res = await fetchWithRetry(`${API_FOOTBALL_URL}${path}`, { headers: { 'x-apisports-key': apiKey } }, { fetchImpl });
     const header = res.headers.get('x-ratelimit-requests-remaining');
     if (header !== null && Number(header) < remaining) remaining = Number(header);
@@ -29,6 +46,10 @@ export function createApiFootballClient(apiKey: string, fetchImpl: typeof fetch 
     if (errors.requests) {
       remaining = 0;
       throw new QuotaExhaustedError();
+    }
+    if (errors.rateLimit && !retried) {
+      await sleep(rateLimitWaitMs);
+      return get<T>(path, true);
     }
     if (!res.ok || Object.keys(errors).length) throw new Error(`API-Football ${path}: ${JSON.stringify(json.errors) || res.status}`);
     return json.response;

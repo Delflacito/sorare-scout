@@ -88,3 +88,36 @@ export function matchFixture(target: Omit<FixtureKey, 'id'>, candidates: Fixture
   );
   return hits.length === 1 ? hits[0].id : null;
 }
+
+export interface AssignEntry {
+  key: string;
+  name: string;
+  minutes: number;
+  knownId?: string;
+}
+
+/**
+ * Attribue au plus un joueur de la compo à chaque entrée, et chaque joueur de la compo au plus une fois :
+ * identifiants déjà connus, puis noms identiques, puis règles de matchPlayer (joueurs ayant joué uniquement,
+ * par minutes décroissantes) parmi les joueurs de la compo restants.
+ */
+export function assignPlayers(entries: AssignEntry[], roster: Candidate[]): Map<string, string> {
+  const result = new Map<string, string>();
+  const free = new Map(roster.map((c) => [c.id, c]));
+  const claim = (key: string, id: string) => {
+    result.set(key, id);
+    free.delete(id);
+  };
+  for (const e of entries) if (e.knownId && free.has(e.knownId)) claim(e.key, e.knownId);
+  for (const e of entries) {
+    if (result.has(e.key)) continue;
+    const exact = [...free.values()].filter((c) => normalizeName(c.name) === normalizeName(e.name));
+    if (exact.length === 1) claim(e.key, exact[0].id);
+  }
+  const rest = entries.filter((e) => !result.has(e.key) && e.minutes > 0).sort((a, b) => b.minutes - a.minutes);
+  for (const e of rest) {
+    const id = matchPlayer(e.name, [...free.values()]);
+    if (id) claim(e.key, id);
+  }
+  return result;
+}
