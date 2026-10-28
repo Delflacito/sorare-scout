@@ -35,25 +35,21 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Marché : arguments et champs de tokenPrices, lowestPriceAnyCard, cardSupply.
+// Marché : dernières ventes (last, season), carte vendue, prix plancher en ETH et taux de change.
 const MP = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
 const tries = {
-  'tp-noargs': 'tokenPrices { nodes { date } }',
-  'tp-rarity': 'tokenPrices(rarity: limited) { nodes { date } }',
-  'tp-first': 'tokenPrices(rarity: limited, first: 5) { nodes { date amounts { eurCents } } }',
-  'tp-node-xyz': 'tokenPrices(rarity: limited, first: 3) { nodes { xyzAmount xyzDate xyzCard xyzDeal } }',
-  'tp-node-guess': 'tokenPrices(rarity: limited, first: 3) { nodes { id date amount amounts { eurCents usdCents wei } } }',
-  'tp-args-xyz': 'tokenPrices(rarity: limited, first: 3, xyzSeason: true) { nodes { date } }',
-  'lp-noargs': 'lowestPriceAnyCard { slug }',
-  'lp-rarity': 'lowestPriceAnyCard(rarity: limited) { slug }',
-  'lp-args-xyz': 'lowestPriceAnyCard(rarity: limited, xyzSeason: true) { slug }',
-  'lp-fields-xyz': 'lowestPriceAnyCard(rarity: limited) { xyzPrice xyzOffer xyzSeason }',
-  'lp-offer': 'lowestPriceAnyCard(rarity: limited) { slug seasonYear inSeasonEligible liveSingleSaleOffer { receiverSide { amounts { eurCents } } } }',
-  'lp-offer2': 'lowestPriceAnyCard(rarity: limited) { slug liveSingleSaleOffer { xyzPrice xyzSide } }',
-  'cs': 'cardSupply { xyz }',
-  'cs2': 'cardSupply { limited season { startYear } }',
+  'tp-last': 'tokenPrices(rarity: limited, last: 5) { nodes { date amounts { eurCents } } }',
+  'tp-season-int': 'tokenPrices(rarity: limited, last: 5, season: 2026) { nodes { date amounts { eurCents } } }',
+  'tp-season-xyz': 'tokenPrices(rarity: limited, last: 2, season: xyz) { nodes { date } }',
+  'tp-card': 'tokenPrices(rarity: limited, last: 3) { nodes { date card { slug seasonYear } } }',
+  'tp-node-xyzc': 'tokenPrices(rarity: limited, last: 2) { nodes { xyzCard xyzSeason } }',
+  'tp-args-xyz2': 'tokenPrices(rarity: limited, last: 2, xyzCollection: 1) { nodes { date } }',
+  'lp-amounts': 'lowestPriceAnyCard(rarity: limited) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }',
+  'lp-inseason': 'lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear }',
+  'lp-season': 'lowestPriceAnyCard(rarity: limited, season: 2026) { slug seasonYear }',
 };
 for (const [k, q] of Object.entries(tries)) await sample(k, MP(q));
+await probe('Root (taux)', (c) => `{ ${c} }`, ['config { exchangeRate { id } }', 'config { xyzRate }', 'exchangeRate { id }', 'xyzExchange']);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
