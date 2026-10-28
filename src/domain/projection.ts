@@ -76,3 +76,34 @@ export function venueFactors(obs: { home: boolean; score: number }[]): { home: n
   const all = mean(obs.map((o) => o.score));
   return { home: mean(home) / all, away: mean(away) / all, observations: obs.length };
 }
+
+export interface PlayerProjectionBase {
+  base: number | null;
+  homeAvg: number | null;
+  homeGames: number;
+  awayAvg: number | null;
+  awayGames: number;
+}
+export interface FixtureContext {
+  isHome: boolean;
+  /** Avantage du terrain mesuré dans le championnat pour ce lieu. */
+  leagueVenueFactor: number;
+  position: { average: number | null; leagueAverage: number | null; observations: number } | null;
+  overall: { index: number | null; observations: number } | null;
+}
+
+/** Score potentiel d'un joueur pour un match donné, avec ses deux composantes (utilisé par le site et le test sur le passé). */
+export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext) {
+  const venueFactor = playerVenueFactor({
+    venueAverage: f.isHome ? p.homeAvg : p.awayAvg,
+    venueGames: f.isHome ? p.homeGames : p.awayGames,
+    base: p.base,
+    leagueFactor: f.leagueVenueFactor,
+  });
+  const opponent = opponentMultiplier({
+    positionAverage: f.position?.average ?? null, positionObs: f.position?.observations ?? 0,
+    positionLeagueAverage: f.position?.leagueAverage ?? null,
+    teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
+  });
+  return { venueFactor, opponent, projected: projectedScore({ base: p.base, venueFactor, opponent }) };
+}

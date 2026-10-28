@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerGameView, type UpcomingView } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR } from '@/domain/types';
-import { opponentMultiplier, playerVenueFactor, projectedScore } from '@/domain/projection';
+import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { fmtDate, fmtPct, fmtScore, indexClass } from '@/lib/format';
 
@@ -39,17 +39,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
           </thead>
           <tbody>
             {upcoming.fixtures.map((f) => {
-              const venueFactor = playerVenueFactor({
-                venueAverage: f.isHome ? upcoming.homeAvg : upcoming.awayAvg,
-                venueGames: f.isHome ? upcoming.homeGames : upcoming.awayGames,
-                base: upcoming.base, leagueFactor: f.leagueVenueFactor,
-              });
-              const opponent = opponentMultiplier({
-                positionAverage: f.position?.average ?? null, positionObs: f.position?.observations ?? 0,
-                positionLeagueAverage: f.position?.leagueAverage ?? null,
-                teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
-              });
-              const projected = projectedScore({ base: upcoming.base, venueFactor, opponent });
+              const { venueFactor, projected } = projectForFixture(upcoming, f);
               const p = f.position;
               return (
                 <tr key={f.fixtureId}>

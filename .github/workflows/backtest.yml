@@ -1,0 +1,28 @@
+name: Backtest
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/backtest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Résultats publiés sur la branche backtest-results (lisible sans téléchargement d'artefact).
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan backtest-results
+          git rm -rq --cached .
+          git add -f backtest-output
+          git commit -qm "Backtest $(date -u +%FT%TZ)"
+          git push -f origin backtest-results
