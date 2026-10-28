@@ -116,3 +116,36 @@ describeDb('fiche équipe', () => {
     expect(await q.getTeamFixtures(ids.ol, 1)).toHaveLength(1);
   });
 });
+
+describeDb('administration', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  let repo: import('@/db/repo').Repo;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    repo = db.repo;
+    ids = await seedLeague(db.repo);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('getUnmatched avec le match concerné', async () => {
+    await repo.addUnmatched({ source: 'sorare', externalId: 'hernandez', name: 'Hernández', club: 'om', fixtureId: ids.g2 });
+    expect(await q.getUnmatched()).toEqual([
+      { source: 'sorare', name: 'Hernández', club: 'om', fixture: 'Olympique de Marseille – Olympique Lyonnais', date: '2026-10-11T20:00:00.000Z' },
+    ]);
+  });
+
+  it('getLastRun et date du dernier import réussi', async () => {
+    expect(await q.getLastRun()).toBeNull();
+    expect(await q.getLastSuccessfulImport()).toBeNull();
+    const ok = await repo.startRun();
+    await repo.finishRun(ok, 'ok', 4, []);
+    const ko = await repo.startRun();
+    await repo.finishRun(ko, 'quota_exhausted', 1, ['Quota API-Football atteint']);
+    expect(await q.getLastRun()).toMatchObject({ status: 'quota_exhausted', fixturesImported: 1, errors: ['Quota API-Football atteint'] });
+    expect(await q.getLastSuccessfulImport()).toEqual(expect.any(String));
+  });
+});
