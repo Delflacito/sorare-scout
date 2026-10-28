@@ -35,19 +35,10 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Postes Sorare : anyPositions (ordre ? plusieurs ?) et champ de poste principal ; ordre des lignes de 5 (formationPlace).
-for (const slug of ['timothy-weah', 'mats-wieffer', 'warren-zaire-emery', 'ainsley-maitland-niles', 'anthony-caci', 'achraf-hakimi']) {
-  await sample(`pos-${slug}`, `{ anyPlayer(slug: "${slug}") { ... on Player { displayName anyPositions position activeClub { slug } } } }`);
-}
-await probe('Player (poste)', (c) => `{ anyPlayer(slug: "timothy-weah") { ... on Player { ${c} } } }`, ['position', 'xyzPosition', 'positions', 'cardPositions', 'activeClub { slug }', 'xyzClub']);
-const mainz = await gql('{ football { club(slug: "mainz-05-mainz") { latestGames(first: 3) { nodes { id } } } } }');
-for (const n of mainz.data?.football?.club?.latestGames?.nodes ?? []) {
-  await sample(`lineup-${n.id}`, `{ football { game(id: "${n.id.replace(/^Game:/, '')}") {
-    homeTeam { slug } homeFormation { startingLineup { slug displayName } }
-    awayFormation { startingLineup { slug displayName } }
-    playerGameScores { anyPlayer { slug } anyPlayerGameStats { ... on PlayerGameStats { formationPlace } } }
-  } } }`);
-}
+// Fiche joueur façon Sorare : prénom / nom, taille, numéro de maillot.
+await probe('Player (fiche)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`, [
+  'firstName', 'lastName', 'height', 'shirtNumber', 'xyzShirt', 'jerseyNumber', 'xyzNumber', 'pictureUrl', 'squaredPictureUrl', 'xyzPicture',
+]);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
