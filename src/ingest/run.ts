@@ -22,7 +22,7 @@ async function main() {
   try {
     // Chaque jour : suit les promotions / relégations.
     const { clubs } = await importClubs(deps);
-    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart() });
+    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 4 });
     const agg = await recomputeAggregates(repo);
     await repo.finishRun(runId, 'ok', result.fixturesImported, result.errors);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
