@@ -35,15 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Slugs Sorare des championnats néerlandais, belge et portugais.
-for (const slug of ['eredivisie', 'eredivisie-nl', 'jupiler-pro-league', 'jupiler-pro-league-be', 'pro-league-be', 'first-division-a-be',
-  'primeira-liga', 'primeira-liga-pt', 'liga-portugal', 'liga-portugal-pt', 'liga-portugal-betclic-pt']) {
-  await sample(`comp-${slug}`, `{ football { competition(slug: "${slug}") { slug displayName teams(first: 3) { nodes { ... on Club { slug name } } } } } }`);
-}
-// Indices : compétitions des clubs connus de ces championnats.
-for (const club of ['psv-eindhoven', 'ajax-amsterdam', 'club-brugge-brugge', 'sl-benfica-lisboa', 'fc-porto-porto', 'sporting-cp-lisboa']) {
-  await sample(`club-${club}`, `{ football { club(slug: "${club}") { slug name latestGames(first: 2) { nodes { competition { slug displayName } } } } } }`);
-}
+// Marché : prix plancher des cartes Limited et dernières ventes.
+const MP = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
+await probe('Player (marché)', MP, [
+  'xyzPrice', 'price', 'lowestPrice', 'xyzSale', 'sales', 'xyzMarket', 'market', 'floor', 'xyzFloor', 'xyzToken', 'tokenPrices', 'xyzCard', 'cards',
+  'lowestPriceAnyCard', 'lowestPriceCard', 'averagePrice', 'xyzAverage', 'xyzLowest', 'xyzOffer', 'xyzSupply', 'cardSupply',
+]);
+await probe('tokenPrices', (c) => MP(`tokenPrices(${c}) { xyz }`), ['rarity: limited', 'rarity: limited, first: 5', 'xyzArg: 1']);
+await probe('lowestPriceAnyCard', (c) => MP(`lowestPriceAnyCard(${c}) { xyz }`), ['rarity: limited', 'rarity: limited, inSeason: true', 'xyzArg: 1']);
+await probe('Root (marché)', (c) => `{ ${c} }`, ['tokens { xyz }', 'xyzToken', 'football { xyzPrice }', 'xyzMarket', 'tokenPrices { xyz }']);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
