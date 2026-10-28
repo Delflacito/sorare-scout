@@ -52,11 +52,15 @@ for (const id of [uuid, fullId]) await sample(`game-id-${id === uuid ? 'uuid' : 
 const idOk = out.samples['game-id-uuid']?.football ? uuid : fullId;
 const G = (sel) => `{ football { game(id: "${idOk}") { ${sel} } } }`;
 
-await probe('StatScore', (c) => G(`playerGameScores { detailedScore { ${c} } }`), [
-  'category', 'stat', 'statValue', 'points', 'score', 'totalScore', 'xyz',
+// Remplaçant de Competition.clubs (obsolète)
+const C = (sel) => `{ football { competition(slug: "ligue-1-fr") { ${sel} } } }`;
+await probe('Competition', (c) => C(c), [
+  'clubs', 'teams', 'clubList', 'participants', 'contestants', 'activeClubs', 'currentClubs', 'clubMemberships',
+  'memberships', 'seasons', 'currentSeason', 'season', 'standings', 'leaderboard', 'games', 'upcomingGames', 'xyzClubs', 'xyz',
 ]);
-await sample('detailed', G(`playerGameScores { score anyPlayer { slug } detailedScore { category stat statValue points totalScore } }`));
-await sample('detailed-min', G(`playerGameScores { score anyPlayer { slug } detailedScore { category stat totalScore } }`));
+await sample('teams', C('teams(first: 50) { nodes { slug name } }'));
+await sample('teams-list', C('teams { slug name }'));
+await sample('teams-any', C('teams(first: 50) { nodes { ... on Club { slug name } } }'));
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
