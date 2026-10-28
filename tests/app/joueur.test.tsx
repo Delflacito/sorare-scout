@@ -100,14 +100,21 @@ describe('/joueurs/[slug]', () => {
     expect(within(hero).getByText('41')).toBeInTheDocument();
   });
 
-  it('cartes Forme, Performance, Temps de jeu', async () => {
+  it('aperçu : carte Forme', async () => {
     render(await Page(params('nuno-mendes')));
     const l5 = screen.getByTestId('form-L5');
     expect(within(l5).getByText('62')).toHaveClass('t55');
     // 4 derniers matchs d'équipe, 3 joués
     expect(within(l5).getByText('75 %')).toBeInTheDocument();
-    expect(screen.getByLabelText('L5 : 2 buts, 1 passes décisives')).toBeInTheDocument();
+    expect(screen.queryByText('Titularisations')).not.toBeInTheDocument();
+  });
+
+  it('statistiques : temps de jeu et performance', async () => {
+    render(await Page(params('nuno-mendes', 'statistiques')));
+    expect(screen.getByRole('link', { name: 'Statistiques' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Titularisations').nextSibling).toHaveTextContent('80 %');
+    expect(screen.getByLabelText('L5 : 2 buts, 1 passes décisives')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Historique' })).not.toBeInTheDocument();
   });
 
   it('graphique : une colonne par match, légende, ligne du L15, info-bulle au survol', async () => {
@@ -135,16 +142,6 @@ describe('/joueurs/[slug]', () => {
     expect(screen.getByRole('radio', { name: 'Domicile' })).toHaveAttribute('aria-checked', 'true');
     fireEvent.change(screen.getByRole('combobox', { name: 'Compétition du graphique' }), { target: { value: 'Champions League' } });
     expect(screen.getByText('Aucun match pour ces filtres')).toBeInTheDocument();
-  });
-
-  it('historique : saison en cours par compétition et championnat saison par saison', async () => {
-    render(await Page(params('nuno-mendes', 'historique')));
-    const current = screen.getByRole('table', { name: 'Saison en cours par compétition' });
-    const total = within(current).getByRole('row', { name: /Total/ });
-    expect(within(total).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Total', '10', '9', '830', '2', '3', '57.0']);
-    const seasons = screen.getByRole('table', { name: 'Championnat, saison par saison' });
-    const row = within(seasons).getAllByRole('row')[1];
-    expect(within(row).getAllByRole('cell').slice(0, 6).map((c) => c.textContent)).toEqual(['2025-26', '30', '26', '2400', '3', '6']);
   });
 
   it('prochains matchs : logo de l’adversaire et score potentiel', async () => {

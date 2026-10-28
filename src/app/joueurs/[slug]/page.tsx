@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getQueries, type CompetitionTotalsView, type PlayerDetail, type PlayerGameView, type PlayerSeasonView, type UpcomingView } from '@/db/queries';
+import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
@@ -16,14 +16,13 @@ import { one, oneOf, type SearchParams } from '@/lib/params';
 export const dynamic = 'force-dynamic';
 
 const STATUS_LABEL = { started: 'titulaire', sub: 'remplaçant', absent: 'absent' } as const;
-const TABS = [['apercu', 'Aperçu'], ['matchs', 'Matchs'], ['historique', 'Historique']] as const;
+const TABS = [['apercu', 'Aperçu'], ['matchs', 'Matchs'], ['statistiques', 'Statistiques']] as const;
 type Tab = (typeof TABS)[number][0];
 /** Matchs de la saison chargés pour le graphique (filtrable) et la liste. */
 const SEASON_GAMES = 80;
 
 const fmtBirth = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtShortDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
-const seasonLabel = (y: number) => `${y}-${String((y + 1) % 100).padStart(2, '0')}`;
 
 const fmtVenue = (factor: number) => {
   const pct = Math.round((factor - 1) * 100);
@@ -315,63 +314,6 @@ function LastGamesTable({ games }: { games: PlayerGameView[] }) {
   );
 }
 
-function SeasonTotals({ rows }: { rows: CompetitionTotalsView[] }) {
-  if (!rows.length) return <p className="empty">Aucun match joué cette saison</p>;
-  const sum = (f: (r: CompetitionTotalsView) => number) => rows.reduce((t, r) => t + f(r), 0);
-  const played = sum((r) => r.played);
-  const average = played ? sum((r) => (r.average ?? 0) * r.played) / played : null;
-  return (
-    <div className="table-wrap">
-      <table aria-label="Saison en cours par compétition">
-        <thead>
-          <tr><th>Compétition</th><th>Matchs</th><th>Titu.</th><th>Minutes</th><th>Buts</th><th>Passes déc.</th><th>Moy. Sorare</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.competition}>
-              <td>{r.competition}</td>
-              <td className="num">{r.played}</td><td className="num">{r.started}</td><td className="num">{r.minutes}</td>
-              <td className="num">{r.goals}</td><td className="num">{r.assists}</td>
-              <td className="num">{r.average === null ? '—' : fmtScore(r.average)}</td>
-            </tr>
-          ))}
-          {rows.length > 1 && (
-            <tr className="history-total">
-              <td>Total</td>
-              <td className="num">{played}</td><td className="num">{sum((r) => r.started)}</td><td className="num">{sum((r) => r.minutes)}</td>
-              <td className="num">{sum((r) => r.goals)}</td><td className="num">{sum((r) => r.assists)}</td>
-              <td className="num">{average === null ? '—' : fmtScore(average)}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SeasonsTable({ rows }: { rows: PlayerSeasonView[] }) {
-  if (!rows.length) return <p className="empty">Historique pas encore importé</p>;
-  return (
-    <div className="table-wrap">
-      <table aria-label="Championnat, saison par saison">
-        <thead>
-          <tr><th>Saison</th><th>Matchs</th><th>Titu.</th><th>Minutes</th><th>Buts</th><th>Passes déc.</th><th>Cartons</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.startYear}>
-              <td>{seasonLabel(r.startYear)}</td>
-              <td className="num">{r.appearances}</td><td className="num">{r.appearances - r.substituteIn}</td>
-              <td className="num">{r.minutes}</td><td className="num">{r.goals}</td><td className="num">{r.assists}</td>
-              <td className="num">{r.yellowCards} 🟨 {r.redCards > 0 && <>{r.redCards} 🟥</>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default async function JoueurPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
   const { slug } = await params;
   const tab: Tab = oneOf(one((await searchParams)?.onglet), TABS.map((t) => t[0])) ?? 'apercu';
@@ -380,9 +322,6 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
     queries.getPlayer(slug), queries.getPlayerGames(slug, SEASON_GAMES), queries.getUpcoming(slug, 5),
   ]);
   if (!player) notFound();
-  const [totals, seasons] = tab === 'historique'
-    ? await Promise.all([queries.getCompetitionTotals(slug), queries.getPlayerSeasons(slug)])
-    : [[], []];
   const s = player.summary;
 
   return (
@@ -403,8 +342,6 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           {s ? (
             <div className="cards">
               <FormCard player={player} games={games} />
-              <PerformanceCard games={games} />
-              <PlayingCard player={player} />
             </div>
           ) : (
             <p className="empty">Pas encore de match importé pour ce joueur</p>
@@ -422,14 +359,13 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
         </>
       )}
 
-      {tab === 'historique' && (
-        <>
-          <h2>Saison en cours, toutes compétitions</h2>
-          <SeasonTotals rows={totals} />
-          <h2>Championnat, saison par saison</h2>
-          <SeasonsTable rows={seasons} />
-          <p className="note">Statistiques de championnat fournies par Sorare (le club n’est pas précisé). Titu. = matchs − entrées en jeu.</p>
-        </>
+      {tab === 'statistiques' && (
+        s ? (
+          <div className="cards">
+            <PlayingCard player={player} />
+            <PerformanceCard games={games} />
+          </div>
+        ) : <p className="empty">Pas encore de match importé pour ce joueur</p>
       )}
     </main>
   );
