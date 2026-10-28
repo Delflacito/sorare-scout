@@ -28,7 +28,8 @@ describeDb('importProfiles', () => {
     playerProfiles: async (slugs: string[]): Promise<SorarePlayerProfile[]> => {
       calls.push(slugs);
       return slugs.filter((s) => s !== 'c').map((slug) => ({
-        slug, birthDate: '1998-12-20', country: { code: 'fr', name: 'France', flagUrl: 'https://f/FR.png' }, seasons: [season(2025, 10), season(2024, 7)],
+        slug, birthDate: '1998-12-20', country: { code: 'fr', name: 'France', flagUrl: 'https://f/FR.png' }, activeClub: { slug: 'fenerbahce', name: 'Fenerbahçe', pictureUrl: null },
+        seasons: [season(2025, 10), season(2024, 7)],
       }));
     },
   }) as unknown as SorareClient;
@@ -48,6 +49,17 @@ describeDb('importProfiles', () => {
     await sql`update players set profile_updated_at = now() - interval '8 days' where sorare_slug = 'b'`;
     await importProfiles({ sorare: fake(again), repo }, { batchSize: 2 });
     expect(again).toEqual([['b']]);
+  });
+
+  it('club actuel hors championnats suivis : seulement pour un joueur sans club suivi', async () => {
+    await sql`update players set team_id = null where sorare_slug = 'a'`;
+    await importProfiles({ sorare: fake([]), repo }, { batchSize: 5 });
+    const rows = await sql`select p.sorare_slug, t.sorare_slug as club, t.kind from players p join teams t on t.id = p.team_id order by 1`;
+    expect(rows).toEqual([
+      { sorare_slug: 'a', club: 'fenerbahce', kind: 'club' },
+      { sorare_slug: 'b', club: 'psg', kind: 'club' },
+      { sorare_slug: 'c', club: 'psg', kind: 'club' },
+    ]);
   });
 
   it('erreur sur un lot : signalée, les autres continuent ; temps dépassé : arrêt', async () => {

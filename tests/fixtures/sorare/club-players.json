@@ -22,7 +22,12 @@
         "slug": "portugal",
         "name": "Portugal",
         "pictureUrl": "https://f/PT.png"
-       }
+       },
+       "position": "Defender",
+       "cardPositions": [
+        "Defender",
+        "Midfielder"
+       ]
       },
       {
        "slug": "vitinha",
@@ -38,7 +43,8 @@
         }
        ],
        "nextClassicFixtureProjectedScore": null,
-       "activeNationalTeam": null
+       "activeNationalTeam": null,
+       "position": "Midfielder"
       }
      ]
     }

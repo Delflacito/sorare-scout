@@ -7,7 +7,7 @@ import type { SorareClient, SorarePlayerStatus } from '@/sources/sorare';
 
 const league: League = { key: 'ligue1', name: 'Ligue 1', sorareSlug: 'ligue-1-fr' };
 const status = (slug: string, s: Partial<SorarePlayerStatus> = {}): SorarePlayerStatus =>
-  ({ slug, pictureUrl: null, playingStatus: 'STARTER', injury: null, suspension: null, projection: null, nationalTeam: null, ...s });
+  ({ slug, pictureUrl: null, playingStatus: 'STARTER', injury: null, suspension: null, projection: null, nationalTeam: null, position: null, cardPositions: [], ...s });
 
 describeDb('importPlayerStatuses', () => {
   let sql: postgres.Sql;
@@ -52,6 +52,31 @@ describeDb('importPlayerStatuses', () => {
       { sorare_slug: 'vitinha', nt: 'portugal', kind: 'national', picture_url: 'https://f/PT.png', competition_id: null },
     ]);
     expect((await repo.nationalTeamsOfPlayers()).map((t) => t.sorareSlug)).toEqual(['portugal']);
+  });
+
+  it('club actuel d’après l’effectif Sorare, postes des cartes ; joueurs partis détachés', async () => {
+    await repo.upsertPlayer({ name: 'Greenwood', sorareSlug: 'greenwood', position: 'Forward', teamId: (await sql`select id from teams where sorare_slug = 'psg'`)[0].id });
+    await sql`update players set profile_updated_at = now()`;
+    const sorare = {
+      clubPlayers: async (s: string) => (s === 'om'
+        ? [status('nuno-mendes', { position: 'Defender', cardPositions: ['Defender', 'Midfielder'] })]
+        : [status('vitinha')]),
+    } as unknown as SorareClient;
+    await importPlayerStatuses({ sorare, repo }, [league]);
+    const rows = await sql`select p.sorare_slug, t.sorare_slug as club, p.card_positions, p.profile_updated_at is null as profile_requested
+      from players p left join teams t on t.id = p.team_id order by 1`;
+    expect(rows).toEqual([
+      { sorare_slug: 'greenwood', club: null, card_positions: null, profile_requested: true },
+      { sorare_slug: 'nuno-mendes', club: 'om', card_positions: ['Defender', 'Midfielder'], profile_requested: false },
+      { sorare_slug: 'vitinha', club: 'psg', card_positions: null, profile_requested: false },
+    ]);
+  });
+
+  it('effectif d’un club indisponible : personne n’est détaché', async () => {
+    const sorare = { clubPlayers: async (s: string) => { if (s === 'om') throw new Error('timeout'); return []; } } as unknown as SorareClient;
+    await importPlayerStatuses({ sorare, repo }, [league]);
+    const [{ count }] = await sql`select count(*)::int as count from players where team_id is null`;
+    expect(count).toBe(0);
   });
 
   it('blessure guérie : effacée au prochain import', async () => {

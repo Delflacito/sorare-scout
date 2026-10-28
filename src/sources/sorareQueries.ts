@@ -41,7 +41,7 @@ export const GAME_DETAIL_QUERY = `query GameDetail($id: ID!) {
 /** Joueurs actifs d'un club : statut de jeu, blessures, suspensions, projection Sorare du prochain match, photo. */
 export const CLUB_PLAYERS_QUERY = `query ClubPlayers($slug: String!) {
   football { club(slug: $slug) { activePlayers(first: 100) { nodes {
-    slug squaredPictureUrl playingStatus
+    slug squaredPictureUrl playingStatus position cardPositions
     activeInjuries { kind expectedEndDate }
     activeSuspensions { reason endDate }
     nextClassicFixtureProjectedScore
@@ -56,7 +56,7 @@ const SEASON_STATS = 'appearances substituteIn goals assists minutesPlayed yello
 export function playerProfilesQuery(count: number, seasons: number[]): string {
   const vars = Array.from({ length: count }, (_, i) => `$p${i}: String!`).join(', ');
   const players = Array.from({ length: count }, (_, i) => `p${i}: anyPlayer(slug: $p${i}) { ... on Player {
-    slug birthDate country { code name flagUrl }
+    slug birthDate country { code name flagUrl } activeClub { slug name pictureUrl }
     ${seasons.map((y) => `s${y}: stats(seasonStartYear: ${y}) { ${SEASON_STATS} }`).join('\n    ')}
   } }`).join('\n  ');
   return `query PlayerProfiles(${vars}) {\n  ${players}\n}`;

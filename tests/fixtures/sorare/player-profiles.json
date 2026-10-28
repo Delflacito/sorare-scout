@@ -34,6 +34,11 @@
     "minutesPlayed": 0,
     "yellowCards": 0,
     "redCards": 0
+   },
+   "activeClub": {
+    "slug": "real-madrid-madrid",
+    "name": "Real Madrid",
+    "pictureUrl": "https://t/rm.png"
    }
   },
   "p1": null

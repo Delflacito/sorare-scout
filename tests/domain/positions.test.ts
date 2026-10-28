@@ -81,3 +81,28 @@ describe('compo Sorare', () => {
     expect(formationOf([])).toBeNull();
   });
 });
+
+describe('lignes de 5 : placement Opta', () => {
+  const pl = (slug: string) => ({ slug });
+  const row = (...slugs: string[]) => slugs.map(pl);
+  it('3-5-2 de Mayence : pistons repérés par leur numéro (2 droit, 3 gauche), quel que soit leur rang', () => {
+    const rows = [row('gk'), row('d6', 'd5', 'd4'), row('lee', 'sano', 'amiri', 'caci', 'mwene'), row('becker', 'tietz')];
+    const places = new Map([['gk', 1], ['d6', 6], ['d5', 5], ['d4', 4], ['lee', 7], ['sano', 11], ['amiri', 8], ['caci', 2], ['mwene', 3], ['becker', 10], ['tietz', 9]]);
+    const pos = lineupPositions(rows, places);
+    expect([pos.get('caci'), pos.get('mwene'), pos.get('lee'), pos.get('sano'), pos.get('amiri')]).toEqual(['RWB', 'LWB', 'CM', 'CM', 'CM']);
+    expect(pos.get('d5')).toBe('CB');
+  });
+  it('défense à 5 et milieu à 5 devant une défense à 4', () => {
+    const back5 = lineupPositions([row('gk'), row('a', 'b', 'c', 'd', 'e'), row('m1', 'm2', 'm3'), row('s1', 's2')],
+      new Map([['a', 5], ['b', 3], ['c', 6], ['d', 2], ['e', 4]]));
+    expect(['a', 'b', 'c', 'd', 'e'].map((x) => back5.get(x))).toEqual(['CB', 'LWB', 'CB', 'RWB', 'CB']);
+    const mid5 = lineupPositions([row('gk'), row('rb', 'cb1', 'cb2', 'lb'), row('a', 'b', 'c', 'd', 'e'), row('st')],
+      new Map([['a', 4], ['b', 11], ['c', 8], ['d', 7], ['e', 10]]));
+    expect(['a', 'b', 'c', 'd', 'e'].map((x) => mid5.get(x))).toEqual(['CM', 'LW', 'CM', 'RW', 'CM']);
+  });
+  it('sans numéro de placement : règle par côté inchangée', () => {
+    const pos = lineupPositions([row('gk'), row('d1', 'd2', 'd3'), row('r', 'x', 'y', 'z', 'l'), row('s1', 's2')]);
+    expect(pos.get('r')).toBe('RWB');
+    expect(pos.get('l')).toBe('LWB');
+  });
+});
