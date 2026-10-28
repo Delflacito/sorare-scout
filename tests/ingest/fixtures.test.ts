@@ -127,4 +127,19 @@ describeDb('importFixtures', () => {
     expect(r.errors).toEqual(['match Game:1 : timeout']);
     expect(r.fixturesImported).toBe(1);
   });
+
+  it('budget de temps dépassé : aucun nouveau match complété, les matchs sont tout de même enregistrés', async () => {
+    const f = fakeSorare();
+    const r = await importFixtures({ ...f, repo }, [league], { deadline: Date.now() - 1 });
+    expect(f.detailCalls).toEqual([]);
+    expect(r.fixturesImported).toBe(0);
+    const [{ count }] = await sql`select count(*)::int as count from fixtures`;
+    expect(count).toBe(3);
+  });
+
+  it('les matchs les plus récents sont complétés en premier', async () => {
+    const f = fakeSorare();
+    await importFixtures({ ...f, repo }, [league]);
+    expect(f.detailCalls).toEqual(['Game:1', 'Game:2']);
+  });
 });
