@@ -322,6 +322,15 @@ describeDb('Ma Game Week et journée', () => {
     expect(boost.map((p) => [p.slug, p.base])).toEqual([['greenwood', 40], ['nuno-mendes', 90]]);
   });
 
+  it('cartes à plusieurs postes : le joueur apparaît dans chaque section', async () => {
+    await sql`update players set card_positions = '{Defender,Midfielder}' where sorare_slug = 'nuno-mendes'`;
+    const fixtures = await q.getGameWeekFixtures();
+    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: false, limit: 10 });
+    expect(players.map((p) => [p.slug, p.position])).toEqual([['nuno-mendes', 'Defender'], ['nuno-mendes', 'Midfielder'], ['greenwood', 'Forward']]);
+    const mids = await q.searchPlayers({ sort: 'l5', position: 'Midfielder', offset: 0 });
+    expect(mids.map((r) => r.slug)).toContain('nuno-mendes');
+  });
+
   it('adversaires par poste : ce que concède l’adversaire de chaque équipe', async () => {
     const fixtures = await q.getGameWeekFixtures();
     const m = await q.getRoundMatchups(fixtures.map((f) => f.id));

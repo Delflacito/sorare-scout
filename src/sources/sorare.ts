@@ -21,9 +21,13 @@ export interface SorarePlayerStatus {
   suspension: { reason: string | null; end: string | null } | null;
   projection: number | null;
   nationalTeam: { slug: string; name: string; pictureUrl: string | null } | null;
+  /** Poste principal Sorare et postes où ses cartes peuvent être alignées. */
+  position: GenericPosition | null;
+  cardPositions: GenericPosition[];
 }
 interface RawPlayerStatus {
   slug: string; squaredPictureUrl: string | null; playingStatus: string | null;
+  position?: GenericPosition | null; cardPositions?: GenericPosition[] | null;
   activeInjuries: { kind: string | null; expectedEndDate: string | null }[] | null;
   activeSuspensions: { reason: string | null; endDate: string | null }[] | null;
   nextClassicFixtureProjectedScore: number | null;
@@ -44,6 +48,8 @@ export interface SorarePlayerScore {
   score: number; decisive: number; allAround: number; minutes: number; started: boolean;
   /** Actions décisives du match (goals, goal_assist, clean_sheet_60, red_card…) et leur nombre. */
   actions: Record<string, number>;
+  /** Numéro de placement Opta du titulaire (2 = latéral droit, 3 = gauche…), null s'il est inconnu. */
+  formationPlace: number | null;
 }
 export interface SorareSeasonStats {
   startYear: number; appearances: number; substituteIn: number; goals: number; assists: number;
@@ -53,6 +59,8 @@ export interface SorareSeasonStats {
 export interface SorarePlayerProfile {
   slug: string; birthDate: string | null;
   country: { code: string; name: string; flagUrl: string | null } | null;
+  /** Club actuel (peut être hors des championnats suivis). */
+  activeClub: { slug: string; name: string; pictureUrl: string | null } | null;
   seasons: SorareSeasonStats[];
 }
 interface RawSeasonStats {
@@ -93,6 +101,7 @@ function toScore(s: RawScore): SorarePlayerScore {
     minutes: s.anyPlayerGameStats?.minsPlayed ?? 0,
     started: s.anyPlayerGameStats?.gameStarted === 1,
     actions: Object.fromEntries(details.filter((d) => DECISIVE.has(d.category) && d.statValue).map((d) => [d.stat, d.statValue!])),
+    formationPlace: s.anyPlayerGameStats?.formationPlace || null,
   };
 }
 
@@ -154,6 +163,8 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
           nationalTeam: p.activeNationalTeam
             ? { slug: p.activeNationalTeam.slug, name: p.activeNationalTeam.name, pictureUrl: p.activeNationalTeam.pictureUrl ?? null }
             : null,
+          position: p.position ?? null,
+          cardPositions: p.cardPositions ?? (p.position ? [p.position] : []),
         };
       });
     },
@@ -174,12 +185,14 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
     /** Identité et statistiques de championnat par saison ; les joueurs introuvables sont ignorés. */
     async playerProfiles(slugs: string[], seasons: number[]): Promise<SorarePlayerProfile[]> {
       if (!slugs.length) return [];
-      type Raw = { slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null } & Record<string, unknown>;
+      type Club = { slug: string; name: string; pictureUrl: string | null };
+      type Raw = { slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null; activeClub?: Club | null } & Record<string, unknown>;
       const d = await query<Record<string, Raw | null>>(playerProfilesQuery(slugs.length, seasons), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
       return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
         slug: p.slug,
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : null,
         country: p.country ? { code: p.country.code, name: p.country.name, flagUrl: p.country.flagUrl ?? null } : null,
+        activeClub: p.activeClub ? { slug: p.activeClub.slug, name: p.activeClub.name, pictureUrl: p.activeClub.pictureUrl ?? null } : null,
         seasons: seasons
           .map((y) => [y, p[`s${y}`] as RawSeasonStats | null] as const)
           .filter(([, st]) => st && (st.appearances ?? 0) > 0)

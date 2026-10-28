@@ -105,12 +105,13 @@ async function completeFixture(deps: FixturesDeps, fixture: FixtureToComplete, t
     await deps.repo.countLineupAttempt(fixture.id);
     return false;
   }
+  const places = new Map(detail.scores.filter((s) => s.formationPlace).map((s) => [s.playerSlug, s.formationPlace!]));
   const sides = [
     { team: teamsById.get(fixture.homeTeamId)!, lineup: detail.home },
     { team: teamsById.get(fixture.awayTeamId)!, lineup: detail.away },
   ].map((s) => ({
     ...s,
-    positions: lineupPositions(s.lineup.starting),
+    positions: lineupPositions(s.lineup.starting, places),
     grid: gridOf(s.lineup),
     members: new Set([...s.lineup.starting.flat(), ...s.lineup.bench].map((p) => p.slug)),
   }));

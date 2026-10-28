@@ -13,7 +13,7 @@ const game = (id: string, date: string, home: string, away: string, status: Sora
     home: team(home, kind), away: team(away, kind), homeGoals: 1, awayGoals: 0, status });
 const pl = (slug: string) => ({ slug, displayName: slug });
 const score = (playerSlug: string, position: SorarePlayerScore['position'], s: number, minutes = 90, started = true, actions: Record<string, number> = {}): SorarePlayerScore =>
-  ({ playerSlug, displayName: playerSlug, position, score: s, decisive: 35, allAround: s - 35, minutes, started, actions });
+  ({ playerSlug, displayName: playerSlug, position, score: s, decisive: 35, allAround: s - 35, minutes, started, actions, formationPlace: null });
 
 const G1 = game('Game:1', '2026-10-25T19:00:00Z', 'psg', 'om');
 const G2 = game('Game:2', '2026-10-18T19:00:00Z', 'om', 'psg');
@@ -157,6 +157,17 @@ describeDb('importFixtures', () => {
     const again = fakeSorare();
     await importFixtures({ ...again, repo }, [league]);
     expect(again.detailCalls).toEqual([]);
+  });
+
+  it('réimport d’un ancien match : le club actuel du joueur n’est pas écrasé', async () => {
+    await importFixtures({ ...fakeSorare(), repo }, [league]);
+    const competitionId = (await sql`select id from competitions`)[0].id;
+    const ol = await repo.upsertTeam({ name: 'OL', sorareSlug: 'ol', competitionId });
+    await sql`update players set team_id = ${ol} where sorare_slug = 'greenwood'`; // transféré depuis
+    await sql`update fixtures set stats_version = 1`;
+    await importFixtures({ ...fakeSorare(), repo }, [league]);
+    const [g] = await sql`select t.sorare_slug from players p join teams t on t.id = p.team_id where p.sorare_slug = 'greenwood'`;
+    expect(g.sorare_slug).toBe('ol');
   });
 
   it('relance : aucun doublon, aucun match redemandé', async () => {

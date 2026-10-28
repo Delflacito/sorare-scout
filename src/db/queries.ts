@@ -179,7 +179,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`})` : sql``}
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
-          ${f.position ? sql`and p.position = ${f.position}` : sql``}
+          ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
           ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
@@ -227,20 +227,22 @@ export function createQueries(sql: postgres.Sql) {
       if (!fixtureIds.length) return [];
       const rows = await sql`
         select * from (
-          select p.sorare_slug, p.name, p.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
+          select p.sorare_slug, p.name, g.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
             o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
             s.next_projected, s.start_rate5, s.l15, s.base, p.playing_status, p.sorare_projection,
-            row_number() over (partition by p.position order by
+            row_number() over (partition by g.position order by
               ${f.sort === 'boost' ? sql`s.next_projected - s.base` : sql`s.next_projected`} desc, p.name) as rank
           from player_summary s
           join players p on p.id = s.player_id
+          -- Une ligne par poste où ses cartes peuvent être alignées.
+          cross join lateral unnest(coalesce(p.card_positions, array[p.position])) as g(position)
           join teams t on t.id = p.team_id
           join fixtures fx on fx.id = s.next_fixture_id
           join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
           where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null and s.base is not null
             and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
             ${f.startersOnly ? sql`and s.start_rate5 >= 0.6` : sql``}
-            ${f.position ? sql`and p.position = ${f.position}` : sql``}
+            ${f.position ? sql`and g.position = ${f.position}` : sql``}
         ) x where rank <= ${f.limit}
         order by array_position(array['Goalkeeper','Defender','Midfielder','Forward'], position), rank`;
       return rows.map((r) => ({

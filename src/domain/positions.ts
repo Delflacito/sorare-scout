@@ -51,15 +51,36 @@ export function formationOf(rows: unknown[][]): string | null {
   return rows.length > 1 ? rows.slice(1).map((r) => r.length).join('-') : null;
 }
 
-/** Poste précis de chaque titulaire d'une compo Sorare (lignes du gardien à l'attaque, rangées de droite à gauche). */
-export function lineupPositions(rows: { slug: string }[][]): Map<string, DetailedPosition> {
+/**
+ * Lignes de 5 : Sorare ne les range pas par côté (ex. 3-5-2 : milieux axiaux puis pistons). On s'appuie alors sur le
+ * numéro de placement Opta, fixe d'une formation à l'autre : 2 = latéral / piston droit, 3 = gauche ;
+ * 7 et 11 = ailiers droit et gauche d'un milieu à 5 devant une défense à 4.
+ */
+function fiveManLine(row: { slug: string }[], lineIndex: number, backThree: boolean, places: Map<string, number>): Map<string, DetailedPosition> | null {
+  const placeOf = (p: { slug: string }) => places.get(p.slug);
+  const has = (n: number) => row.some((p) => placeOf(p) === n);
+  const [right, left, inner]: [number, number, DetailedPosition] =
+    lineIndex === 0 ? [2, 3, 'CB'] : backThree ? [2, 3, 'CM'] : [7, 11, 'CM'];
+  if (!has(right) || !has(left)) return null;
+  const wideRight: DetailedPosition = lineIndex === 0 || backThree ? 'RWB' : 'RW';
+  const wideLeft: DetailedPosition = lineIndex === 0 || backThree ? 'LWB' : 'LW';
+  return new Map(row.map((p) => [p.slug, placeOf(p) === right ? wideRight : placeOf(p) === left ? wideLeft : inner]));
+}
+
+/**
+ * Poste précis de chaque titulaire d'une compo Sorare (lignes du gardien à l'attaque, rangées de droite à gauche).
+ * `places` : numéro de placement Opta de chaque joueur, quand Sorare le fournit.
+ */
+export function lineupPositions(rows: { slug: string }[][], places: Map<string, number> = new Map()): Map<string, DetailedPosition> {
   const formation = formationOf(rows);
   const result = new Map<string, DetailedPosition>();
-  rows.forEach((row, r) =>
+  const backThree = rows[1]?.length === 3;
+  rows.forEach((row, r) => {
+    const five = r > 0 && row.length === 5 ? fiveManLine(row, r - 1, backThree, places) : null;
     row.forEach((player, c) => {
-      const pos = detailedPosition(formation, `${r + 1}:${c + 1}`, 'right');
+      const pos = five?.get(player.slug) ?? detailedPosition(formation, `${r + 1}:${c + 1}`, 'right');
       if (pos) result.set(player.slug, pos);
-    }),
-  );
+    });
+  });
   return result;
 }

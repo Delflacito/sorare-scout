@@ -17,6 +17,10 @@ export interface PlayerStatusInput {
   suspension: { reason: string | null; end: string | null } | null;
   projection: number | null;
   nationalTeamId?: number | null;
+  /** Club suivi dans l'effectif duquel Sorare le liste (club actuel). */
+  teamId?: number | null;
+  position?: GenericPosition | null;
+  cardPositions?: GenericPosition[];
 }
 export interface PlayerInput { name: string; sorareSlug: string; position: GenericPosition; teamId: number }
 export interface FixtureInput {
@@ -31,6 +35,7 @@ export interface AppearanceInput {
 }
 export interface PlayerProfileInput {
   slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null;
+  activeClub?: { slug: string; name: string; pictureUrl: string | null } | null;
   seasons: { startYear: number; appearances: number; substituteIn: number; goals: number; assists: number; minutes: number; yellowCards: number; redCards: number }[];
 }
 export interface PlayerSummaryRow {
@@ -67,8 +72,11 @@ export interface VenueFactorRow { competitionId: number; home: number; away: num
 /** tracked : club d'un championnat suivi (ses joueurs sont importés). */
 export interface TeamRow { id: number; name: string; sorareSlug: string; tracked?: boolean }
 
-/** Version du détail de match importé ; 2 : actions décisives. Les matchs d'une version antérieure sont réimportés. */
-export const STATS_VERSION = 2;
+/**
+ * Version du détail de match importé ; les matchs d'une version antérieure sont réimportés.
+ * 2 : actions décisives ; 3 : pistons et ailiers des lignes de 5 repérés par leur placement Opta.
+ */
+export const STATS_VERSION = 3;
 /** Délai avant de rafraîchir l'identité et l'historique d'un joueur. */
 const PROFILE_REFRESH_DAYS = 7;
 
@@ -134,7 +142,8 @@ function createBaseRepo(sql: Sql) {
     async upsertPlayer(p: PlayerInput): Promise<number> {
       const [r] = await sql`
         insert into players (name, sorare_slug, position, team_id) values (${p.name}, ${p.sorareSlug}, ${p.position}, ${p.teamId})
-        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position, team_id = excluded.team_id
+        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
+          team_id = coalesce(players.team_id, excluded.team_id)
         returning id`;
       return r.id;
     },
@@ -146,7 +155,9 @@ function createBaseRepo(sql: Sql) {
         const res = await sql`update players set picture_url = coalesce(${r.pictureUrl}, picture_url), playing_status = ${r.playingStatus},
           injury_kind = ${r.injury?.kind ?? null}, injury_end = ${r.injury?.expectedEnd ?? null},
           suspension_reason = ${r.suspension?.reason ?? null}, suspension_end = ${r.suspension?.end ?? null},
-          sorare_projection = ${r.projection}, national_team_id = ${r.nationalTeamId ?? null}, status_updated_at = now()
+          sorare_projection = ${r.projection}, national_team_id = ${r.nationalTeamId ?? null}, status_updated_at = now(),
+          team_id = coalesce(${r.teamId ?? null}, team_id), position = coalesce(${r.position ?? null}, position),
+          card_positions = coalesce(${r.cardPositions?.length ? r.cardPositions : null}::text[], card_positions)
           where sorare_slug = ${r.slug}`;
         updated += res.count;
       }
@@ -253,6 +264,18 @@ function createBaseRepo(sql: Sql) {
       )}`;
     },
 
+    /**
+     * Joueurs rattachés à un club suivi qui ne figurent plus dans aucun effectif (partis hors des championnats suivis) :
+     * détachés, et leur profil est redemandé pour connaître leur nouveau club.
+     */
+    async releasePlayersNotIn(listedSlugs: string[]): Promise<number> {
+      const rows = await sql`update players set team_id = null, profile_updated_at = null
+        where team_id in (select id from teams where competition_id is not null and kind = 'club')
+          and not (sorare_slug = any(${listedSlugs}))
+        returning id`;
+      return rows.length;
+    },
+
     /** Joueurs dont l'identité et l'historique sont absents ou plus vieux qu'une semaine, les plus anciens d'abord. */
     async playersNeedingProfile(): Promise<string[]> {
       const rows = await sql`select sorare_slug from players
@@ -268,6 +291,15 @@ function createBaseRepo(sql: Sql) {
           country_name = ${p.country?.name ?? null}, country_flag_url = ${p.country?.flagUrl ?? null}, profile_updated_at = now()
           where sorare_slug = ${p.slug} returning id`;
         if (!player) continue;
+        // Club actuel hors des championnats suivis : seulement pour un joueur qui n'est plus dans un effectif suivi.
+        if (p.activeClub) {
+          const [club] = await sql`
+            insert into teams (name, sorare_slug, picture_url, kind) values (${p.activeClub.name}, ${p.activeClub.slug}, ${p.activeClub.pictureUrl}, 'club')
+            on conflict (sorare_slug) do update set picture_url = coalesce(teams.picture_url, excluded.picture_url)
+            returning id`;
+          await sql`update players set team_id = ${club.id} where id = ${player.id} and (team_id is null
+            or team_id not in (select id from teams where competition_id is not null and kind = 'club'))`;
+        }
         await sql`delete from player_seasons where player_id = ${player.id}`;
         if (p.seasons.length) await sql`insert into player_seasons ${sql(p.seasons.map((x) => ({
           player_id: player.id, start_year: x.startYear, appearances: x.appearances, substitute_in: x.substituteIn, goals: x.goals,
