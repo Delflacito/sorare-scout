@@ -35,15 +35,18 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Photos des joueurs et logos des clubs
-await probe('Player (images)', (c) => `{ anyPlayer(slug: "desire-doue") { ... on Player { ${c} } } }`, [
-  'pictureUrl', 'avatarPictureUrl', 'squaredPictureUrl', 'avatarUrl', 'imageUrl', 'photoUrl', 'xyzPicture', 'xyzAvatar', 'xyzImage', 'xyzUrl',
+// Sélections nationales et autres compétitions
+const GF = 'id date statusTyped homeGoals awayGoals homeTeam { __typename slug name pictureUrl } awayTeam { __typename slug name pictureUrl } competition { slug displayName }';
+await sample('psg-games-all', `{ football { club(slug: "psg-paris") { latestGames(first: 15) { nodes { ${GF} } } } } }`);
+await probe('Player (sélection)', (c) => `{ anyPlayer(slug: "desire-doue") { ... on Player { ${c} } } }`, [
+  'activeNationalTeam', 'nationalTeam', 'national', 'xyzNational', 'country', 'activeClub', 'activeTeams', 'xyzTeam',
 ]);
-await probe('Club (images)', (c) => `{ football { club(slug: "psg-paris") { ${c} } } }`, [
-  'pictureUrl', 'emblemUrl', 'logoUrl', 'crestUrl', 'shieldUrl', 'imageUrl', 'xyzPicture', 'xyzEmblem', 'xyzLogo', 'xyzUrl',
-  'code', 'shortName', 'xyzName', 'domesticLeague { slug }',
+await sample('player-nt', `{ anyPlayer(slug: "desire-doue") { ... on Player { activeNationalTeam { slug name pictureUrl } } } }`);
+await probe('Football (sélection)', (c) => `{ football { ${c}(slug: "france") { slug } } }`, ['nationalTeam', 'team', 'xyzNational']);
+await sample('nt-games', `{ football { nationalTeam(slug: "france") { slug name latestGames(first: 6) { nodes { ${GF} } } } } }`);
+await probe('Competition (type)', (c) => `{ football { competition(slug: "champions-league-europe") { ${c} } } }`, [
+  'slug', 'displayName', 'format', 'type', 'competitionType', 'xyzType', 'country { slug }', 'xyzFormat',
 ]);
-await sample('club-players-images', `{ football { club(slug: "psg-paris") { pictureUrl activePlayers(first: 3) { nodes { slug pictureUrl avatarPictureUrl squaredPictureUrl } } } } }`);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
