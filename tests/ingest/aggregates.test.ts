@@ -92,6 +92,31 @@ describeDb('recomputeAggregates', () => {
     expect(v.observations).toBe(8);
   });
 
+  it('coupes et sélections : comptent pour le joueur, pas pour le concédé ni l’avantage du terrain', async () => {
+    const ucl = await repo.upsertCompetition({ slug: 'ucl', name: 'Champions League', isLeague: false });
+    const nl = await repo.upsertCompetition({ slug: 'nl', name: 'Nations League', isLeague: false });
+    const z = await repo.ensureTeam({ name: 'Z', sorareSlug: 'Z', pictureUrl: null, kind: 'club' });
+    const p = await repo.ensureTeam({ name: 'P', sorareSlug: 'P', pictureUrl: null, kind: 'national' });
+    const q = await repo.ensureTeam({ name: 'Q', sorareSlug: 'Q', pictureUrl: null, kind: 'national' });
+    const cup = await repo.upsertFixture({ date: '2026-10-04T20:00:00Z', competitionId: ucl, homeTeamId: ids.A, awayTeamId: z, homeGoals: 0, awayGoals: 0, status: 'played', sorareGameId: 'cup' });
+    const nt = await repo.upsertFixture({ date: '2026-10-05T20:00:00Z', competitionId: nl, homeTeamId: p, awayTeamId: q, homeGoals: 0, awayGoals: 0, status: 'played', sorareGameId: 'nt' });
+    for (const f of [cup, nt]) await repo.markLineupsImported(f, null, null);
+    await repo.upsertAppearance({ fixtureId: cup, playerId: ids.a1, teamId: ids.A, grid: null, detailedPosition: 'LB', started: true, minutes: 90, score: 100, decisive: 0, allAround: 100 });
+    await repo.upsertAppearance({ fixtureId: nt, playerId: ids.a1, teamId: p, grid: null, detailedPosition: 'LB', started: true, minutes: 90, score: 90, decisive: 0, allAround: 90 });
+    await recomputeAggregates(repo);
+    // a1 : f1 60, f2 50, coupe 100, sélection 90
+    const [a1] = await sql`select l5, start_rate5 from player_summary where player_id = ${ids.a1}`;
+    expect(a1).toEqual({ l5: 75, start_rate5: 1 });
+    // x a quitté A pour C avant le match de coupe : il ne lui est pas compté
+    const [x] = await sql`select l5 from player_summary where player_id = ${ids.x}`;
+    expect(x.l5).toBeCloseTo(70 / 3);
+    expect(await conceded('A', 'LB')).toEqual({ average: 80, league_average: 55, observations: 1, low_sample: true });
+    const [{ count }] = await sql`select count(*)::int as count from team_conceded_overall where team_id in (${z}, ${p}, ${q})`;
+    expect(count).toBe(0);
+    const venues = await sql`select observations from venue_factors`;
+    expect(venues).toEqual([{ observations: 8 }]);
+  });
+
   it('idempotent', async () => {
     await recomputeAggregates(repo);
     await recomputeAggregates(repo);

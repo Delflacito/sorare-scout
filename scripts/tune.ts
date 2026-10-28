@@ -16,7 +16,7 @@ const VALIDATION_ROUNDS = 2;
 
 const sql = getSql();
 const { fixtures, appearances } = await createRepo(sql).aggregateInputs();
-const competitions = await sql`select id from competitions`;
+const competitions = await sql`select id from competitions where is_league`;
 await sql.end();
 
 const train: TuningRow[] = [];

@@ -7,11 +7,14 @@ export const CONCEDED_WINDOWS = [5, 10];
 const USUAL_POSITION_SAMPLE = 10;
 
 const byDateDesc = (a: { date: string }, b: { date: string }) => Date.parse(b.date) - Date.parse(a.date);
+const isLeague = (f: CompletedFixture) => (f.scope ?? 'league') === 'league';
 
+/** Concédé, qualité adverse et avantage du terrain : championnats uniquement (les coupes et sélections n'y entrent pas). */
 function conceded(
-  fixtures: CompletedFixture[],
+  allFixtures: CompletedFixture[],
   apps: AppearanceRow[],
 ): { byPosition: Conceded[]; overall: ConcededOverallRow[]; venues: VenueFactorRow[] } {
+  const fixtures = allFixtures.filter(isLeague);
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
   const rows: Conceded[] = [];
   const overall: ConcededOverallRow[] = [];
@@ -48,20 +51,24 @@ function conceded(
 /**
  * Matchs d'équipe à prendre en compte pour un joueur : pour chaque club, de sa première participation pour ce club
  * jusqu'à sa première participation pour le club suivant (les matchs d'avant son arrivée ne comptent pas).
+ * Matchs de sélection : seulement ceux où il figure sur la feuille de match.
  */
 function playerTeamGames(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>, fixturesByTeam: Map<number, CompletedFixture[]>): TeamGame[] {
+  const national = apps.filter((a) => fixtureById.get(a.fixtureId)!.scope === 'national');
+  const nationalGames = national.map((a) => ({ fixtureId: String(a.fixtureId), date: fixtureById.get(a.fixtureId)!.date, teamId: String(a.teamId) }));
   const stints: { teamId: number; from: number }[] = [];
-  const sorted = [...apps].sort((a, b) => Date.parse(fixtureById.get(a.fixtureId)!.date) - Date.parse(fixtureById.get(b.fixtureId)!.date));
+  const sorted = apps.filter((a) => fixtureById.get(a.fixtureId)!.scope !== 'national').sort((a, b) => Date.parse(fixtureById.get(a.fixtureId)!.date) - Date.parse(fixtureById.get(b.fixtureId)!.date));
   for (const a of sorted) {
     if (stints.at(-1)?.teamId !== a.teamId) stints.push({ teamId: a.teamId, from: Date.parse(fixtureById.get(a.fixtureId)!.date) });
   }
-  return stints.flatMap((s, i) => {
+  const clubGames = stints.flatMap((s, i) => {
     const from = s.from;
     const to = stints[i + 1]?.from ?? Infinity;
     return (fixturesByTeam.get(s.teamId) ?? [])
-      .filter((f) => Date.parse(f.date) >= from && Date.parse(f.date) < to)
+      .filter((f) => f.scope !== 'national' && Date.parse(f.date) >= from && Date.parse(f.date) < to)
       .map((f) => ({ fixtureId: String(f.id), date: f.date, teamId: String(s.teamId) }));
   });
+  return [...clubGames, ...nationalGames];
 }
 
 function usualPosition(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>): DetailedPosition | null {

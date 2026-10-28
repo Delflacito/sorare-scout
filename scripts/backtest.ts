@@ -12,7 +12,7 @@ config({ path: '.env.local', quiet: true });
 
 const sql = getSql();
 const { fixtures, appearances } = await createRepo(sql).aggregateInputs();
-const competitions = await sql`select id, name from competitions order by name`;
+const competitions = await sql`select id, name from competitions where is_league order by name`;
 const players = new Map((await sql`select id, name from players`).map((p) => [p.id as number, p.name as string]));
 const teams = new Map((await sql`select id, name from teams`).map((t) => [t.id as number, t.name as string]));
 

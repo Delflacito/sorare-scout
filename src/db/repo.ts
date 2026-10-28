@@ -5,13 +5,18 @@ import type { Conceded, ConcededOverall } from '@/domain/metrics';
 export type FixtureStatus = 'played' | 'scheduled' | 'postponed';
 export type RunStatus = 'running' | 'ok' | 'error';
 
-export interface CompetitionInput { slug: string; name: string }
+/** isLeague : championnat suivi (par défaut) ; false pour une coupe ou une compétition de sélections. */
+export interface CompetitionInput { slug: string; name: string; isLeague?: boolean }
 export interface TeamInput { name: string; sorareSlug: string; competitionId: number; pictureUrl?: string | null; shortName?: string | null }
+export type TeamKind = 'club' | 'national';
+/** Équipe hors des championnats suivis (adversaire de coupe d'Europe, sélection nationale). */
+export interface OtherTeamInput { name: string; sorareSlug: string; pictureUrl: string | null; kind: TeamKind }
 export interface PlayerStatusInput {
   slug: string; pictureUrl: string | null; playingStatus: string | null;
   injury: { kind: string | null; expectedEnd: string | null } | null;
   suspension: { reason: string | null; end: string | null } | null;
   projection: number | null;
+  nationalTeamId?: number | null;
 }
 export interface PlayerInput { name: string; sorareSlug: string; position: GenericPosition; teamId: number }
 export interface FixtureInput {
@@ -36,9 +41,13 @@ export interface PlayerSummaryRow {
 }
 
 export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
+/** league : championnat ; cup : autre compétition de club ; national : sélections. */
+export type FixtureScope = 'league' | 'cup' | 'national';
 export interface CompletedFixture {
   id: number; competitionId: number; homeTeamId: number; awayTeamId: number; date: string;
   homeGoals?: number | null; awayGoals?: number | null;
+  /** Absent : championnat. */
+  scope?: FixtureScope;
 }
 export interface AppearanceRow {
   fixtureId: number; playerId: number; teamId: number; detailedPosition: DetailedPosition | null;
@@ -46,7 +55,8 @@ export interface AppearanceRow {
 }
 export interface ConcededOverallRow extends ConcededOverall { rating: number | null }
 export interface VenueFactorRow { competitionId: number; home: number; away: number; observations: number }
-export interface TeamRow { id: number; name: string; sorareSlug: string }
+/** tracked : club d'un championnat suivi (ses joueurs sont importés). */
+export interface TeamRow { id: number; name: string; sorareSlug: string; tracked?: boolean }
 
 /** Nombre de tentatives d'import de compo pour un match avant de l'abandonner. */
 export const MAX_LINEUP_ATTEMPTS = 5;
@@ -63,8 +73,8 @@ function createBaseRepo(sql: Sql) {
 
     async upsertCompetition(c: CompetitionInput): Promise<number> {
       const [r] = await sql`
-        insert into competitions (slug, name) values (${c.slug}, ${c.name})
-        on conflict (slug) do update set name = excluded.name
+        insert into competitions (slug, name, is_league) values (${c.slug}, ${c.name}, ${c.isLeague ?? true})
+        on conflict (slug) do update set name = excluded.name, is_league = excluded.is_league
         returning id`;
       return r.id;
     },
@@ -77,6 +87,28 @@ function createBaseRepo(sql: Sql) {
           picture_url = coalesce(excluded.picture_url, teams.picture_url), short_name = coalesce(excluded.short_name, teams.short_name)
         returning id`;
       return r.id;
+    },
+
+    /** Équipe hors championnat suivi : créée si besoin, sans toucher au rattachement d'un club suivi. */
+    async ensureTeam(t: OtherTeamInput): Promise<number> {
+      const [r] = await sql`
+        insert into teams (name, sorare_slug, picture_url, kind) values (${t.name}, ${t.sorareSlug}, ${t.pictureUrl}, ${t.kind})
+        on conflict (sorare_slug) do update set picture_url = coalesce(teams.picture_url, excluded.picture_url)
+        returning id`;
+      return r.id;
+    },
+
+    /** Identifiants des joueurs déjà connus parmi ces slugs. */
+    async playerIdsBySlugs(slugs: string[]): Promise<Map<string, number>> {
+      if (!slugs.length) return new Map();
+      const rows = await sql`select id, sorare_slug from players where sorare_slug = any(${slugs})`;
+      return new Map(rows.map((r) => [r.sorare_slug as string, r.id as number]));
+    },
+
+    /** Sélections nationales des joueurs connus. */
+    async nationalTeamsOfPlayers(): Promise<TeamRow[]> {
+      const rows = await sql`select distinct t.id, t.name, t.sorare_slug from players p join teams t on t.id = p.national_team_id order by t.sorare_slug`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug }));
     },
 
     /** Détache de la compétition les clubs qui n'y figurent plus (relégués). */
@@ -100,7 +132,7 @@ function createBaseRepo(sql: Sql) {
         const res = await sql`update players set picture_url = coalesce(${r.pictureUrl}, picture_url), playing_status = ${r.playingStatus},
           injury_kind = ${r.injury?.kind ?? null}, injury_end = ${r.injury?.expectedEnd ?? null},
           suspension_reason = ${r.suspension?.reason ?? null}, suspension_end = ${r.suspension?.end ?? null},
-          sorare_projection = ${r.projection}, status_updated_at = now()
+          sorare_projection = ${r.projection}, national_team_id = ${r.nationalTeamId ?? null}, status_updated_at = now()
           where sorare_slug = ${r.slug}`;
         updated += res.count;
       }
@@ -147,8 +179,8 @@ function createBaseRepo(sql: Sql) {
     },
 
     async allTeams(): Promise<TeamRow[]> {
-      const rows = await sql`select id, name, sorare_slug from teams`;
-      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug }));
+      const rows = await sql`select id, name, sorare_slug, competition_id is not null and kind = 'club' as tracked from teams`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug, tracked: r.tracked }));
     },
 
     async upsertAppearance(a: AppearanceInput): Promise<void> {
@@ -207,8 +239,10 @@ function createBaseRepo(sql: Sql) {
     /** Matchs joués et complets, avec toutes leurs participations : entrée du recalcul des agrégats. */
     async aggregateInputs(): Promise<{ fixtures: CompletedFixture[]; appearances: AppearanceRow[] }> {
       const fixtures = await sql`
-        select id, competition_id, home_team_id, away_team_id, date, home_goals, away_goals from fixtures
-        where status = 'played' and lineups_imported order by date`;
+        select f.id, f.competition_id, f.home_team_id, f.away_team_id, f.date, f.home_goals, f.away_goals,
+          case when c.is_league then 'league' when h.kind = 'national' then 'national' else 'cup' end as scope
+        from fixtures f join competitions c on c.id = f.competition_id join teams h on h.id = f.home_team_id
+        where f.status = 'played' and f.lineups_imported order by f.date`;
       const appearances = await sql`
         select a.fixture_id, a.player_id, a.team_id, a.detailed_position, a.started, a.minutes,
           a.sorare_score, a.decisive_score, a.all_around_score
@@ -217,7 +251,7 @@ function createBaseRepo(sql: Sql) {
       return {
         fixtures: fixtures.map((f) => ({
           id: f.id, competitionId: f.competition_id, homeTeamId: f.home_team_id, awayTeamId: f.away_team_id,
-          date: (f.date as Date).toISOString(), homeGoals: f.home_goals, awayGoals: f.away_goals,
+          date: (f.date as Date).toISOString(), homeGoals: f.home_goals, awayGoals: f.away_goals, scope: f.scope,
         })),
         appearances: appearances.map((a) => ({
           fixtureId: a.fixture_id, playerId: a.player_id, teamId: a.team_id, detailedPosition: a.detailed_position,

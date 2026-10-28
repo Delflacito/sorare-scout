@@ -53,6 +53,8 @@ export interface PlayerGameView {
   opponentPictureUrl: string | null; opponentShortName: string | null;
   goalsFor: number | null; goalsAgainst: number | null; score: number; minutes: number;
   status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
+  /** Compétition du match ; isLeague = false pour une coupe ou un match de sélection. */
+  competition: string; isLeague: boolean;
 }
 
 export interface TeamView { id: number; name: string; slug: string; competition: string | null }
@@ -197,7 +199,7 @@ export function createQueries(sql: postgres.Sql) {
       const rows = await sql`
         with p as (select id, team_id from players where sorare_slug = ${slug}),
         games as (
-          select f.id, f.date, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals,
+          select f.id, f.date, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals, f.competition_id,
             coalesce(a.team_id, (select team_id from p)) as team_id,
             a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score
           from fixtures f
@@ -206,7 +208,8 @@ export function createQueries(sql: postgres.Sql) {
             and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
         )
         select g.*, o.name as opponent, o.sorare_slug as opponent_slug, o.picture_url as opponent_picture_url,
-          o.short_name as opponent_short_name from games g
+          o.short_name as opponent_short_name, c.name as competition, c.is_league from games g
+        join competitions c on c.id = g.competition_id
         join teams o on o.id = case when g.home_team_id = g.team_id then g.away_team_id else g.home_team_id end
         order by g.date desc limit ${limit}`;
       return rows.map((g) => ({
@@ -218,6 +221,7 @@ export function createQueries(sql: postgres.Sql) {
         score: g.sorare_score ?? 0, minutes: g.minutes ?? 0,
         status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
         position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
+        competition: g.competition, isLeague: g.is_league,
       }));
     },
 
@@ -302,11 +306,12 @@ export function createQueries(sql: postgres.Sql) {
       return rows.map(toConceded);
     },
 
-    /** Derniers matchs complets de l'équipe (ceux qui entrent dans la fenêtre du concédé). */
+    /** Derniers matchs de championnat complets de l'équipe (ceux qui entrent dans la fenêtre du concédé). */
     async getTeamFixtures(teamId: number, limit: number): Promise<TeamFixtureView[]> {
       const rows = await sql`
         select f.id, f.date, f.home_team_id, f.home_goals, f.away_goals, o.name as opponent, o.sorare_slug as opponent_slug
         from fixtures f
+        join competitions c on c.id = f.competition_id and c.is_league
         join teams o on o.id = case when f.home_team_id = ${teamId} then f.away_team_id else f.home_team_id end
         where ${teamId} in (f.home_team_id, f.away_team_id) and f.status = 'played' and f.lineups_imported
         order by f.date desc limit ${limit}`;
@@ -343,7 +348,7 @@ export function createQueries(sql: postgres.Sql) {
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
-      const rows = await sql`select slug, name from competitions order by name`;
+      const rows = await sql`select slug, name from competitions where is_league order by name`;
       return rows.map((r) => ({ slug: r.slug, name: r.name }));
     },
   };

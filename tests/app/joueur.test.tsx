@@ -30,6 +30,7 @@ const game = (fixtureId: number, day: number, score: number, status: PlayerGameV
   opponentPictureUrl: 'https://t/ol.png', opponentShortName: 'OL', goalsFor: 2, goalsAgainst: 1,
   score, minutes: status === 'absent' ? 0 : status === 'sub' ? 25 : 90, status, position: status === 'started' ? 'LB' : null,
   decisive: status === 'absent' ? 0 : 35, allAround: status === 'absent' ? 0 : score - 35,
+  competition: fixtureId === 3 ? 'Champions League' : 'Ligue 1', isLeague: fixtureId !== 3,
 });
 const games: PlayerGameView[] = [game(4, 25, 70, 'started'), game(3, 18, 44, 'sub'), game(2, 11, 0, 'absent'), game(1, 4, 81.5, 'started')];
 const upcoming: UpcomingView = {
@@ -104,6 +105,8 @@ describe('/joueurs/[slug]', () => {
     const rows = within(screen.getByRole('table', { name: 'Derniers matchs' })).getAllByRole('row').slice(1);
     expect(within(rows[0]).getByRole('link', { name: /Olympique Lyonnais/ })).toHaveAttribute('href', '/matchs/4');
     expect(within(rows[2]).getByText('absent')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Champions League')).toBeInTheDocument();
+    expect(within(rows[0]).queryByText('Ligue 1')).not.toBeInTheDocument();
   });
 
   it('joueur inconnu → notFound', async () => {

@@ -7,8 +7,10 @@ import type { SorareClient, SorareGame, SorareGameDetail, SorarePlayerScore } fr
 
 const league: League = { key: 'ligue1', name: 'Ligue 1', sorareSlug: 'ligue-1-fr' };
 
-const game = (id: string, date: string, home: string, away: string, status: SorareGame['status'] = 'played', competitionSlug = 'ligue-1-fr'): SorareGame =>
-  ({ id, date, homeClubSlug: home, awayClubSlug: away, competitionSlug, homeGoals: 1, awayGoals: 0, status });
+const team = (slug: string, kind: 'club' | 'national' = 'club') => ({ slug, name: slug.toUpperCase(), pictureUrl: `https://t/${slug}.png`, kind });
+const game = (id: string, date: string, home: string, away: string, status: SorareGame['status'] = 'played', competitionSlug = 'ligue-1-fr', kind: 'club' | 'national' = 'club'): SorareGame =>
+  ({ id, date, homeClubSlug: home, awayClubSlug: away, competitionSlug, competitionName: competitionSlug.toUpperCase(),
+    home: team(home, kind), away: team(away, kind), homeGoals: 1, awayGoals: 0, status });
 const pl = (slug: string) => ({ slug, displayName: slug });
 const score = (playerSlug: string, position: SorarePlayerScore['position'], s: number, minutes = 90, started = true): SorarePlayerScore =>
   ({ playerSlug, displayName: playerSlug, position, score: s, decisive: 35, allAround: s - 35, minutes, started });
@@ -17,6 +19,9 @@ const G1 = game('Game:1', '2026-10-25T19:00:00Z', 'psg', 'om');
 const G2 = game('Game:2', '2026-10-18T19:00:00Z', 'om', 'psg');
 const CUP = game('Game:9', '2026-10-21T19:00:00Z', 'psg', 'om', 'played', 'coupe-de-france');
 const NEXT = game('Game:3', '2026-11-01T20:00:00Z', 'psg', 'om', 'scheduled');
+const UCL = game('Game:7', '2026-10-22T19:00:00Z', 'barcelona', 'psg', 'played', 'uefa-champions-league');
+const UCL_NEXT = game('Game:8', '2026-11-05T20:00:00Z', 'psg', 'bayern', 'scheduled', 'uefa-champions-league');
+const NT = game('Game:nt', '2026-10-10T18:45:00Z', 'portugal', 'spain', 'played', 'uefa-nations-league', 'national');
 
 const DETAIL_G1: SorareGameDetail = {
   // lignes rangées de droite à gauche, comme dans Sorare
@@ -35,14 +40,28 @@ const DETAIL_G2: SorareGameDetail = {
 };
 const EMPTY: SorareGameDetail = { home: { starting: [], bench: [] }, away: { starting: [], bench: [] }, scores: [] };
 
-function fakeSorare(opts: { details?: Record<string, SorareGameDetail | Error>; failingClub?: string } = {}) {
+const DETAIL_UCL: SorareGameDetail = {
+  home: { starting: [[pl('ter-stegen')], [pl('kounde')]], bench: [] },
+  away: { starting: [[pl('donnarumma')], [pl('hakimi'), pl('nuno-mendes')]], bench: [pl('newcomer')] },
+  scores: [score('ter-stegen', 'Goalkeeper', 40), score('kounde', 'Defender', 60), score('nuno-mendes', 'Defender', 66),
+    score('newcomer', 'Forward', 30, 10, false)],
+};
+const DETAIL_NT: SorareGameDetail = {
+  home: { starting: [[pl('costa')], [pl('nuno-mendes')]], bench: [pl('vitinha')] },
+  away: { starting: [[pl('simon')], [pl('cucurella')]], bench: [] },
+  scores: [score('costa', 'Goalkeeper', 50), score('nuno-mendes', 'Defender', 77), score('vitinha', 'Midfielder', 0, 0, false),
+    score('cucurella', 'Defender', 45)],
+};
+
+function fakeSorare(opts: { details?: Record<string, SorareGameDetail | Error>; failingClub?: string; psgGames?: SorareGame[] } = {}) {
   const detailCalls: string[] = [];
   const details = opts.details ?? { 'Game:1': DETAIL_G1, 'Game:2': DETAIL_G2 };
   const sorare = {
     clubGames: async (slug: string) => {
       if (slug === opts.failingClub) throw new Error('Sorare GraphQL: club introuvable');
-      return slug === 'psg' ? [G1, G2, CUP, NEXT] : [G1, G2];
+      return slug === 'psg' ? (opts.psgGames ?? [G1, G2, NEXT]) : [G1, G2];
     },
+    nationalTeamGames: async (slug: string) => (slug === 'portugal' ? [NT] : []),
     gameDetail: async (id: string) => {
       detailCalls.push(id);
       const d = details[id] ?? EMPTY;
@@ -86,14 +105,44 @@ describeDb('importFixtures', () => {
     expect(f).toEqual({ home_formation: '4-3-3', away_formation: '3-4-2' });
   });
 
-  it('ignore les matchs de coupe, garde les matchs à venir', async () => {
-    await importFixtures({ ...fakeSorare(), repo }, [league]);
-    const games = await sql`select sorare_game_id, status from fixtures order by sorare_game_id`;
+  it('matchs de coupe joués importés dans leur compétition (hors championnat), matchs à venir du championnat gardés', async () => {
+    await importFixtures({ ...fakeSorare({ psgGames: [G1, G2, CUP, NEXT] }), repo }, [league]);
+    const games = await sql`select f.sorare_game_id, f.status, c.slug, c.is_league from fixtures f join competitions c on c.id = f.competition_id
+      order by f.sorare_game_id`;
     expect(games).toEqual([
-      { sorare_game_id: 'Game:1', status: 'played' },
-      { sorare_game_id: 'Game:2', status: 'played' },
-      { sorare_game_id: 'Game:3', status: 'scheduled' },
+      { sorare_game_id: 'Game:1', status: 'played', slug: 'ligue-1-fr', is_league: true },
+      { sorare_game_id: 'Game:2', status: 'played', slug: 'ligue-1-fr', is_league: true },
+      { sorare_game_id: 'Game:3', status: 'scheduled', slug: 'ligue-1-fr', is_league: true },
+      { sorare_game_id: 'Game:9', status: 'played', slug: 'coupe-de-france', is_league: false },
     ]);
+  });
+
+  it('Ligue des champions : adversaire créé, joueurs du club suivi importés, ceux de l’adversaire ignorés', async () => {
+    const f = fakeSorare({ psgGames: [G1, UCL, UCL_NEXT], details: { 'Game:1': DETAIL_G1, 'Game:7': DETAIL_UCL } });
+    const r = await importFixtures({ ...f, repo }, [league]);
+    expect(r.errors).toEqual([]);
+    const games = await sql`select sorare_game_id from fixtures order by 1`;
+    expect(games.map((g) => g.sorare_game_id)).toEqual(['Game:1', 'Game:2', 'Game:7']); // match européen à venir non enregistré
+    const [barca] = await sql`select name, picture_url, kind, competition_id from teams where sorare_slug = 'barcelona'`;
+    expect(barca).toEqual({ name: 'BARCELONA', picture_url: 'https://t/barcelona.png', kind: 'club', competition_id: null });
+    const ucl = (await appearances()).filter((a) => a.sorare_game_id === 'Game:7');
+    expect(ucl.map((a) => [a.sorare_slug, a.team])).toEqual([['newcomer', 'psg'], ['nuno-mendes', 'psg']]);
+    const [psg] = await sql`select competition_id from teams where sorare_slug = 'psg'`;
+    expect(psg.competition_id).not.toBeNull();
+  });
+
+  it('sélections : matchs des sélections des joueurs connus, seuls ces joueurs sont importés, club inchangé', async () => {
+    await importFixtures({ ...fakeSorare(), repo }, [league]);
+    const portugal = await repo.ensureTeam({ name: 'Portugal', sorareSlug: 'portugal', pictureUrl: null, kind: 'national' });
+    await repo.updatePlayerStatuses([{ slug: 'nuno-mendes', pictureUrl: null, playingStatus: null, injury: null, suspension: null, projection: null, nationalTeamId: portugal }]);
+    const r = await importFixtures({ ...fakeSorare({ details: { 'Game:nt': DETAIL_NT } }), repo }, [league]);
+    expect(r).toEqual({ fixturesImported: 1, errors: [] });
+    const nt = (await appearances()).filter((a) => a.sorare_game_id === 'Game:nt');
+    expect(nt.map((a) => [a.sorare_slug, a.team, a.sorare_score])).toEqual([['nuno-mendes', 'portugal', 77]]);
+    const [nuno] = await sql`select t.sorare_slug from players p join teams t on t.id = p.team_id where p.sorare_slug = 'nuno-mendes'`;
+    expect(nuno.sorare_slug).toBe('psg');
+    const [spain] = await sql`select kind from teams where sorare_slug = 'spain'`;
+    expect(spain.kind).toBe('national');
   });
 
   it('relance : aucun doublon, aucun match redemandé', async () => {

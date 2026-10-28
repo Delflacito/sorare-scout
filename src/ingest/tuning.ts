@@ -64,7 +64,8 @@ export function buildRoundRows(fixtures: CompletedFixture[], appearances: Appear
     venue: { home: number; away: number };
     goals: (team: number, opp: number) => GoalStats;
   }>();
-  for (const competitionId of new Set(history.map((f) => f.competitionId))) {
+  // Championnats uniquement : les coupes et sélections ne comptent que dans l'historique des joueurs.
+  for (const competitionId of new Set(history.filter((f) => (f.scope ?? 'league') === 'league').map((f) => f.competitionId))) {
     const compFixtures = history.filter((f) => f.competitionId === competitionId);
     const teamFixtures = new Map<number, number[]>();
     for (const f of compFixtures) for (const t of [f.homeTeamId, f.awayTeamId]) teamFixtures.set(t, [...(teamFixtures.get(t) ?? []), f.id]);

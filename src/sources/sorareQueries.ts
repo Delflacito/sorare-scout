@@ -4,12 +4,21 @@ export const CLUBS_QUERY = `query Clubs($slug: String!) {
   football { competition(slug: $slug) { slug teams(first: 50) { nodes { ... on Club { slug name shortName pictureUrl } } } } }
 }`;
 
-const GAME_FIELDS = 'id date statusTyped homeGoals awayGoals homeTeam { slug } awayTeam { slug } competition { slug }';
+const TEAM = '__typename slug name pictureUrl';
+const GAME_FIELDS = `id date statusTyped homeGoals awayGoals homeTeam { ${TEAM} } awayTeam { ${TEAM} } competition { slug displayName }`;
 
 export const CLUB_GAMES_QUERY = `query ClubGames($slug: String!) {
   football { club(slug: $slug) {
     latestGames(first: 40) { nodes { ${GAME_FIELDS} } }
     upcomingGames(first: 5) { ${GAME_FIELDS} }
+  } }
+}`;
+
+/** Matchs d'une sélection nationale (toutes compétitions). */
+export const NATIONAL_TEAM_GAMES_QUERY = `query NationalTeamGames($slug: String!) {
+  football { nationalTeam(slug: $slug) {
+    latestGames(first: 15) { nodes { ${GAME_FIELDS} } }
+    upcomingGames(first: 3) { ${GAME_FIELDS} }
   } }
 }`;
 
@@ -36,5 +45,6 @@ export const CLUB_PLAYERS_QUERY = `query ClubPlayers($slug: String!) {
     activeInjuries { kind expectedEndDate }
     activeSuspensions { reason endDate }
     nextClassicFixtureProjectedScore
+    activeNationalTeam { slug name pictureUrl }
   } } } }
 }`;

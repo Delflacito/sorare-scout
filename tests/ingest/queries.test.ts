@@ -89,6 +89,36 @@ describeDb('fiche joueur', () => {
   });
 });
 
+describeDb('coupes et sélections', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    const ucl = await db.repo.upsertCompetition({ slug: 'ucl', name: 'Champions League', isLeague: false });
+    const barca = await db.repo.ensureTeam({ name: 'Barcelone', sorareSlug: 'barca', pictureUrl: null, kind: 'club' });
+    ids.cup = await db.repo.upsertFixture({ date: '2026-10-21T20:00:00Z', competitionId: ucl, homeTeamId: barca, awayTeamId: ids.ol, homeGoals: 2, awayGoals: 2, status: 'played', sorareGameId: 'cup' });
+    await db.repo.markLineupsImported(ids.cup, null, null);
+    await db.repo.upsertAppearance({ fixtureId: ids.cup, playerId: ids.tagliafico, teamId: ids.ol, grid: null, detailedPosition: 'LB', started: true, minutes: 90, score: 70, decisive: 35, allAround: 35 });
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('derniers matchs du joueur : compétition indiquée', async () => {
+    const [g, h] = await q.getPlayerGames('tagliafico', 15);
+    expect(g).toMatchObject({ fixtureId: ids.cup, opponent: 'Barcelone', competition: 'Champions League', isLeague: false, score: 70, goalsFor: 2 });
+    expect(h).toMatchObject({ competition: 'Ligue 1', isLeague: true });
+  });
+
+  it('fiche équipe et filtres : championnat uniquement', async () => {
+    expect((await q.getTeamFixtures(ids.ol, 5)).map((f) => f.opponent)).not.toContain('Barcelone');
+    expect(await q.listCompetitions()).toEqual([{ slug: 'ligue-1-fr', name: 'Ligue 1' }]);
+    expect((await q.listTeams()).map((t) => t.slug)).toEqual(['ol', 'om', 'psg']);
+  });
+});
+
 describeDb('fiche équipe', () => {
   let sql: postgres.Sql;
   let q: Queries;

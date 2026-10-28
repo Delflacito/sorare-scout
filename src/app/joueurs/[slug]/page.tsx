@@ -146,6 +146,7 @@ function LastGamesTable({ games }: { games: PlayerGameView[] }) {
                   <ClubLogo name={g.opponent} url={g.opponentPictureUrl} />
                   {g.opponent}
                 </Link>
+                {!g.isLeague && <span className="comp-chip">{g.competition}</span>}
               </td>
               <td className="num">{g.goalsFor ?? '–'} – {g.goalsAgainst ?? '–'}</td>
               <td>{STATUS_LABEL[g.status]}</td>
