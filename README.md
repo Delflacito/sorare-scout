@@ -7,7 +7,7 @@ calculé d'après le placement réel des joueurs dans les compositions des match
 - `/joueurs` : explorateur (recherche, filtres ligue / poste / poste précis, tri L5 · L15 · L40 · % titu · indice adversaire)
 - `/joueurs/<slug>` : fiche joueur (scores récents, temps de jeu, Decisive / All-Around, prochain match et ce que l'adversaire concède à son poste)
 - `/equipes/<slug>` : terrain coloré des points concédés par poste (fenêtre 5 ou 10 matchs)
-- `/admin/rapprochement` : état du dernier import et joueurs non appariés
+- `/admin/imports` : état du dernier import
 
 Conception : `docs/superpowers/specs/2026-10-28-sorare-analyse-joueurs-design.md`.
 
@@ -17,7 +17,6 @@ Conception : `docs/superpowers/specs/2026-10-28-sorare-analyse-joueurs-design.md
 - Une base Postgres (Supabase conseillé) avec l'extension `unaccent`. Sur Supabase, utiliser l'adresse du
   **Transaction pooler** (bouton « Connect », port 6543) comme `DATABASE_URL`.
 - Une clé API Sorare : https://sorare.com/settings/developer (envoyée dans l'en-tête `APIKEY`)
-- Une clé API-Football : https://dashboard.api-football.com
 
 ## Installation
 
@@ -29,15 +28,11 @@ cp .env.example .env.local   # puis renseigner les clés et DATABASE_URL
 Appliquer les migrations (`supabase/migrations/*.sql`, dans l'ordre) : via `supabase db push`, ou
 `for f in supabase/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done`.
 
-## Vérifier les API (à faire une fois)
+## Source des données
 
-```bash
-node scripts/spike.mjs
-```
-
-Le script écrit les réponses brutes dans `spike-output/`. Il sert à confirmer les requêtes GraphQL Sorare
-(`src/sources/sorareQueries.ts`) et le sens de la grille API-Football (`GRID_COL1_SIDE` dans
-`src/domain/positions.ts`). Voir `docs/spike-results.md`.
+Tout vient de l'API Sorare, y compris la composition de chaque match (`homeFormation` / `awayFormation`), d'où l'on
+déduit le poste précis de chaque titulaire. Détails : `docs/spike-results.md`. Le workflow « Spike API » (onglet
+Actions) vérifie la clé et sonde le schéma ; il publie ses résultats sur la branche `spike-results`.
 
 ## Import des données
 
@@ -45,13 +40,12 @@ Le script écrit les réponses brutes dans `spike-output/`. Il sert à confirmer
 npm run ingest   # clubs (promotions / relégations), matchs, compos, scores, agrégats
 ```
 
-L'offre gratuite d'API-Football étant limitée (~100 requêtes/jour, ~10/minute), l'import espace ses requêtes, s'arrête
-proprement quand le quota est atteint et reprend au lancement suivant sans doublon. Les premiers jours servent donc à
-rattraper l'historique de la saison. Un match dont la compo reste introuvable est abandonné après 5 tentatives.
-Les clubs non appariés et les formations inconnues sont visibles dans `/admin/rapprochement` et dans le journal d'import.
+Le premier import récupère l'historique de la saison (environ 1 800 matchs sur les 5 championnats, une requête par
+match). Un match dont la compo n'est pas encore publiée est retenté aux imports suivants, puis abandonné après 5 essais.
+Les erreurs éventuelles sont visibles dans `/admin/imports`.
 
 Import automatique : le workflow `.github/workflows/ingest.yml` tourne chaque jour à 05:17 UTC. Créer dans GitHub
-(Settings → Secrets and variables → Actions) les secrets `SORARE_API_KEY`, `API_FOOTBALL_KEY` et `DATABASE_URL`.
+(Settings → Secrets and variables → Actions) les secrets `SORARE_API_KEY` et `DATABASE_URL`.
 
 ## Site
 

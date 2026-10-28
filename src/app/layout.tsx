@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link href="/joueurs" className="brand">Sorare Scout</Link>
           <nav>
             <Link href="/joueurs">Joueurs</Link>{' · '}
-            <Link href="/admin/rapprochement">Imports</Link>
+            <Link href="/admin/imports">Imports</Link>
           </nav>
         </header>
         {children}

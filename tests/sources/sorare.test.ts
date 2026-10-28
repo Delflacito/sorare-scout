@@ -16,7 +16,7 @@ function fakeFetch(byQuery: [RegExp, unknown][]) {
 
 describe('client Sorare', () => {
   it('envoie la clé dans l’en-tête APIKEY et liste les clubs', async () => {
-    const f = fakeFetch([[/clubs/, fixture('clubs')]]);
+    const f = fakeFetch([[/teams/, fixture('clubs')]]);
     const clubs = await createSorareClient('k3y', f.impl).clubs('ligue-1-fr');
     expect(clubs).toEqual([
       { slug: 'psg', name: 'Paris Saint-Germain', competitionSlug: 'ligue-1-fr' },
@@ -25,24 +25,30 @@ describe('client Sorare', () => {
     expect(f.requests[0].headers.get('APIKEY')).toBe('k3y');
   });
 
-  it('matchs d’un club : passés et à venir, statut normalisé', async () => {
+  it('matchs d’un club : passés et à venir, compétition et statut normalisé', async () => {
     const f = fakeFetch([[/latestGames/, fixture('club-games')]]);
-    const games = await createSorareClient('k', f.impl).clubGames('psg');
-    expect(games).toEqual([
-      { id: 'Game:1', date: '2026-10-25T19:00:00Z', homeClubSlug: 'psg', awayClubSlug: 'om', homeGoals: 2, awayGoals: 1, status: 'played' },
-      { id: 'Game:0', date: '2026-10-18T19:00:00Z', homeClubSlug: 'lens', awayClubSlug: 'psg', homeGoals: null, awayGoals: null, status: 'postponed' },
-      { id: 'Game:2', date: '2026-11-01T20:00:00Z', homeClubSlug: 'psg', awayClubSlug: 'lyon', homeGoals: null, awayGoals: null, status: 'scheduled' },
+    const games = await createSorareClient('k', f.impl).clubGames('psg-paris');
+    expect(games.map((g) => [g.id, g.competitionSlug, g.status, g.homeClubSlug, g.awayClubSlug, g.homeGoals])).toEqual([
+      ['Game:aaa', 'ligue-1-fr', 'played', 'psg-paris', 'olympique-lyonnais-lyon', 2],
+      ['Game:bbb', 'champions-league-europe', 'played', 'psg-paris', 'barcelona-barcelona', 1],
+      ['Game:ccc', 'ligue-1-fr', 'postponed', 'lens-lens', 'psg-paris', null],
+      ['Game:ddd', 'ligue-1-fr', 'scheduled', 'psg-paris', 'marseille-marseille', null],
     ]);
   });
 
-  it('scores d’un match', async () => {
-    const f = fakeFetch([[/playerGameScores/, fixture('game-scores')]]);
-    const scores = await createSorareClient('k', f.impl).gameScores('Game:1');
-    expect(scores[0]).toEqual({
-      playerSlug: 'nuno-mendes', displayName: 'Nuno Mendes', clubSlug: 'psg', position: 'Defender',
-      score: 72.4, decisive: 35, allAround: 37.4, minutes: 90,
+  it('détail d’un match : compos, scores, décisif et All-Around', async () => {
+    const f = fakeFetch([[/startingLineup/, fixture('game-detail')]]);
+    const d = await createSorareClient('k', f.impl).gameDetail('Game:aaa');
+    expect(f.requests[0].body.variables).toEqual({ id: 'aaa' });
+    expect(d.home.starting.map((r) => r.length)).toEqual([1, 4, 3, 3]);
+    expect(d.home.starting[1][0]).toEqual({ slug: 'achraf-hakimi', displayName: 'Achraf Hakimi' });
+    expect(d.home.bench).toEqual([{ slug: 'lee-kang-in', displayName: 'Lee Kang-in' }]);
+    expect(d.scores[0]).toEqual({
+      playerSlug: 'desire-doue', displayName: 'Désiré Doué', position: 'Forward',
+      score: 53.6, decisive: 35, allAround: 18.6, minutes: 90, started: true,
     });
-    expect(scores[1]).toMatchObject({ playerSlug: 'theo-hernandez', clubSlug: 'om', decisive: 0, allAround: 0, minutes: 0 });
+    expect(d.scores[1]).toMatchObject({ playerSlug: 'lee-kang-in', minutes: 20, started: false, decisive: 0, allAround: 0 });
+    expect(d.scores[2]).toMatchObject({ playerSlug: 'absent-player', minutes: 0, started: false });
   });
 
   it('erreur GraphQL → exception explicite', async () => {

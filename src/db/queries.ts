@@ -53,9 +53,8 @@ export interface TeamFixtureView {
   goalsFor: number | null; goalsAgainst: number | null;
 }
 
-export interface UnmatchedView { source: 'sorare' | 'apifootball'; name: string; club: string | null; fixture: string | null; date: string | null }
 export interface ImportRunView {
-  startedAt: string; finishedAt: string | null; status: 'running' | 'ok' | 'error' | 'quota_exhausted';
+  startedAt: string; finishedAt: string | null; status: 'running' | 'ok' | 'error';
   fixturesImported: number; errors: string[];
 }
 
@@ -202,20 +201,6 @@ export function createQueries(sql: postgres.Sql) {
       });
     },
 
-    async getUnmatched(): Promise<UnmatchedView[]> {
-      const rows = await sql`
-        select u.source, u.name, u.club, f.date, h.name as home, a.name as away
-        from unmatched_players u
-        left join fixtures f on f.id = u.fixture_id
-        left join teams h on h.id = f.home_team_id
-        left join teams a on a.id = f.away_team_id
-        order by f.date desc nulls last, u.name`;
-      return rows.map((r) => ({
-        source: r.source, name: r.name, club: r.club,
-        fixture: r.home ? `${r.home} – ${r.away}` : null, date: r.date ? (r.date as Date).toISOString() : null,
-      }));
-    },
-
     async getLastRun(): Promise<ImportRunView | null> {
       const [r] = await sql`select * from import_runs order by id desc limit 1`;
       return r
@@ -226,9 +211,9 @@ export function createQueries(sql: postgres.Sql) {
         : null;
     },
 
-    /** Fin du dernier import ayant importé des données (statut ok ou quota atteint). */
+    /** Fin du dernier import réussi. */
     async getLastSuccessfulImport(): Promise<string | null> {
-      const [r] = await sql`select finished_at from import_runs where status in ('ok', 'quota_exhausted') and finished_at is not null
+      const [r] = await sql`select finished_at from import_runs where status = 'ok' and finished_at is not null
         order by finished_at desc limit 1`;
       return r ? (r.finished_at as Date).toISOString() : null;
     },

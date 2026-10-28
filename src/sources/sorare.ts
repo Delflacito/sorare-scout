@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, GAME_SCORES_QUERY } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, GAME_DETAIL_QUERY } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -15,24 +15,48 @@ export const SORARE_COMPETITIONS = {
 
 export interface SorareClub { slug: string; name: string; competitionSlug: string }
 export interface SorareGame {
-  id: string; date: string; homeClubSlug: string; awayClubSlug: string;
+  id: string; date: string; homeClubSlug: string; awayClubSlug: string; competitionSlug: string | null;
   homeGoals: number | null; awayGoals: number | null; status: 'played' | 'scheduled' | 'postponed';
 }
+export interface SorareLineupPlayer { slug: string; displayName: string }
+/** Compo d'une équipe : titulaires par ligne (gardien d'abord, chaque ligne de droite à gauche) et remplaçants. */
+export interface SorareTeamLineup { starting: SorareLineupPlayer[][]; bench: SorareLineupPlayer[] }
 export interface SorarePlayerScore {
-  playerSlug: string; displayName: string; clubSlug: string; position: GenericPosition;
-  score: number; decisive: number; allAround: number; minutes: number;
+  playerSlug: string; displayName: string; position: GenericPosition;
+  score: number; decisive: number; allAround: number; minutes: number; started: boolean;
 }
+export interface SorareGameDetail { home: SorareTeamLineup; away: SorareTeamLineup; scores: SorarePlayerScore[] }
 
 interface RawGame {
-  id: string; date: string; status: string; homeGoals: number | null; awayGoals: number | null;
-  homeTeam: { slug: string }; awayTeam: { slug: string };
+  id: string; date: string; statusTyped: string; homeGoals: number | null; awayGoals: number | null;
+  homeTeam: { slug: string }; awayTeam: { slug: string }; competition: { slug: string } | null;
 }
+interface RawLineup { startingLineup: SorareLineupPlayer[][] | null; bench: SorareLineupPlayer[] | null }
 interface RawScore {
   score: number | null;
-  decisiveScore: { totalScore: number } | null;
-  allAroundStats: { totalScore: number }[] | null;
-  playerGameStats: { minsPlayed: number | null; team: { slug: string } | null } | null;
-  anyPlayer: { slug: string; displayName: string; position: GenericPosition };
+  anyPlayer: { slug: string; displayName: string; anyPositions: GenericPosition[] };
+  anyPlayerGameStats: { minsPlayed: number | null; gameStarted: number | null; formationPlace: number | null } | null;
+  detailedScore: { category: string; stat: string; totalScore: number }[] | null;
+}
+
+/** Catégories du détail de score qui ne relèvent pas de l'All-Around (le décisif est porté par level_score). */
+const NOT_ALL_AROUND = new Set(['UNKNOWN', 'POSITIVE_DECISIVE_STAT', 'NEGATIVE_DECISIVE_STAT']);
+
+const toLineup = (l: RawLineup | null): SorareTeamLineup => ({ starting: l?.startingLineup ?? [], bench: l?.bench ?? [] });
+
+function toScore(s: RawScore): SorarePlayerScore {
+  const details = s.detailedScore ?? [];
+  const sum = (xs: typeof details) => Math.round(xs.reduce((a, x) => a + x.totalScore, 0) * 10) / 10;
+  return {
+    playerSlug: s.anyPlayer.slug,
+    displayName: s.anyPlayer.displayName,
+    position: s.anyPlayer.anyPositions[0] ?? 'Midfielder',
+    score: s.score ?? 0,
+    decisive: sum(details.filter((d) => d.stat === 'level_score')),
+    allAround: sum(details.filter((d) => !NOT_ALL_AROUND.has(d.category))),
+    minutes: s.anyPlayerGameStats?.minsPlayed ?? 0,
+    started: s.anyPlayerGameStats?.gameStarted === 1,
+  };
 }
 
 function gameStatus(s: string): SorareGame['status'] {
@@ -43,8 +67,8 @@ function gameStatus(s: string): SorareGame['status'] {
 }
 
 const toGame = (g: RawGame): SorareGame => ({
-  id: g.id, date: g.date, homeClubSlug: g.homeTeam.slug, awayClubSlug: g.awayTeam.slug,
-  homeGoals: g.homeGoals, awayGoals: g.awayGoals, status: gameStatus(g.status),
+  id: g.id, date: g.date, homeClubSlug: g.homeTeam.slug, awayClubSlug: g.awayTeam.slug, competitionSlug: g.competition?.slug ?? null,
+  homeGoals: g.homeGoals, awayGoals: g.awayGoals, status: gameStatus(g.statusTyped),
 });
 
 export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof fetch = fetch) {
@@ -67,29 +91,22 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
 
   return {
     async clubs(competitionSlug: string): Promise<SorareClub[]> {
-      const d = await query<{ football: { competition: { clubs: { nodes: { slug: string; name: string }[] } } } }>(
+      const d = await query<{ football: { competition: { teams: { nodes: { slug: string; name: string }[] } } } }>(
         CLUBS_QUERY, { slug: competitionSlug });
-      return d.football.competition.clubs.nodes.map((c) => ({ slug: c.slug, name: c.name, competitionSlug }));
+      return d.football.competition.teams.nodes.map((c) => ({ slug: c.slug, name: c.name, competitionSlug }));
     },
 
     async clubGames(clubSlug: string): Promise<SorareGame[]> {
-      const d = await query<{ football: { club: { latestGames: RawGame[]; upcomingGames: RawGame[] } } }>(
+      const d = await query<{ football: { club: { latestGames: { nodes: RawGame[] }; upcomingGames: RawGame[] } } }>(
         CLUB_GAMES_QUERY, { slug: clubSlug });
-      return [...d.football.club.latestGames, ...d.football.club.upcomingGames].map(toGame);
+      return [...d.football.club.latestGames.nodes, ...d.football.club.upcomingGames].map(toGame);
     },
 
-    async gameScores(gameId: string): Promise<SorarePlayerScore[]> {
-      const d = await query<{ football: { game: { playerGameScores: RawScore[] } } }>(GAME_SCORES_QUERY, { id: gameId });
-      return d.football.game.playerGameScores.map((s) => ({
-        playerSlug: s.anyPlayer.slug,
-        displayName: s.anyPlayer.displayName,
-        clubSlug: s.playerGameStats?.team?.slug ?? '',
-        position: s.anyPlayer.position,
-        score: s.score ?? 0,
-        decisive: s.decisiveScore?.totalScore ?? 0,
-        allAround: (s.allAroundStats ?? []).reduce((a, x) => a + x.totalScore, 0),
-        minutes: s.playerGameStats?.minsPlayed ?? 0,
-      }));
+    async gameDetail(gameId: string): Promise<SorareGameDetail> {
+      const d = await query<{ football: { game: { homeFormation: RawLineup | null; awayFormation: RawLineup | null; playerGameScores: RawScore[] } } }>(
+        GAME_DETAIL_QUERY, { id: gameId.replace(/^Game:/, '') });
+      const g = d.football.game;
+      return { home: toLineup(g.homeFormation), away: toLineup(g.awayFormation), scores: g.playerGameScores.map(toScore) };
     },
   };
 }

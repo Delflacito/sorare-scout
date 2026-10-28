@@ -1,9 +1,0 @@
-{ "errors": [], "results": 2, "response": [
-  { "team": { "id": 85, "name": "Paris Saint Germain" }, "formation": "4-3-3",
-    "startXI": [ { "player": { "id": 1, "name": "G. Donnarumma", "pos": "G", "grid": "1:1" } },
-                 { "player": { "id": 42, "name": "Nuno Mendes", "pos": "D", "grid": "2:1" } } ],
-    "substitutes": [ { "player": { "id": 77, "name": "L. Hernández", "pos": "D", "grid": null } } ] },
-  { "team": { "id": 81, "name": "Marseille" }, "formation": "3-4-2-1",
-    "startXI": [ { "player": { "id": 9, "name": "Mason Greenwood", "pos": "F", "grid": "4:1" } } ],
-    "substitutes": [] }
-] }

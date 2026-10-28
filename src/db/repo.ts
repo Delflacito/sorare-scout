@@ -3,11 +3,11 @@ import type { DetailedPosition, GenericPosition } from '@/domain/types';
 import type { Conceded } from '@/domain/metrics';
 
 export type FixtureStatus = 'played' | 'scheduled' | 'postponed';
-export type RunStatus = 'running' | 'ok' | 'error' | 'quota_exhausted';
+export type RunStatus = 'running' | 'ok' | 'error';
 
-export interface CompetitionInput { slug: string; name: string; apifootballId?: number | null }
-export interface TeamInput { name: string; sorareSlug: string; apifootballId?: number | null; competitionId: number }
-export interface PlayerInput { name: string; sorareSlug: string; apifootballId?: number | null; position: GenericPosition; teamId: number }
+export interface CompetitionInput { slug: string; name: string }
+export interface TeamInput { name: string; sorareSlug: string; competitionId: number }
+export interface PlayerInput { name: string; sorareSlug: string; position: GenericPosition; teamId: number }
 export interface FixtureInput {
   date: string; competitionId: number; homeTeamId: number; awayTeamId: number;
   homeGoals: number | null; awayGoals: number | null; status: FixtureStatus; sorareGameId: string;
@@ -16,7 +16,6 @@ export interface AppearanceInput {
   fixtureId: number; playerId: number; teamId: number; grid: string | null; detailedPosition: DetailedPosition | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
 }
-export interface UnmatchedInput { source: 'sorare' | 'apifootball'; externalId: string; name: string; club: string | null; fixtureId: number | null }
 export interface PlayerSummaryRow {
   playerId: number; l5: number; l15: number; l40: number; stdDev5: number;
   startRate5: number; avgMinutes5: number; startRate15: number; avgMinutes15: number;
@@ -24,15 +23,15 @@ export interface PlayerSummaryRow {
   usualPosition: DetailedPosition | null;
 }
 
-export interface FixtureToComplete { id: number; apifootballFixtureId: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
+export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
 export interface CompletedFixture { id: number; competitionId: number; homeTeamId: number; awayTeamId: number; date: string }
 export interface AppearanceRow {
   fixtureId: number; playerId: number; teamId: number; detailedPosition: DetailedPosition | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
 }
-export interface TeamRow { id: number; name: string; sorareSlug: string; apifootballId: number | null }
+export interface TeamRow { id: number; name: string; sorareSlug: string }
 
-/** Nombre de requêtes de compo API-Football tentées pour un match avant de l'abandonner. */
+/** Nombre de tentatives d'import de compo pour un match avant de l'abandonner. */
 export const MAX_LINEUP_ATTEMPTS = 5;
 
 /** Lignes par insert groupé : reste sous la limite de 65 534 paramètres Postgres. */
@@ -47,19 +46,16 @@ function createBaseRepo(sql: Sql) {
 
     async upsertCompetition(c: CompetitionInput): Promise<number> {
       const [r] = await sql`
-        insert into competitions (slug, name, apifootball_id) values (${c.slug}, ${c.name}, ${c.apifootballId ?? null})
-        on conflict (slug) do update set name = excluded.name,
-          apifootball_id = coalesce(excluded.apifootball_id, competitions.apifootball_id)
+        insert into competitions (slug, name) values (${c.slug}, ${c.name})
+        on conflict (slug) do update set name = excluded.name
         returning id`;
       return r.id;
     },
 
     async upsertTeam(t: TeamInput): Promise<number> {
       const [r] = await sql`
-        insert into teams (name, sorare_slug, apifootball_id, competition_id)
-        values (${t.name}, ${t.sorareSlug}, ${t.apifootballId ?? null}, ${t.competitionId})
-        on conflict (sorare_slug) do update set name = excluded.name, competition_id = excluded.competition_id,
-          apifootball_id = coalesce(excluded.apifootball_id, teams.apifootball_id)
+        insert into teams (name, sorare_slug, competition_id) values (${t.name}, ${t.sorareSlug}, ${t.competitionId})
+        on conflict (sorare_slug) do update set name = excluded.name, competition_id = excluded.competition_id
         returning id`;
       return r.id;
     },
@@ -72,10 +68,8 @@ function createBaseRepo(sql: Sql) {
 
     async upsertPlayer(p: PlayerInput): Promise<number> {
       const [r] = await sql`
-        insert into players (name, sorare_slug, apifootball_id, position, team_id)
-        values (${p.name}, ${p.sorareSlug}, ${p.apifootballId ?? null}, ${p.position}, ${p.teamId})
-        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
-          team_id = excluded.team_id, apifootball_id = coalesce(players.apifootball_id, excluded.apifootball_id)
+        insert into players (name, sorare_slug, position, team_id) values (${p.name}, ${p.sorareSlug}, ${p.position}, ${p.teamId})
+        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position, team_id = excluded.team_id
         returning id`;
       return r.id;
     },
@@ -90,12 +84,6 @@ function createBaseRepo(sql: Sql) {
       return r.id;
     },
 
-    async setFixtureApiFootballId(fixtureId: number, apifootballFixtureId: number): Promise<void> {
-      // Un match reporté puis rejoué peut correspondre au même match API-Football : le premier lien est conservé.
-      await sql`update fixtures set apifootball_fixture_id = ${apifootballFixtureId}
-        where id = ${fixtureId} and not exists (select 1 from fixtures where apifootball_fixture_id = ${apifootballFixtureId})`;
-    },
-
     async markLineupsImported(fixtureId: number, homeFormation: string | null, awayFormation: string | null): Promise<void> {
       await sql`update fixtures set lineups_imported = true, home_formation = ${homeFormation}, away_formation = ${awayFormation}
         where id = ${fixtureId}`;
@@ -103,14 +91,10 @@ function createBaseRepo(sql: Sql) {
 
     async fixturesNeedingLineups(): Promise<FixtureToComplete[]> {
       const rows = await sql`
-        select id, apifootball_fixture_id, sorare_game_id, home_team_id, away_team_id from fixtures
-        where status = 'played' and not lineups_imported and apifootball_fixture_id is not null
-          and lineups_attempts < ${MAX_LINEUP_ATTEMPTS}
+        select id, sorare_game_id, home_team_id, away_team_id from fixtures
+        where status = 'played' and not lineups_imported and lineups_attempts < ${MAX_LINEUP_ATTEMPTS}
         order by date`;
-      return rows.map((r) => ({
-        id: r.id, apifootballFixtureId: r.apifootball_fixture_id, sorareGameId: r.sorare_game_id,
-        homeTeamId: r.home_team_id, awayTeamId: r.away_team_id,
-      }));
+      return rows.map((r) => ({ id: r.id, sorareGameId: r.sorare_game_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id }));
     },
 
     /** Compte une tentative d'import de compo infructueuse (au-delà de MAX_LINEUP_ATTEMPTS, le match est abandonné). */
@@ -118,29 +102,14 @@ function createBaseRepo(sql: Sql) {
       await sql`update fixtures set lineups_attempts = lineups_attempts + 1 where id = ${fixtureId}`;
     },
 
-    /** Joueur Sorare déjà associé à chacun de ces identifiants API-Football. */
-    async apiFootballOwners(afIds: number[]): Promise<Map<number, string>> {
-      if (!afIds.length) return new Map();
-      const rows = await sql`select apifootball_id, sorare_slug from players where apifootball_id in ${sql(afIds)}`;
-      return new Map(rows.map((r) => [r.apifootball_id as number, r.sorare_slug as string]));
-    },
-
     async teamsByCompetition(competitionId: number): Promise<TeamRow[]> {
-      const rows = await sql`select id, name, sorare_slug, apifootball_id from teams where competition_id = ${competitionId}`;
-      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug, apifootballId: r.apifootball_id }));
+      const rows = await sql`select id, name, sorare_slug from teams where competition_id = ${competitionId}`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug }));
     },
 
     async allTeams(): Promise<TeamRow[]> {
-      const rows = await sql`select id, name, sorare_slug, apifootball_id from teams`;
-      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug, apifootballId: r.apifootball_id }));
-    },
-
-    /** apifootball_id déjà connus pour ces joueurs Sorare. */
-    async knownPlayerIds(sorareSlugs: string[]): Promise<Map<string, number>> {
-      if (!sorareSlugs.length) return new Map();
-      const rows = await sql`select sorare_slug, apifootball_id from players
-        where sorare_slug in ${sql(sorareSlugs)} and apifootball_id is not null`;
-      return new Map(rows.map((r) => [r.sorare_slug as string, r.apifootball_id as number]));
+      const rows = await sql`select id, name, sorare_slug from teams`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug }));
     },
 
     async upsertAppearance(a: AppearanceInput): Promise<void> {
@@ -153,13 +122,6 @@ function createBaseRepo(sql: Sql) {
           detailed_position = excluded.detailed_position, started = excluded.started, minutes = excluded.minutes,
           sorare_score = excluded.sorare_score, decisive_score = excluded.decisive_score,
           all_around_score = excluded.all_around_score`;
-    },
-
-    async addUnmatched(u: UnmatchedInput): Promise<void> {
-      await sql`
-        insert into unmatched_players (source, external_id, name, club, fixture_id)
-        values (${u.source}, ${u.externalId}, ${u.name}, ${u.club}, ${u.fixtureId})
-        on conflict do nothing`;
     },
 
     async replaceConceded(rows: Conceded[]): Promise<void> {
