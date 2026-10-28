@@ -1,6 +1,6 @@
 import type postgres from 'postgres';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
-import type { Conceded } from '@/domain/metrics';
+import type { Conceded, ConcededOverall } from '@/domain/metrics';
 
 export type FixtureStatus = 'played' | 'scheduled' | 'postponed';
 export type RunStatus = 'running' | 'ok' | 'error';
@@ -21,6 +21,8 @@ export interface PlayerSummaryRow {
   startRate5: number; avgMinutes5: number; startRate15: number; avgMinutes15: number;
   decisive5: number; allAround5: number; decisive15: number; allAround15: number;
   usualPosition: DetailedPosition | null;
+  /** Forme (matchs joués uniquement), base du score potentiel. */
+  form: number | null;
 }
 
 export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
@@ -140,6 +142,16 @@ function createBaseRepo(sql: Sql) {
       )}`;
     },
 
+    async replaceConcededOverall(rows: ConcededOverall[]): Promise<void> {
+      await sql`delete from team_conceded_overall`;
+      for (const chunk of chunks(rows)) await sql`insert into team_conceded_overall ${sql(
+        chunk.map((r) => ({
+          team_id: Number(r.teamId), window_size: r.window, average: r.average, league_average: r.leagueAverage,
+          index: r.index, observations: r.observations,
+        })),
+      )}`;
+    },
+
     async replacePlayerSummaries(rows: PlayerSummaryRow[]): Promise<void> {
       await sql`delete from player_summary`;
       for (const chunk of chunks(rows)) await sql`insert into player_summary ${sql(
@@ -147,7 +159,7 @@ function createBaseRepo(sql: Sql) {
           player_id: r.playerId, l5: r.l5, l15: r.l15, l40: r.l40, std_dev5: r.stdDev5,
           start_rate5: r.startRate5, avg_minutes5: r.avgMinutes5, start_rate15: r.startRate15, avg_minutes15: r.avgMinutes15,
           decisive5: r.decisive5, all_around5: r.allAround5, decisive15: r.decisive15, all_around15: r.allAround15,
-          usual_position: r.usualPosition,
+          usual_position: r.usualPosition, form: r.form,
         })),
       )}`;
     },

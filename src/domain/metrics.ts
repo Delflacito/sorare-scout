@@ -104,3 +104,27 @@ export function concededByPosition(obs: ConcededObs[], teamFixtures: Record<stri
     };
   });
 }
+
+export interface ConcededOverall {
+  teamId: string;
+  window: number;
+  average: number | null;
+  leagueAverage: number | null;
+  index: number | null;
+  observations: number;
+}
+
+/** Comme concededByPosition, mais tous postes confondus : qualité défensive générale de l'équipe. */
+export function concededOverall(obs: ConcededObs[], teamFixtures: Record<string, string[]>, window: number): ConcededOverall[] {
+  const byTeam = new Map<string, number[]>();
+  for (const [teamId, fixtures] of Object.entries(teamFixtures)) {
+    const inWindow = new Set(fixtures.slice(0, window));
+    const scores = obs.filter((o) => o.started && o.opponentTeamId === teamId && inWindow.has(o.fixtureId)).map((o) => o.score);
+    if (scores.length) byTeam.set(teamId, scores);
+  }
+  const leagueAverage = mean([...byTeam.values()].flat());
+  return [...byTeam.entries()].map(([teamId, scores]) => {
+    const average = mean(scores);
+    return { teamId, window, average, leagueAverage, index: leagueAverage === 0 ? null : average / leagueAverage, observations: scores.length };
+  });
+}

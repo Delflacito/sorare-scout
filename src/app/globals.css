@@ -62,3 +62,6 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .zone.empty { opacity: .45; }
 .zone-label { display: block; font-size: 11px; color: var(--muted); }
 .zone-value { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+td.strong { font-weight: 600; }
+.match-teams { display: grid; gap: 16px; }
+@media (min-width: 900px) { .match-teams { grid-template-columns: 1fr 1fr; } }

@@ -1,15 +1,18 @@
 import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow } from '@/db/repo';
-import { concededByPosition, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
+import { concededByPosition, concededOverall, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
 import type { DetailedPosition } from '@/domain/types';
+import type { ConcededOverall } from '@/domain/metrics';
+import { playerForm } from '@/domain/projection';
 
 export const CONCEDED_WINDOWS = [5, 10];
 const USUAL_POSITION_SAMPLE = 10;
 
 const byDateDesc = (a: { date: string }, b: { date: string }) => Date.parse(b.date) - Date.parse(a.date);
 
-function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): Conceded[] {
+function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): { byPosition: Conceded[]; overall: ConcededOverall[] } {
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
   const rows: Conceded[] = [];
+  const overall: ConcededOverall[] = [];
   const competitions = new Set(fixtures.map((f) => f.competitionId));
   for (const competitionId of competitions) {
     const compFixtures = fixtures.filter((f) => f.competitionId === competitionId).sort(byDateDesc);
@@ -26,9 +29,12 @@ function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): Conceded
         fixtureId: String(f.id), date: f.date, position: a.detailedPosition, score: a.score, started: a.started,
       });
     }
-    for (const w of CONCEDED_WINDOWS) rows.push(...concededByPosition(obs, teamFixtures, w));
+    for (const w of CONCEDED_WINDOWS) {
+      rows.push(...concededByPosition(obs, teamFixtures, w));
+      overall.push(...concededOverall(obs, teamFixtures, w));
+    }
   }
-  return rows;
+  return { byPosition: rows, overall };
 }
 
 /**
@@ -82,6 +88,12 @@ function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerS
       startRate5: pt5.startRate, avgMinutes5: pt5.avgMinutes, startRate15: pt15.startRate, avgMinutes15: pt15.avgMinutes,
       decisive5: b5.decisive, allAround5: b5.allAround, decisive15: b15.decisive, allAround15: b15.allAround,
       usualPosition: usualPosition(playerApps, fixtureById),
+      form: playerForm(
+        playerApps
+          .filter((a) => a.minutes > 0)
+          .sort((a, b) => byDateDesc(fixtureById.get(a.fixtureId)!, fixtureById.get(b.fixtureId)!))
+          .map((a) => a.score),
+      ),
     };
   });
 }
@@ -92,8 +104,9 @@ export async function recomputeAggregates(repo: Repo): Promise<{ conceded: numbe
   const concededRows = conceded(fixtures, appearances);
   const summaryRows = summaries(fixtures, appearances);
   await repo.transaction(async (tx) => {
-    await tx.replaceConceded(concededRows);
+    await tx.replaceConceded(concededRows.byPosition);
+    await tx.replaceConcededOverall(concededRows.overall);
     await tx.replacePlayerSummaries(summaryRows);
   });
-  return { conceded: concededRows.length, players: summaryRows.length };
+  return { conceded: concededRows.byPosition.length, players: summaryRows.length };
 }

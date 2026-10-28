@@ -148,3 +148,54 @@ describeDb('administration', () => {
     expect(await q.getLastSuccessfulImport()).toEqual(expect.any(String));
   });
 });
+
+describeDb('matchs et projections', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('getPlayerGames : lien vers le match, adversaire et score du match', async () => {
+    const [g] = await q.getPlayerGames('greenwood', 15);
+    expect(g).toMatchObject({ fixtureId: ids.g3, opponent: 'Olympique Lyonnais', opponentSlug: 'ol', isHome: false, goalsFor: 0, goalsAgainst: 1 });
+  });
+
+  it('getUpcoming : prochains matchs, forme et indices de l’adversaire', async () => {
+    const u = await q.getUpcoming('nuno-mendes', 5);
+    expect(u).toMatchObject({ form: 70, startRate: 1, usualPosition: 'LB' });
+    expect(u!.fixtures).toHaveLength(1);
+    expect(u!.fixtures[0]).toMatchObject({
+      fixtureId: ids.next, opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true,
+      position: { average: 55, observations: 2 },
+      overall: { observations: 2 },
+    });
+    expect(u!.fixtures[0].position!.index).toBeCloseTo(55 / 60);
+  });
+
+  it('getUpcoming : joueur inconnu → null', async () => {
+    expect(await q.getUpcoming('personne', 5)).toBeNull();
+  });
+
+  it('getMatch : équipes, score, formations et joueurs', async () => {
+    const m = await q.getMatch(ids.g2);
+    expect(m).toMatchObject({
+      id: ids.g2, status: 'played', competition: 'Ligue 1',
+      home: { name: 'Olympique de Marseille', slug: 'om', goals: 1, formation: '4-3-3' },
+      away: { name: 'Olympique Lyonnais', slug: 'ol', goals: 0, formation: '4-3-3' },
+    });
+    expect(m!.players).toEqual([
+      expect.objectContaining({ side: 'home', slug: 'greenwood', name: 'Mason Greenwood', detailedPosition: 'ST', started: true, score: 80, decisive: 40, allAround: 40 }),
+      expect.objectContaining({ side: 'away', slug: 'tagliafico', detailedPosition: 'LB', started: true, score: 60 }),
+    ]);
+  });
+
+  it('getMatch : inconnu → null', async () => {
+    expect(await q.getMatch(999999)).toBeNull();
+  });
+});
