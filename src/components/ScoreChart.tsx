@@ -87,6 +87,13 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
   const height = TOP + PLOT_H + BOTTOM;
   const baseline = TOP + PLOT_H;
   const g = hover !== null ? ordered[hover] : null;
+  // Début de chaque mois ; son libellé n'est affiché que s'il a la place avant le mois suivant.
+  const monthStarts = ordered.map((m, i) => i).filter((i) => i === 0 || monthKey(ordered[i - 1].date) !== monthKey(ordered[i].date));
+  const MONTH_LABEL_W = 52;
+  const showMonthLabel = (i: number) => {
+    const next = monthStarts[monthStarts.indexOf(i) + 1];
+    return next === undefined || (next - i) * BAND >= MONTH_LABEL_W;
+  };
 
   return (
     <figure className="card chart-card">
@@ -130,7 +137,7 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
                   {newMonth && (
                     <>
                       {i > 0 && <line x1={x0} x2={x0} y1={14} y2={baseline} className="month-sep" />}
-                      <text x={x0 + 4} y={12} className="month-label">{fmtMonth(m.date)}</text>
+                      {showMonthLabel(i) && <text x={x0 + 4} y={12} className="month-label">{fmtMonth(m.date)}</text>}
                     </>
                   )}
                   {m.status === 'absent' ? (
