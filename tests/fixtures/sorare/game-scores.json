@@ -1,0 +1,8 @@
+{ "data": { "football": { "game": { "id": "Game:1", "playerGameScores": [
+  { "score": 72.4, "decisiveScore": { "totalScore": 35 }, "allAroundStats": [{ "totalScore": 12.4 }, { "totalScore": 25 }],
+    "playerGameStats": { "minsPlayed": 90, "team": { "slug": "psg" } },
+    "anyPlayer": { "slug": "nuno-mendes", "displayName": "Nuno Mendes", "position": "Defender" } },
+  { "score": 0, "decisiveScore": null, "allAroundStats": [],
+    "playerGameStats": { "minsPlayed": 0, "team": { "slug": "om" } },
+    "anyPlayer": { "slug": "theo-hernandez", "displayName": "Theo Hernández", "position": "Defender" } }
+] } } } }
