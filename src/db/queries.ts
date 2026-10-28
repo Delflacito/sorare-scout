@@ -61,10 +61,12 @@ export interface ImportRunView {
 
 export interface UpcomingFixture {
   fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
-  /** Concédé par l'adversaire au poste habituel du joueur (5 derniers matchs). */
-  position: { average: number | null; index: number | null; observations: number } | null;
-  /** Concédé par l'adversaire tous postes confondus (5 derniers matchs). */
-  overall: { average: number | null; index: number | null; observations: number } | null;
+  /** Concédé par l'adversaire au poste habituel du joueur (5 derniers matchs) et moyenne de la ligue à ce poste. */
+  position: { average: number | null; leagueAverage: number | null; observations: number } | null;
+  /** Qualité défensive générale de l'adversaire (10 derniers matchs) : indice et note de 1 à 100 (100 = le plus fort). */
+  overall: { index: number | null; rating: number | null; observations: number } | null;
+  /** Avantage du terrain mesuré dans le championnat pour le club du joueur (domicile ou extérieur). */
+  venueFactor: number;
 }
 export interface UpcomingView {
   form: number | null; startRate: number | null; usualPosition: DetailedPosition | null; fixtures: UpcomingFixture[];
@@ -214,20 +216,26 @@ export function createQueries(sql: postgres.Sql) {
           order by f.date limit ${limit}
         )
         select n.*, o.name as opponent, o.sorare_slug as opponent_slug,
-          cp.average as pos_average, cp.index as pos_index, cp.observations as pos_obs,
-          co.average as all_average, co.index as all_index, co.observations as all_obs
+          cp.average as pos_average, cp.league_average as pos_league, cp.observations as pos_obs,
+          coalesce(cp.league_average, (select avg(league_average) from team_conceded_by_position
+            where detailed_position = ${p.usual_position} and window_size = 5)) as pos_league_any,
+          co.index as all_index, co.rating as all_rating, co.observations as all_obs,
+          case when n.is_home then v.home_factor else v.away_factor end as venue_factor
         from next n
         join teams o on o.id = n.opponent_id
         left join team_conceded_by_position cp
           on cp.team_id = n.opponent_id and cp.detailed_position = ${p.usual_position} and cp.window_size = 5
-        left join team_conceded_overall co on co.team_id = n.opponent_id and co.window_size = 5
+        left join team_conceded_overall co on co.team_id = n.opponent_id and co.window_size = 10
+        left join venue_factors v on v.competition_id = o.competition_id
         order by n.date` : [];
       return {
         form: p.form, startRate: p.start_rate5, usualPosition: p.usual_position,
         fixtures: rows.map((r) => ({
           fixtureId: r.id, date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome: r.is_home,
-          position: r.pos_obs === null ? null : { average: r.pos_average, index: r.pos_index, observations: r.pos_obs },
-          overall: r.all_obs === null ? null : { average: r.all_average, index: r.all_index, observations: r.all_obs },
+          position: r.pos_league_any === null ? null
+            : { average: r.pos_average, leagueAverage: r.pos_league_any, observations: r.pos_obs ?? 0 },
+          overall: r.all_obs === null ? null : { index: r.all_index, rating: r.all_rating, observations: r.all_obs },
+          venueFactor: r.venue_factor ?? 1,
         })),
       };
     },

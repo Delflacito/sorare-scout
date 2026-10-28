@@ -1,18 +1,21 @@
-import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow } from '@/db/repo';
+import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow, ConcededOverallRow, VenueFactorRow } from '@/db/repo';
 import { concededByPosition, concededOverall, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
 import type { DetailedPosition } from '@/domain/types';
-import type { ConcededOverall } from '@/domain/metrics';
-import { playerForm } from '@/domain/projection';
+import { playerForm, qualityRatings, venueFactors } from '@/domain/projection';
 
 export const CONCEDED_WINDOWS = [5, 10];
 const USUAL_POSITION_SAMPLE = 10;
 
 const byDateDesc = (a: { date: string }, b: { date: string }) => Date.parse(b.date) - Date.parse(a.date);
 
-function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): { byPosition: Conceded[]; overall: ConcededOverall[] } {
+function conceded(
+  fixtures: CompletedFixture[],
+  apps: AppearanceRow[],
+): { byPosition: Conceded[]; overall: ConcededOverallRow[]; venues: VenueFactorRow[] } {
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
   const rows: Conceded[] = [];
-  const overall: ConcededOverall[] = [];
+  const overall: ConcededOverallRow[] = [];
+  const venues: VenueFactorRow[] = [];
   const competitions = new Set(fixtures.map((f) => f.competitionId));
   for (const competitionId of competitions) {
     const compFixtures = fixtures.filter((f) => f.competitionId === competitionId).sort(byDateDesc);
@@ -31,10 +34,15 @@ function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): { byPosi
     }
     for (const w of CONCEDED_WINDOWS) {
       rows.push(...concededByPosition(obs, teamFixtures, w));
-      overall.push(...concededOverall(obs, teamFixtures, w));
+      const teams = concededOverall(obs, teamFixtures, w);
+      const ratings = qualityRatings(teams.filter((t) => t.average !== null).map((t) => ({ teamId: t.teamId, average: t.average! })));
+      overall.push(...teams.map((t) => ({ ...t, rating: ratings.get(t.teamId) ?? null })));
     }
+    const starters = apps.filter((a) => a.started && fixtureById.get(a.fixtureId)?.competitionId === competitionId);
+    const v = venueFactors(starters.map((a) => ({ home: a.teamId === fixtureById.get(a.fixtureId)!.homeTeamId, score: a.score })));
+    venues.push({ competitionId, ...v });
   }
-  return { byPosition: rows, overall };
+  return { byPosition: rows, overall, venues };
 }
 
 /**
@@ -106,6 +114,7 @@ export async function recomputeAggregates(repo: Repo): Promise<{ conceded: numbe
   await repo.transaction(async (tx) => {
     await tx.replaceConceded(concededRows.byPosition);
     await tx.replaceConcededOverall(concededRows.overall);
+    await tx.replaceVenueFactors(concededRows.venues);
     await tx.replacePlayerSummaries(summaryRows);
   });
   return { conceded: concededRows.byPosition.length, players: summaryRows.length };
