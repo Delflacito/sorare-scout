@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getQueries, PAGE_SIZE, SORTS } from '@/db/queries';
 import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { fmtIndex, fmtPct, fmtScore, indexClass } from '@/lib/format';
+import { ClubLogo, PlayerAvatar } from '@/components/Media';
+import { StatusBadges } from '@/components/StatusBadges';
 import { one, oneOf, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
@@ -63,14 +65,22 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
             <thead>
               <tr>
                 <th>Joueur</th><th>Club</th><th>Poste</th><th>L5</th><th>L15</th><th>L40</th><th>% titu</th>
-                <th>Prochain match</th><th>Indice adv.</th>
+                <th>Prochain match</th><th>Indice adv.</th><th>Proj. Sorare</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.slug}>
-                  <td><Link href={`/joueurs/${r.slug}`}>{r.name}</Link></td>
-                  <td>{r.team ?? '—'}</td>
+                  <td>
+                    <span className="player-cell">
+                      <PlayerAvatar name={r.name} url={r.pictureUrl} size={32} />
+                      <Link href={`/joueurs/${r.slug}`}>{r.name}</Link>
+                      <StatusBadges compact playingStatus={r.playingStatus}
+                        injury={r.injuryKind ? { kind: r.injuryKind, end: null } : null}
+                        suspension={r.suspensionReason ? { reason: r.suspensionReason, end: null } : null} />
+                    </span>
+                  </td>
+                  <td><span className="club-link"><ClubLogo name={r.team ?? ''} url={r.teamPictureUrl} />{r.team ?? '—'}</span></td>
                   <td>{r.usualPosition ? POSITION_LABEL_FR[r.usualPosition] : GENERIC_LABEL_FR[r.position]}</td>
                   <td className="num">{fmtScore(r.l5)}</td>
                   <td className="num">{fmtScore(r.l15)}</td>
@@ -84,6 +94,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
                   <td className={`num ${indexClass(r.nextIndex)} ${r.nextLowSample ? 'low-sample' : ''}`}>
                     {r.nextIndex === null ? '—' : fmtIndex(r.nextIndex)}
                   </td>
+                  <td className="num">{r.sorareProjection === null ? '—' : Math.round(r.sorareProjection)}</td>
                 </tr>
               ))}
             </tbody>
