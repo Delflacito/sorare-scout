@@ -39,6 +39,8 @@ export interface GameWeekPlayer {
   team: string; teamPictureUrl: string | null; pictureUrl: string | null;
   opponent: string; opponentPictureUrl: string | null; isHome: boolean; date: string;
   projected: number; startRate: number; l15: number; playingStatus: string | null; sorareProjection: number | null;
+  /** Niveau habituel (L15 sur les matchs joués) : le score potentiel s'en écarte selon l'adversaire et le lieu. */
+  base: number;
 }
 /** Concédé par l'adversaire à chaque poste (5 derniers matchs), vu depuis une équipe qui joue la journée. */
 export interface RoundMatchup {
@@ -48,7 +50,9 @@ export interface RoundMatchup {
   opponentRating: number | null;
   byPosition: Partial<Record<DetailedPosition, { average: number | null; index: number | null; observations: number }>>;
 }
-export interface GameWeekFilters { competition?: string; position?: GenericPosition; startersOnly: boolean; limit: number }
+/** projected : meilleurs scores potentiels ; boost : plus gros gains par rapport au niveau habituel. */
+export type GameWeekSort = 'projected' | 'boost';
+export interface GameWeekFilters { competition?: string; position?: GenericPosition; startersOnly: boolean; limit: number; sort?: GameWeekSort }
 
 /** Joueur indisponible : blessé ou suspendu. */
 const UNAVAILABLE = 'p.injury_kind is not null or p.injury_end is not null or p.suspension_reason is not null or p.suspension_end is not null';
@@ -211,14 +215,15 @@ export function createQueries(sql: postgres.Sql) {
         select * from (
           select p.sorare_slug, p.name, p.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
             o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
-            s.next_projected, s.start_rate5, s.l15, p.playing_status, p.sorare_projection,
-            row_number() over (partition by p.position order by s.next_projected desc, p.name) as rank
+            s.next_projected, s.start_rate5, s.l15, s.base, p.playing_status, p.sorare_projection,
+            row_number() over (partition by p.position order by
+              ${f.sort === 'boost' ? sql`s.next_projected - s.base` : sql`s.next_projected`} desc, p.name) as rank
           from player_summary s
           join players p on p.id = s.player_id
           join teams t on t.id = p.team_id
           join fixtures fx on fx.id = s.next_fixture_id
           join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
-          where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null
+          where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null and s.base is not null
             and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
             ${f.startersOnly ? sql`and s.start_rate5 >= 0.6` : sql``}
             ${f.position ? sql`and p.position = ${f.position}` : sql``}
@@ -228,7 +233,7 @@ export function createQueries(sql: postgres.Sql) {
         slug: r.sorare_slug, name: r.name, position: r.position, usualPosition: r.usual_position,
         team: r.team, teamPictureUrl: r.team_picture, pictureUrl: r.picture_url,
         opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
-        projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
+        projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
       }));
     },
 

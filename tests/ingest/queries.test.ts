@@ -310,6 +310,18 @@ describeDb('Ma Game Week et journée', () => {
     expect(after.map((p) => p.slug)).toEqual([]); // Greenwood : titulaire 1 fois sur 2
   });
 
+  it('plus gros boosts : classés par gain sur le niveau habituel', async () => {
+    const fixtures = await q.getGameWeekFixtures();
+    await sql`update player_summary set base = 90, next_projected = 95 where player_id = ${ids['nuno-mendes']}`;
+    await sql`update player_summary set base = 40, next_projected = 60 where player_id = ${ids.greenwood}`;
+    await sql`update players set position = 'Defender' where sorare_slug = 'greenwood'`;
+    const ids9 = fixtures.map((f) => f.id);
+    const top = await q.getGameWeekPlayers(ids9, { startersOnly: false, limit: 10 });
+    expect(top.map((p) => p.slug)).toEqual(['nuno-mendes', 'greenwood']);
+    const boost = await q.getGameWeekPlayers(ids9, { startersOnly: false, limit: 10, sort: 'boost' });
+    expect(boost.map((p) => [p.slug, p.base])).toEqual([['greenwood', 40], ['nuno-mendes', 90]]);
+  });
+
   it('adversaires par poste : ce que concède l’adversaire de chaque équipe', async () => {
     const fixtures = await q.getGameWeekFixtures();
     const m = await q.getRoundMatchups(fixtures.map((f) => f.id));

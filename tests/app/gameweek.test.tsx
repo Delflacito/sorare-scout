@@ -21,7 +21,7 @@ const fixture: GameWeekFixture = {
 const player = (slug: string, position: GameWeekPlayer['position'], projected: number): GameWeekPlayer => ({
   slug, name: slug, position, usualPosition: null, team: 'Paris Saint-Germain', teamPictureUrl: null, pictureUrl: null,
   opponent: 'Olympique de Marseille', opponentPictureUrl: 'https://t/om.png', isHome: true, date: fixture.date,
-  projected, startRate: 0.8, l15: 60, playingStatus: 'STARTER', sorareProjection: 55,
+  projected, startRate: 0.8, l15: 60, base: 60, playingStatus: 'STARTER', sorareProjection: 55,
 });
 const matchup = (team: string, rating: number, st: number): RoundMatchup => ({
   fixtureId: 9, date: fixture.date, team, teamSlug: team, teamPictureUrl: null, opponent: `adv-${team}`, opponentSlug: 'x',
@@ -46,13 +46,21 @@ describe('/game-week', () => {
     expect(within(row).getByText('Olympique de Marseille')).toBeInTheDocument();
     expect(within(screen.getByRole('table', { name: 'Attaquants' })).getByText('81.0')).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Gardiens' })).not.toBeInTheDocument();
-    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, startersOnly: true, limit: 10 });
+    expect(within(row).getByText(/\+12\.4/)).toHaveClass('hot');
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, startersOnly: true, limit: 10, sort: 'projected' });
+  });
+
+  it('onglet « Plus gros boosts » : classement par gain sur le niveau habituel', async () => {
+    render(await GameWeek(params({ vue: 'boost' })));
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, startersOnly: true, limit: 10, sort: 'boost' });
+    expect(screen.getByRole('link', { name: 'Plus gros boosts' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Meilleurs scores' })).toHaveAttribute('href', '/game-week');
   });
 
   it('filtres : compétition et remplaçants inclus', async () => {
     await GameWeek(params({ competition: 'ligue-1-fr', tous: '1' }));
     expect(getGameWeekFixtures).toHaveBeenCalledWith('ligue-1-fr');
-    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: 'ligue-1-fr', startersOnly: false, limit: 10 });
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: 'ligue-1-fr', startersOnly: false, limit: 10, sort: 'projected' });
   });
 
   it('aucun match programmé', async () => {
