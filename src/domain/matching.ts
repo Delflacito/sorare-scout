@@ -11,7 +11,17 @@ export interface FixtureKey {
 }
 
 /** Alias de clubs (nom normalisé → nom normalisé), appliqués avant les règles de rapprochement. */
-export const CLUB_ALIASES: Record<string, string> = {};
+export const CLUB_ALIASES: Record<string, string> = {
+  'olympique lyonnais': 'lyon',
+  'fc internazionale milano': 'inter',
+  'internazionale': 'inter',
+  'fc bayern munchen': 'bayern munich',
+  'bayern munchen': 'bayern munich',
+  'wolverhampton wanderers': 'wolves',
+  'athletic club': 'athletic bilbao',
+  'brighton & hove albion': 'brighton',
+  'brighton and hove albion': 'brighton',
+};
 
 const CLUB_STOPWORDS = new Set(['fc', 'cf', 'ac', 'as', 'sc', 'ssc', 'afc', 'rc', 'ogc', 'stade', 'club', 'de']);
 const DAY_MS = 24 * 60 * 60 * 1000;
