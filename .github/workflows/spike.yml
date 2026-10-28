@@ -1,6 +1,8 @@
 name: Spike API
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   spike:
     runs-on: ubuntu-latest
@@ -14,8 +16,12 @@ jobs:
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: spike-output
-          path: spike-output/
-          retention-days: 7
+      # Réponses brutes publiées sur la branche spike-results (lisible sans téléchargement d'artefact).
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan spike-results
+          git rm -rq --cached .
+          git add -f spike-output
+          git commit -qm "Résultats du spike $(date -u +%FT%TZ)"
+          git push -f origin spike-results
