@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getQueries, PAGE_SIZE, SORTS } from '@/db/queries';
-import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
+import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
 import { fmtIndex, fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
@@ -47,11 +47,11 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           {teams.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
         </select>
         <select name="position" defaultValue={filters.position ?? ''} aria-label="Poste">
-          <option value="">Tous les postes</option>
+          <option value="">Tous les postes (carte)</option>
           {GENERIC.map((g) => <option key={g} value={g}>{GENERIC_LABEL_FR[g]}</option>)}
         </select>
         <select name="detailedPosition" defaultValue={filters.detailedPosition ?? ''} aria-label="Poste précis">
-          <option value="">Tous les postes précis</option>
+          <option value="">Tous les postes sur le terrain</option>
           {DETAILED_POSITIONS.map((d) => <option key={d} value={d}>{POSITION_LABEL_FR[d]}</option>)}
         </select>
         <select name="sort" defaultValue={filters.sort} aria-label="Tri">
@@ -87,7 +87,10 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
                     </span>
                   </td>
                   <td><span className="club-link"><ClubLogo name={r.team ?? ''} url={r.teamPictureUrl} />{r.team ?? '—'}</span></td>
-                  <td>{r.usualPosition ? POSITION_LABEL_FR[r.usualPosition] : GENERIC_LABEL_FR[r.position]}</td>
+                  <td>
+                    {cardLabel(r.cardPositions)}
+                    {r.usualPosition && <span className="muted small" title="Poste occupé sur le terrain"> · {POSITION_LABEL_FR[r.usualPosition]}</span>}
+                  </td>
                   <td className="num">{fmtScore(r.l5)}</td>
                   <td className="num">{fmtScore(r.l15)}</td>
                   <td className="num">{fmtScore(r.l40)}</td>

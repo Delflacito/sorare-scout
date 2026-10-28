@@ -13,6 +13,9 @@ export const POSITION_NAME_FR: Record<DetailedPosition, string> = {
   DM: 'Milieu défensif', CM: 'Milieu central', AM: 'Milieu offensif', LW: 'Ailier gauche', RW: 'Ailier droit', ST: 'Avant-centre',
 };
 
+/** Postes d'une carte Sorare : « Milieu / Attaquant ». */
+export const cardLabel = (positions: GenericPosition[]) => positions.map((p) => GENERIC_LABEL_FR[p]).join(' / ');
+
 export const GENERIC_OF: Record<DetailedPosition, GenericPosition> = {
   GK: 'Goalkeeper',
   LB: 'Defender', CB: 'Defender', RB: 'Defender', LWB: 'Defender', RWB: 'Defender',

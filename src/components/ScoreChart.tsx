@@ -69,6 +69,11 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Le match le plus récent est à droite : on ouvre le graphique dessus (et après chaque changement de filtre).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [competition, venue, available, games]);
   if (!games.length) return null;
   const others = [...new Set(games.filter((g) => !g.isLeague).map((g) => g.competition))];
   const ordered = filterGames(games, competition, venue).reverse();

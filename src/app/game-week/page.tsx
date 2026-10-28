@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries';
-import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
+import { POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
@@ -34,7 +34,7 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
         <div className="table-wrap">
           <table aria-label={title}>
             <thead>
-              <tr><th>#</th><th>Joueur</th><th>Match</th><th>Poste</th><th>Potentiel</th><th>Habitude (L15)</th><th>vs habitude</th><th>% titu</th><th>Proj. Sorare</th></tr>
+              <tr><th>#</th><th>Joueur</th><th>Match</th><th>Carte</th><th>Potentiel</th><th>Habitude (L15)</th><th>vs habitude</th><th>% titu</th><th>Proj. Sorare</th></tr>
             </thead>
             <tbody>
               {players.map((p, i) => (
@@ -56,7 +56,10 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
                     </span>
                     <div className="muted small">{fmtDate(p.date)}</div>
                   </td>
-                  <td>{p.usualPosition ? POSITION_LABEL_FR[p.usualPosition] : GENERIC_LABEL_FR[p.position]}</td>
+                  <td>
+                    {cardLabel(p.cardPositions)}
+                    {p.usualPosition && <span className="muted small" title="Poste occupé sur le terrain"> · {POSITION_LABEL_FR[p.usualPosition]}</span>}
+                  </td>
                   <td className="num strong">{fmtScore(p.projected)}</td>
                   <td className="num">{fmtScore(p.base)}</td>
                   <Boost p={p} />

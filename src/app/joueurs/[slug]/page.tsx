@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type CompetitionTotalsView, type PlayerDetail, type PlayerGameView, type PlayerSeasonView, type UpcomingView } from '@/db/queries';
-import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR } from '@/domain/types';
+import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
@@ -70,10 +70,11 @@ function Hero({ player }: { player: PlayerDetail }) {
             </Link>
           ) : <span className="pill-link">Sans club suivi</span>}
           {player.competition && <span className="pill-link">{player.competition}</span>}
+          <span className="pill-link pill-card" title="Postes où ses cartes Sorare peuvent être alignées">Carte : {cardLabel(player.cardPositions)}</span>
         </div>
         <StatusBadges playingStatus={player.playingStatus} injury={player.injury} suspension={player.suspension} />
         <dl className="pcard-attrs">
-          <Attr label="Rôle">{player.usualPosition ? POSITION_NAME_FR[player.usualPosition] : GENERIC_LABEL_FR[player.position]}</Attr>
+          <Attr label="Rôle sur le terrain">{player.usualPosition ? POSITION_NAME_FR[player.usualPosition] : GENERIC_LABEL_FR[player.position]}</Attr>
           {player.country && (
             <Attr label="Nationalité">
               {player.country.flagUrl && <img className="flag" src={player.country.flagUrl} alt="" />} {player.country.name}
@@ -82,7 +83,6 @@ function Hero({ player }: { player: PlayerDetail }) {
           {player.birthDate && (
             <Attr label="Âge"><span title={`Né le ${fmtBirth(player.birthDate)}`}>{ageAt(player.birthDate)} <small>ans</small></span></Attr>
           )}
-          {player.height && <Attr label="Taille">{player.height} <small>cm</small></Attr>}
           {player.shirtNumber !== null && <Attr label="Maillot">#{player.shirtNumber}</Attr>}
         </dl>
         {player.birthDate && <p className="pcard-born">Né le {fmtBirth(player.birthDate)}</p>}
