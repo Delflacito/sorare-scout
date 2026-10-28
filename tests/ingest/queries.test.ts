@@ -277,3 +277,51 @@ describeDb('photos, logos et statuts', () => {
     expect(m).toMatchObject({ home: { pictureUrl: 'https://t/om.png' }, away: { pictureUrl: 'https://t/ol.png' } });
   });
 });
+
+describeDb('Ma Game Week et journée', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('prochaine journée : matchs dans les 4 jours suivant le premier', async () => {
+    const l1 = ids.l1;
+    await sql`insert into fixtures (date, competition_id, home_team_id, away_team_id, status, sorare_game_id)
+      values ('2099-01-03T20:00:00Z', ${l1}, ${ids.ol}, ${ids.psg}, 'scheduled', 'g10'), ('2099-01-09T20:00:00Z', ${l1}, ${ids.om}, ${ids.ol}, 'scheduled', 'g11')`;
+    const f = await q.getGameWeekFixtures();
+    expect(f.map((x) => [x.home.slug, x.away.slug])).toEqual([['psg', 'om'], ['ol', 'psg']]);
+    expect(f[0]).toMatchObject({ competition: 'Ligue 1', home: { name: 'Paris Saint-Germain' }, away: { rating: expect.any(Number) } });
+    expect(await q.getGameWeekFixtures('premier-league')).toEqual([]);
+  });
+
+  it('meilleurs scores potentiels par poste, blessés exclus', async () => {
+    const fixtures = await q.getGameWeekFixtures();
+    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: false, limit: 10 });
+    expect(players.map((p) => p.slug)).toEqual(['nuno-mendes', 'greenwood']); // défenseur puis attaquant
+    expect(players[0]).toMatchObject({ team: 'Paris Saint-Germain', opponent: 'Olympique de Marseille', isHome: true, projected: expect.any(Number) });
+    await sql`update players set injury_kind = 'Knee' where sorare_slug = 'nuno-mendes'`;
+    const after = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: true, limit: 10 });
+    expect(after.map((p) => p.slug)).toEqual([]); // Greenwood : titulaire 1 fois sur 2
+  });
+
+  it('adversaires par poste : ce que concède l’adversaire de chaque équipe', async () => {
+    const fixtures = await q.getGameWeekFixtures();
+    const m = await q.getRoundMatchups(fixtures.map((f) => f.id));
+    expect(m.map((x) => [x.teamSlug, x.opponentSlug, x.isHome])).toEqual([['psg', 'om', true], ['om', 'psg', false]]);
+    // OM a concédé aux latéraux gauches 60 (Tagliafico, g2) et 50 (g3)
+    expect(m[0].byPosition.LB).toMatchObject({ average: 55, observations: 2 });
+  });
+
+  it('explorateur : tri par score potentiel et masquage des indisponibles', async () => {
+    await sql`update players set suspension_reason = 'Red card' where sorare_slug = 'greenwood'`;
+    const rows = await q.searchPlayers({ sort: 'projected', available: true, offset: 0 });
+    expect(rows.map((r) => r.slug)).not.toContain('greenwood');
+    expect(rows[0]).toMatchObject({ slug: 'nuno-mendes', nextProjected: expect.any(Number) });
+  });
+});

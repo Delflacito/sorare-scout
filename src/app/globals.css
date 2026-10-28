@@ -137,3 +137,16 @@ td.strong { font-weight: 600; }
 .player-cell { display: flex; align-items: center; gap: 10px; }
 .player-cell .avatar { border-radius: 8px; }
 .match-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+.filters .check { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.filters .check input { padding: 0; }
+.subtitle { color: var(--muted); margin: -4px 0 16px; }
+.gw-fixtures { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; padding: 0; list-style: none; }
+.gw-fixtures li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--neutral-bg); font-size: 13px; }
+.rank { color: var(--muted); width: 24px; }
+.matrix td.cell { text-align: center; font-variant-numeric: tabular-nums; }
+.matrix td.cell.hot { background: var(--hot-bg); }
+.matrix td.cell.cold { background: var(--cold-bg); }
+.matrix th a { color: inherit; }
+.matrix th.sorted { text-decoration: underline; }
+.small { font-size: 12px; }

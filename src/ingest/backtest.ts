@@ -1,6 +1,5 @@
 import type { CompletedFixture, AppearanceRow } from '@/db/repo';
-import { projectForFixture } from '@/domain/projection';
-import { computeAggregates } from './aggregates';
+import { computeAggregates, projector } from './aggregates';
 
 const ROUND_DAYS = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,10 +45,7 @@ export function backtestRound(
   const agg = computeAggregates(history, appearances.filter((a) => historyIds.has(a.fixtureId)));
 
   const summaryOf = new Map(agg.summaries.map((s) => [s.playerId, s]));
-  const byPosition = new Map(agg.byPosition.filter((c) => c.window === 5).map((c) => [`${c.teamId}|${c.position}`, c]));
-  const leagueAtPosition = new Map(agg.byPosition.filter((c) => c.window === 5).map((c) => [c.position, c.leagueAverage]));
-  const overall = new Map(agg.overall.filter((c) => c.window === 10).map((c) => [c.teamId, c]));
-  const venues = new Map(agg.venues.map((v) => [v.competitionId, v]));
+  const project = projector(agg, amplification);
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
   const inRound = new Set(round.fixtureIds);
 
@@ -57,22 +53,14 @@ export function backtestRound(
   for (const a of appearances) {
     if (!inRound.has(a.fixtureId) || a.minutes <= 0) continue;
     const s = summaryOf.get(a.playerId);
-    if (!s || s.base === null || !s.usualPosition) continue; // aucun match joué avant la journée
+    if (!s) continue;
     const f = fixtureById.get(a.fixtureId)!;
     const isHome = f.homeTeamId === a.teamId;
-    const opp = String(isHome ? f.awayTeamId : f.homeTeamId);
-    const pos = byPosition.get(`${opp}|${s.usualPosition}`);
-    const all = overall.get(opp);
-    const venue = venues.get(f.competitionId);
-    const { venueFactor, opponent, projected } = projectForFixture(s, {
-      isHome,
-      leagueVenueFactor: venue ? (isHome ? venue.home : venue.away) : 1,
-      position: { average: pos?.average ?? null, leagueAverage: pos?.leagueAverage ?? leagueAtPosition.get(s.usualPosition) ?? null, observations: pos?.observations ?? 0 },
-      overall: all ? { index: all.index, observations: all.observations } : null,
-    }, amplification);
+    const p = project(s, { isHome, opponentId: isHome ? f.awayTeamId : f.homeTeamId, competitionId: f.competitionId });
+    if (!p) continue; // aucun match joué avant la journée
     rows.push({
       competitionId: f.competitionId, fixtureId: f.id, playerId: a.playerId, isHome, started: a.started,
-      actual: a.score, base: s.base, projected: projected!, venueFactor, opponent,
+      actual: a.score, base: s.base!, projected: p.projected!, venueFactor: p.venueFactor, opponent: p.opponent,
     });
   }
   return rows;

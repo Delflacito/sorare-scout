@@ -6,7 +6,7 @@ import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
-import { fmtDate, fmtPct, fmtScore, indexClass } from '@/lib/format';
+import { fmtDate, fmtPct, fmtScore, indexClass, ratingClass } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +16,6 @@ const fmtVenue = (factor: number) => {
   const pct = Math.round((factor - 1) * 100);
   return pct > 0 ? `+${pct} %` : pct < 0 ? `−${-pct} %` : '0 %';
 };
-
-/** Note 1–100 (100 = adversaire le plus fort) : couleur favorable (faible note) ou défavorable. */
-const ratingClass = (rating: number | null) => (rating === null ? '' : rating <= 33 ? 'hot' : rating >= 67 ? 'cold' : 'neutral');
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (

@@ -15,7 +15,7 @@ const row: PlayerListRow = {
   usualPosition: 'LB', l5: 62.4, l15: 58.1, l40: 50, startRate: 0.8,
   nextOpponent: 'Olympique de Marseille', nextOpponentSlug: 'om', nextIsHome: true, nextIndex: 1.234, nextLowSample: false,
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
-  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41,
+  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3,
 };
 
 describe('/joueurs', () => {
@@ -37,18 +37,27 @@ describe('/joueurs', () => {
     expect(screen.getByLabelText('Blessé · Thigh Injury')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Proj. Sorare' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '41' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Potentiel' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '71.3' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Masquer blessés et suspendus' })).not.toBeChecked();
+  });
+
+  it('tri par défaut : score potentiel ; option pour masquer les indisponibles', async () => {
+    searchPlayers.mockResolvedValue([]);
+    await Page({ searchParams: Promise.resolve({ dispo: '1' }) });
+    expect(searchPlayers).toHaveBeenCalledWith(expect.objectContaining({ sort: 'projected', available: true }));
   });
 
   it('transmet les filtres de l’URL', async () => {
     searchPlayers.mockResolvedValue([]);
     await Page({ searchParams: Promise.resolve({ position: 'Defender', q: 'nuno', sort: 'l15', page: '2', team: 'om' }) });
-    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, sort: 'l15', offset: 50 });
+    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, available: undefined, sort: 'l15', offset: 50 });
   });
 
   it('valeurs de filtre invalides ignorées', async () => {
     searchPlayers.mockResolvedValue([]);
     await Page({ searchParams: Promise.resolve({ position: 'Pilote', sort: 'DROP', detailedPosition: 'XX' }) });
-    expect(searchPlayers).toHaveBeenCalledWith({ q: undefined, position: undefined, competition: undefined, team: undefined, detailedPosition: undefined, sort: 'l5', offset: 0 });
+    expect(searchPlayers).toHaveBeenCalledWith({ q: undefined, position: undefined, competition: undefined, team: undefined, detailedPosition: undefined, available: undefined, sort: 'projected', offset: 0 });
   });
 
   it('liste vide → message', async () => {

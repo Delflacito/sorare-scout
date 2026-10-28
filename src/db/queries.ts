@@ -2,7 +2,7 @@ import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
 
-export const SORTS = ['l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
+export const SORTS = ['projected', 'l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
 export const PAGE_SIZE = 50;
 
@@ -12,6 +12,8 @@ export interface SearchFilters {
   team?: string;
   position?: GenericPosition;
   detailedPosition?: DetailedPosition;
+  /** Masque les joueurs blessés ou suspendus. */
+  available?: boolean;
   sort: Sort;
   offset: number;
 }
@@ -23,7 +25,33 @@ export interface PlayerListRow {
   nextIndex: number | null; nextLowSample: boolean | null;
   pictureUrl: string | null; teamPictureUrl: string | null; playingStatus: string | null;
   injuryKind: string | null; suspensionReason: string | null; sorareProjection: number | null;
+  /** Score potentiel du prochain match de championnat. */
+  nextProjected: number | null;
 }
+
+export interface GameWeekFixture {
+  id: number; date: string; competition: string;
+  home: { slug: string; name: string; pictureUrl: string | null; rating: number | null };
+  away: { slug: string; name: string; pictureUrl: string | null; rating: number | null };
+}
+export interface GameWeekPlayer {
+  slug: string; name: string; position: GenericPosition; usualPosition: DetailedPosition | null;
+  team: string; teamPictureUrl: string | null; pictureUrl: string | null;
+  opponent: string; opponentPictureUrl: string | null; isHome: boolean; date: string;
+  projected: number; startRate: number; l15: number; playingStatus: string | null; sorareProjection: number | null;
+}
+/** Concédé par l'adversaire à chaque poste (5 derniers matchs), vu depuis une équipe qui joue la journée. */
+export interface RoundMatchup {
+  fixtureId: number; date: string; team: string; teamSlug: string; teamPictureUrl: string | null;
+  opponent: string; opponentSlug: string; opponentPictureUrl: string | null; isHome: boolean;
+  /** Qualité défensive de l'adversaire, 1–100 (100 = le plus fort). */
+  opponentRating: number | null;
+  byPosition: Partial<Record<DetailedPosition, { average: number | null; index: number | null; observations: number }>>;
+}
+export interface GameWeekFilters { competition?: string; position?: GenericPosition; startersOnly: boolean; limit: number }
+
+/** Joueur indisponible : blessé ou suspendu. */
+const UNAVAILABLE = 'p.injury_kind is not null or p.injury_end is not null or p.suspension_reason is not null or p.suspension_end is not null';
 
 export interface ConcededView {
   position: DetailedPosition; average: number | null; leagueAverage: number | null; index: number | null;
@@ -100,7 +128,7 @@ const toConceded = (r: postgres.Row): ConcededView => ({
 
 export function createQueries(sql: postgres.Sql) {
   const SORT_SQL: Record<Sort, postgres.PendingQuery<postgres.Row[]>> = {
-    l5: sql`s.l5`, l15: sql`s.l15`, l40: sql`s.l40`, startRate: sql`s.start_rate5`, nextIndex: sql`cp.index`,
+    projected: sql`s.next_projected`, l5: sql`s.l5`, l15: sql`s.l15`, l40: sql`s.l40`, startRate: sql`s.start_rate5`, nextIndex: sql`cp.index`,
   };
 
   /** Prochain match programmé de chaque équipe. */
@@ -119,7 +147,8 @@ export function createQueries(sql: postgres.Sql) {
         select p.sorare_slug, p.name, p.position, t.name as team, t.sorare_slug as team_slug, c.name as competition,
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
-          p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection
+          p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
+          s.next_projected
         from players p
         join player_summary s on s.player_id = p.id
         left join teams t on t.id = p.team_id
@@ -134,6 +163,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.position ? sql`and p.position = ${f.position}` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
+          ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
         limit ${PAGE_SIZE} offset ${f.offset}`;
       return rows.map((r) => ({
@@ -143,6 +173,91 @@ export function createQueries(sql: postgres.Sql) {
         nextIndex: r.next_index, nextLowSample: r.low_sample,
         pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, playingStatus: r.playing_status,
         injuryKind: r.injury_kind, suspensionReason: r.suspension_reason, sorareProjection: r.sorare_projection,
+        nextProjected: r.next_projected,
+      }));
+    },
+
+    /**
+     * Prochaine journée : matchs de championnat programmés dans les 4 jours qui suivent le premier d'entre eux.
+     * Les championnats jouent rarement le même jour : une fenêtre de 4 jours couvre une Game Week Sorare.
+     */
+    async getGameWeekFixtures(competition?: string): Promise<GameWeekFixture[]> {
+      const rows = await sql`
+        with upcoming as (
+          select f.*, c.name as competition from fixtures f join competitions c on c.id = f.competition_id and c.is_league
+          where f.status = 'scheduled' and f.date > now() ${competition ? sql`and c.slug = ${competition}` : sql``}
+        )
+        select u.id, u.date, u.competition,
+          h.sorare_slug as home_slug, h.name as home_name, h.picture_url as home_picture, ho.rating as home_rating,
+          a.sorare_slug as away_slug, a.name as away_name, a.picture_url as away_picture, ao.rating as away_rating
+        from upcoming u
+        join teams h on h.id = u.home_team_id
+        join teams a on a.id = u.away_team_id
+        left join team_conceded_overall ho on ho.team_id = h.id and ho.window_size = 10
+        left join team_conceded_overall ao on ao.team_id = a.id and ao.window_size = 10
+        where u.date < (select min(date) from upcoming) + interval '4 days'
+        order by u.date, u.id`;
+      return rows.map((r) => ({
+        id: r.id, date: (r.date as Date).toISOString(), competition: r.competition,
+        home: { slug: r.home_slug, name: r.home_name, pictureUrl: r.home_picture, rating: r.home_rating },
+        away: { slug: r.away_slug, name: r.away_name, pictureUrl: r.away_picture, rating: r.away_rating },
+      }));
+    },
+
+    /** Meilleurs scores potentiels de la journée par poste, hors blessés et suspendus. */
+    async getGameWeekPlayers(fixtureIds: number[], f: GameWeekFilters): Promise<GameWeekPlayer[]> {
+      if (!fixtureIds.length) return [];
+      const rows = await sql`
+        select * from (
+          select p.sorare_slug, p.name, p.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
+            o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
+            s.next_projected, s.start_rate5, s.l15, p.playing_status, p.sorare_projection,
+            row_number() over (partition by p.position order by s.next_projected desc, p.name) as rank
+          from player_summary s
+          join players p on p.id = s.player_id
+          join teams t on t.id = p.team_id
+          join fixtures fx on fx.id = s.next_fixture_id
+          join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
+          where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null
+            and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
+            ${f.startersOnly ? sql`and s.start_rate5 >= 0.6` : sql``}
+            ${f.position ? sql`and p.position = ${f.position}` : sql``}
+        ) x where rank <= ${f.limit}
+        order by array_position(array['Goalkeeper','Defender','Midfielder','Forward'], position), rank`;
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, position: r.position, usualPosition: r.usual_position,
+        team: r.team, teamPictureUrl: r.team_picture, pictureUrl: r.picture_url,
+        opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
+        projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
+      }));
+    },
+
+    /** Pour chaque équipe de la journée : ce que son adversaire concède à chaque poste. */
+    async getRoundMatchups(fixtureIds: number[]): Promise<RoundMatchup[]> {
+      if (!fixtureIds.length) return [];
+      const sides = await sql`
+        select f.id, f.date, s.team_id, s.opponent_id, s.is_home,
+          t.name as team, t.sorare_slug as team_slug, t.picture_url as team_picture,
+          o.name as opponent, o.sorare_slug as opponent_slug, o.picture_url as opponent_picture, co.rating
+        from fixtures f
+        cross join lateral (values (f.home_team_id, f.away_team_id, true), (f.away_team_id, f.home_team_id, false)) s(team_id, opponent_id, is_home)
+        join teams t on t.id = s.team_id
+        join teams o on o.id = s.opponent_id
+        left join team_conceded_overall co on co.team_id = s.opponent_id and co.window_size = 10
+        where f.id = any(${fixtureIds})
+        order by f.date, f.id, s.is_home desc`;
+      const conceded = await sql`select team_id, detailed_position, average, index, observations from team_conceded_by_position
+        where window_size = 5 and team_id = any(${sides.map((s) => s.opponent_id)})`;
+      const byTeam = new Map<number, RoundMatchup['byPosition']>();
+      for (const c of conceded) {
+        const m = byTeam.get(c.team_id) ?? {};
+        m[c.detailed_position as DetailedPosition] = { average: c.average, index: c.index, observations: c.observations };
+        byTeam.set(c.team_id, m);
+      }
+      return sides.map((s) => ({
+        fixtureId: s.id, date: (s.date as Date).toISOString(), team: s.team, teamSlug: s.team_slug, teamPictureUrl: s.team_picture,
+        opponent: s.opponent, opponentSlug: s.opponent_slug, opponentPictureUrl: s.opponent_picture, isHome: s.is_home,
+        opponentRating: s.rating, byPosition: byTeam.get(s.opponent_id) ?? {},
       }));
     },
 
