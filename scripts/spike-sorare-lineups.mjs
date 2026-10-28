@@ -35,15 +35,25 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Marché : prix plancher des cartes Limited et dernières ventes.
+// Marché : arguments et champs de tokenPrices, lowestPriceAnyCard, cardSupply.
 const MP = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
-await probe('Player (marché)', MP, [
-  'xyzPrice', 'price', 'lowestPrice', 'xyzSale', 'sales', 'xyzMarket', 'market', 'floor', 'xyzFloor', 'xyzToken', 'tokenPrices', 'xyzCard', 'cards',
-  'lowestPriceAnyCard', 'lowestPriceCard', 'averagePrice', 'xyzAverage', 'xyzLowest', 'xyzOffer', 'xyzSupply', 'cardSupply',
-]);
-await probe('tokenPrices', (c) => MP(`tokenPrices(${c}) { xyz }`), ['rarity: limited', 'rarity: limited, first: 5', 'xyzArg: 1']);
-await probe('lowestPriceAnyCard', (c) => MP(`lowestPriceAnyCard(${c}) { xyz }`), ['rarity: limited', 'rarity: limited, inSeason: true', 'xyzArg: 1']);
-await probe('Root (marché)', (c) => `{ ${c} }`, ['tokens { xyz }', 'xyzToken', 'football { xyzPrice }', 'xyzMarket', 'tokenPrices { xyz }']);
+const tries = {
+  'tp-noargs': 'tokenPrices { nodes { date } }',
+  'tp-rarity': 'tokenPrices(rarity: limited) { nodes { date } }',
+  'tp-first': 'tokenPrices(rarity: limited, first: 5) { nodes { date amounts { eurCents } } }',
+  'tp-node-xyz': 'tokenPrices(rarity: limited, first: 3) { nodes { xyzAmount xyzDate xyzCard xyzDeal } }',
+  'tp-node-guess': 'tokenPrices(rarity: limited, first: 3) { nodes { id date amount amounts { eurCents usdCents wei } } }',
+  'tp-args-xyz': 'tokenPrices(rarity: limited, first: 3, xyzSeason: true) { nodes { date } }',
+  'lp-noargs': 'lowestPriceAnyCard { slug }',
+  'lp-rarity': 'lowestPriceAnyCard(rarity: limited) { slug }',
+  'lp-args-xyz': 'lowestPriceAnyCard(rarity: limited, xyzSeason: true) { slug }',
+  'lp-fields-xyz': 'lowestPriceAnyCard(rarity: limited) { xyzPrice xyzOffer xyzSeason }',
+  'lp-offer': 'lowestPriceAnyCard(rarity: limited) { slug seasonYear inSeasonEligible liveSingleSaleOffer { receiverSide { amounts { eurCents } } } }',
+  'lp-offer2': 'lowestPriceAnyCard(rarity: limited) { slug liveSingleSaleOffer { xyzPrice xyzSide } }',
+  'cs': 'cardSupply { xyz }',
+  'cs2': 'cardSupply { limited season { startYear } }',
+};
+for (const [k, q] of Object.entries(tries)) await sample(k, MP(q));
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
