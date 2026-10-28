@@ -65,7 +65,7 @@ describe('client Sorare', () => {
     expect(d.home.bench).toEqual([{ slug: 'lee-kang-in', displayName: 'Lee Kang-in' }]);
     expect(d.scores[0]).toEqual({
       playerSlug: 'desire-doue', displayName: 'Désiré Doué', position: 'Forward',
-      score: 53.6, decisive: 35, allAround: 18.6, minutes: 90, started: true,
+      score: 53.6, decisive: 35, allAround: 18.6, minutes: 90, started: true, actions: { goals: 1 },
     });
     expect(d.scores[1]).toMatchObject({ playerSlug: 'lee-kang-in', minutes: 20, started: false, decisive: 0, allAround: 0 });
     expect(d.scores[2]).toMatchObject({ playerSlug: 'absent-player', minutes: 0, started: false });
@@ -81,6 +81,20 @@ describe('client Sorare', () => {
       { slug: 'vitinha', pictureUrl: null, playingStatus: 'STARTER',
         injury: null, suspension: { reason: 'Red card', end: '2026-11-02' }, projection: null, nationalTeam: null },
     ]);
+  });
+
+  it('profils : naissance, nationalité, saisons jouées (une requête pour plusieurs joueurs)', async () => {
+    const f = fakeFetch([[/PlayerProfiles/, fixture('player-profiles')]]);
+    const profiles = await createSorareClient('k', f.impl).playerProfiles(['kylian-mbappe-lottin', 'inconnu'], [2026, 2025, 2024]);
+    expect(f.requests[0].body.variables).toEqual({ p0: 'kylian-mbappe-lottin', p1: 'inconnu' });
+    expect(f.requests[0].body.query).toContain('s2024: stats(seasonStartYear: 2024)');
+    expect(profiles).toEqual([{
+      slug: 'kylian-mbappe-lottin', birthDate: '1998-12-20', country: { code: 'fr', name: 'France', flagUrl: 'https://flags/FR.png' },
+      seasons: [
+        { startYear: 2026, appearances: 9, substituteIn: 1, goals: 8, assists: 2, minutes: 790, yellowCards: 0, redCards: 0 },
+        { startYear: 2025, appearances: 31, substituteIn: 2, goals: 25, assists: 5, minutes: 2606, yellowCards: 2, redCards: 0 },
+      ],
+    }]);
   });
 
   it('erreur GraphQL → exception explicite', async () => {

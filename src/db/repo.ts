@@ -26,6 +26,12 @@ export interface FixtureInput {
 export interface AppearanceInput {
   fixtureId: number; playerId: number; teamId: number; grid: string | null; detailedPosition: DetailedPosition | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
+  /** Actions décisives (goals, goal_assist, clean_sheet_60…) et leur nombre. */
+  actions?: Record<string, number>;
+}
+export interface PlayerProfileInput {
+  slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null;
+  seasons: { startYear: number; appearances: number; substituteIn: number; goals: number; assists: number; minutes: number; yellowCards: number; redCards: number }[];
 }
 export interface PlayerSummaryRow {
   playerId: number; l5: number; l15: number; l40: number; stdDev5: number;
@@ -60,6 +66,11 @@ export interface ConcededOverallRow extends ConcededOverall { rating: number | n
 export interface VenueFactorRow { competitionId: number; home: number; away: number; observations: number }
 /** tracked : club d'un championnat suivi (ses joueurs sont importés). */
 export interface TeamRow { id: number; name: string; sorareSlug: string; tracked?: boolean }
+
+/** Version du détail de match importé ; 2 : actions décisives. Les matchs d'une version antérieure sont réimportés. */
+export const STATS_VERSION = 2;
+/** Délai avant de rafraîchir l'identité et l'historique d'un joueur. */
+const PROFILE_REFRESH_DAYS = 7;
 
 /** Nombre de tentatives d'import de compo pour un match avant de l'abandonner. */
 export const MAX_LINEUP_ATTEMPTS = 5;
@@ -159,15 +170,17 @@ function createBaseRepo(sql: Sql) {
     },
 
     async markLineupsImported(fixtureId: number, homeFormation: string | null, awayFormation: string | null): Promise<void> {
-      await sql`update fixtures set lineups_imported = true, home_formation = ${homeFormation}, away_formation = ${awayFormation}
-        where id = ${fixtureId}`;
+      await sql`update fixtures set lineups_imported = true, home_formation = ${homeFormation}, away_formation = ${awayFormation},
+        stats_version = ${STATS_VERSION} where id = ${fixtureId}`;
     },
 
     async fixturesNeedingLineups(): Promise<FixtureToComplete[]> {
       const rows = await sql`
         select id, sorare_game_id, home_team_id, away_team_id from fixtures
-        where status = 'played' and not lineups_imported and lineups_attempts < ${MAX_LINEUP_ATTEMPTS}
-        order by date desc`;
+        where status = 'played' and (
+          (not lineups_imported and lineups_attempts < ${MAX_LINEUP_ATTEMPTS})
+          or (lineups_imported and stats_version < ${STATS_VERSION}))
+        order by lineups_imported, date desc`;
       return rows.map((r) => ({ id: r.id, sorareGameId: r.sorare_game_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id }));
     },
 
@@ -189,13 +202,13 @@ function createBaseRepo(sql: Sql) {
     async upsertAppearance(a: AppearanceInput): Promise<void> {
       await sql`
         insert into appearances (fixture_id, player_id, team_id, grid, detailed_position, started, minutes,
-          sorare_score, decisive_score, all_around_score)
+          sorare_score, decisive_score, all_around_score, decisive_actions)
         values (${a.fixtureId}, ${a.playerId}, ${a.teamId}, ${a.grid}, ${a.detailedPosition}, ${a.started}, ${a.minutes},
-          ${a.score}, ${a.decisive}, ${a.allAround})
+          ${a.score}, ${a.decisive}, ${a.allAround}, ${sql.json(a.actions ?? {})})
         on conflict (fixture_id, player_id) do update set team_id = excluded.team_id, grid = excluded.grid,
           detailed_position = excluded.detailed_position, started = excluded.started, minutes = excluded.minutes,
           sorare_score = excluded.sorare_score, decisive_score = excluded.decisive_score,
-          all_around_score = excluded.all_around_score`;
+          all_around_score = excluded.all_around_score, decisive_actions = excluded.decisive_actions`;
     },
 
     async replaceConceded(rows: Conceded[]): Promise<void> {
@@ -238,6 +251,34 @@ function createBaseRepo(sql: Sql) {
           next_fixture_id: r.nextFixtureId ?? null, next_projected: r.nextProjected ?? null,
         })),
       )}`;
+    },
+
+    /** Joueurs dont l'identité et l'historique sont absents ou plus vieux qu'une semaine, les plus anciens d'abord. */
+    async playersNeedingProfile(): Promise<string[]> {
+      const rows = await sql`select sorare_slug from players
+        where profile_updated_at is null or profile_updated_at < now() - make_interval(days => ${PROFILE_REFRESH_DAYS})
+        order by profile_updated_at nulls first, id`;
+      return rows.map((r) => r.sorare_slug);
+    },
+
+    /** Identité et historique par saison (l'historique d'un joueur est remplacé en entier). */
+    async saveProfiles(profiles: PlayerProfileInput[]): Promise<void> {
+      for (const p of profiles) {
+        const [player] = await sql`update players set birth_date = ${p.birthDate}, country_code = ${p.country?.code ?? null},
+          country_name = ${p.country?.name ?? null}, country_flag_url = ${p.country?.flagUrl ?? null}, profile_updated_at = now()
+          where sorare_slug = ${p.slug} returning id`;
+        if (!player) continue;
+        await sql`delete from player_seasons where player_id = ${player.id}`;
+        if (p.seasons.length) await sql`insert into player_seasons ${sql(p.seasons.map((x) => ({
+          player_id: player.id, start_year: x.startYear, appearances: x.appearances, substitute_in: x.substituteIn, goals: x.goals,
+          assists: x.assists, minutes: x.minutes, yellow_cards: x.yellowCards, red_cards: x.redCards,
+        })))}`;
+      }
+    },
+
+    /** Marque des joueurs comme traités même si Sorare ne les connaît pas (évite de les redemander chaque jour). */
+    async touchProfiles(slugs: string[]): Promise<void> {
+      if (slugs.length) await sql`update players set profile_updated_at = now() where sorare_slug = any(${slugs})`;
     },
 
     /** Club actuel de chaque joueur. */

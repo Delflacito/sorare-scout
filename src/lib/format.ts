@@ -18,3 +18,10 @@ export function roundLabel(fixtures: { date: string }[]): string {
   const n = `${fixtures.length} match${fixtures.length > 1 ? 's' : ''}`;
   return first === last ? `${first} · ${n}` : `Du ${first} au ${last} · ${n}`;
 }
+
+/** Âge à une date donnée (date de naissance AAAA-MM-JJ). */
+export function ageAt(birthDate: string, now = new Date()): number {
+  const [y, m, d] = birthDate.split('-').map(Number);
+  const age = now.getUTCFullYear() - y;
+  return now.getUTCMonth() + 1 < m || (now.getUTCMonth() + 1 === m && now.getUTCDate() < d) ? age - 1 : age;
+}

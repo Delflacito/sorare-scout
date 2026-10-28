@@ -130,7 +130,7 @@ async function completeFixture(deps: FixturesDeps, fixture: FixtureToComplete, t
         grid: side.grid.get(s.playerSlug) ?? null,
         detailedPosition: side.positions.get(s.playerSlug) ?? null,
         started: side.grid.has(s.playerSlug),
-        minutes: s.minutes, score: s.score, decisive: s.decisive, allAround: s.allAround,
+        minutes: s.minutes, score: s.score, decisive: s.decisive, allAround: s.allAround, actions: s.actions,
       });
     }
     await tx.markLineupsImported(fixture.id, formationOf(detail.home.starting), formationOf(detail.away.starting));

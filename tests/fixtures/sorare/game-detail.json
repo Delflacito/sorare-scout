@@ -22,7 +22,9 @@
         { "category": "POSSESSION", "stat": "duel_won", "totalScore": 5 },
         { "category": "ATTACKING", "stat": "pen_area_entries", "totalScore": 6.5 },
         { "category": "PASSING", "stat": "accurate_pass", "totalScore": 13.1 },
-        { "category": "POSITIVE_DECISIVE_STAT", "stat": "goals", "totalScore": 0 }
+        { "category": "POSITIVE_DECISIVE_STAT", "stat": "goals", "statValue": 1, "totalScore": 0 },
+        { "category": "POSITIVE_DECISIVE_STAT", "stat": "goal_assist", "statValue": 0, "totalScore": 0 },
+        { "category": "NEGATIVE_DECISIVE_STAT", "stat": "red_card", "statValue": 0, "totalScore": 0 }
       ] },
     { "score": 38, "anyPlayer": { "slug": "lee-kang-in", "displayName": "Lee Kang-in", "anyPositions": ["Midfielder"] },
       "anyPlayerGameStats": { "minsPlayed": 20, "gameStarted": null, "formationPlace": 0 }, "detailedScore": [] },

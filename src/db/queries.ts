@@ -77,6 +77,19 @@ export interface PlayerDetail {
   injury: { kind: string | null; end: string | null } | null;
   suspension: { reason: string | null; end: string | null } | null;
   sorareProjection: number | null;
+  birthDate: string | null;
+  country: { code: string; name: string; flagUrl: string | null } | null;
+}
+
+/** Statistiques de championnat d'une saison (Sorare). */
+export interface PlayerSeasonView {
+  startYear: number; appearances: number; substituteIn: number; goals: number; assists: number;
+  minutes: number; yellowCards: number; redCards: number;
+}
+/** Saison en cours, par compétition, d'après les matchs importés. */
+export interface CompetitionTotalsView {
+  competition: string; isLeague: boolean; played: number; started: number; minutes: number;
+  goals: number; assists: number; average: number | null;
 }
 
 export type GameStatus = 'started' | 'sub' | 'absent';
@@ -87,6 +100,7 @@ export interface PlayerGameView {
   status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
   /** Compétition du match ; isLeague = false pour une coupe ou un match de sélection. */
   competition: string; isLeague: boolean;
+  actions: Record<string, number>;
 }
 
 export interface TeamView { id: number; name: string; slug: string; competition: string | null }
@@ -272,6 +286,7 @@ export function createQueries(sql: postgres.Sql) {
         select p.id, p.sorare_slug, p.name, p.position, t.name as team, t.sorare_slug as team_slug, c.name as competition,
           p.picture_url, t.picture_url as team_picture_url, t.short_name as team_short_name, p.playing_status,
           p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
+          p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
@@ -308,7 +323,36 @@ export function createQueries(sql: postgres.Sql) {
         injury: r.injury_kind || r.injury_end ? { kind: r.injury_kind, end: r.injury_end } : null,
         suspension: r.suspension_reason || r.suspension_end ? { reason: r.suspension_reason, end: r.suspension_end } : null,
         sorareProjection: r.sorare_projection,
+        birthDate: r.birth_date,
+        country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
       };
+    },
+
+    async getPlayerSeasons(slug: string): Promise<PlayerSeasonView[]> {
+      const rows = await sql`select s.* from player_seasons s join players p on p.id = s.player_id
+        where p.sorare_slug = ${slug} order by s.start_year desc`;
+      return rows.map((r) => ({
+        startYear: r.start_year, appearances: r.appearances, substituteIn: r.substitute_in, goals: r.goals, assists: r.assists,
+        minutes: r.minutes, yellowCards: r.yellow_cards, redCards: r.red_cards,
+      }));
+    },
+
+    /** Saison en cours par compétition (matchs où le joueur a joué), championnat d'abord. */
+    async getCompetitionTotals(slug: string): Promise<CompetitionTotalsView[]> {
+      const rows = await sql`
+        select c.name as competition, c.is_league, count(*)::int as played, count(*) filter (where a.started)::int as started,
+          sum(a.minutes)::int as minutes,
+          coalesce(sum((a.decisive_actions->>'goals')::int), 0)::int as goals,
+          coalesce(sum((a.decisive_actions->>'goal_assist')::int), 0)::int as assists,
+          avg(a.sorare_score) as average
+        from appearances a join players p on p.id = a.player_id
+        join fixtures f on f.id = a.fixture_id join competitions c on c.id = f.competition_id
+        where p.sorare_slug = ${slug} and a.minutes > 0
+        group by c.name, c.is_league order by c.is_league desc, played desc, c.name`;
+      return rows.map((r) => ({
+        competition: r.competition, isLeague: r.is_league, played: r.played, started: r.started, minutes: r.minutes,
+        goals: r.goals, assists: r.assists, average: r.average,
+      }));
     },
 
     /**
@@ -321,7 +365,7 @@ export function createQueries(sql: postgres.Sql) {
         games as (
           select f.id, f.date, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals, f.competition_id,
             coalesce(a.team_id, (select team_id from p)) as team_id,
-            a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score
+            a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score, a.decisive_actions
           from fixtures f
           left join appearances a on a.fixture_id = f.id and a.player_id = (select id from p)
           where f.status = 'played' and f.lineups_imported
@@ -341,7 +385,7 @@ export function createQueries(sql: postgres.Sql) {
         score: g.sorare_score ?? 0, minutes: g.minutes ?? 0,
         status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
         position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
-        competition: g.competition, isLeague: g.is_league,
+        competition: g.competition, isLeague: g.is_league, actions: g.decisive_actions ?? {},
       }));
     },
 
