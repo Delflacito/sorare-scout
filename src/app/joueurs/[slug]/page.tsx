@@ -62,7 +62,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
       </div>
       <p className="subtitle">
         Score potentiel s’il joue : forme {upcoming.form === null ? '—' : fmtScore(upcoming.form)} (0,6 × 5 derniers matchs joués + 0,4 × 15)
-        × adversaire (60 % concédé au poste, 40 % qualité générale, indice 100 = moyenne de la ligue) × domicile +3 % / extérieur −3 %.
+        × adversaire (60 % qualité générale, 40 % concédé au poste, indice 100 = moyenne de la ligue) × domicile +3 % / extérieur −3 %.
         {upcoming.startRate !== null && <> Probabilité d’être titulaire : {fmtPct(upcoming.startRate)} (5 derniers matchs).</>}
       </p>
     </>
