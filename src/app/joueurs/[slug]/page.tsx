@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerGameView, type UpcomingView } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR } from '@/domain/types';
-import { achievableScore, projectedScore } from '@/domain/projection';
+import { opponentMultiplier, playerVenueFactor, projectedScore } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { fmtDate, fmtPct, fmtScore, indexClass } from '@/lib/format';
 
@@ -39,20 +39,23 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
           </thead>
           <tbody>
             {upcoming.fixtures.map((f) => {
-              const achievable = f.position
-                ? achievableScore({
-                    positionAverage: f.position.average, positionObs: f.position.observations,
-                    positionLeagueAverage: f.position.leagueAverage,
-                    teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
-                  })
-                : null;
-              const projected = projectedScore({ form: upcoming.form, achievable, venueFactor: f.venueFactor });
+              const venueFactor = playerVenueFactor({
+                venueAverage: f.isHome ? upcoming.homeAvg : upcoming.awayAvg,
+                venueGames: f.isHome ? upcoming.homeGames : upcoming.awayGames,
+                base: upcoming.base, leagueFactor: f.leagueVenueFactor,
+              });
+              const opponent = opponentMultiplier({
+                positionAverage: f.position?.average ?? null, positionObs: f.position?.observations ?? 0,
+                positionLeagueAverage: f.position?.leagueAverage ?? null,
+                teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
+              });
+              const projected = projectedScore({ base: upcoming.base, venueFactor, opponent });
               const p = f.position;
               return (
                 <tr key={f.fixtureId}>
                   <td>{fmtDate(f.date)}</td>
                   <td>{f.isHome ? 'vs' : '@'} <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
-                  <td className="num">{fmtVenue(f.venueFactor)}</td>
+                  <td className="num">{fmtVenue(venueFactor)}</td>
                   <td className="num strong">{projected === null ? '—' : fmtScore(projected)}</td>
                   {p && p.average !== null ? (
                     <td className={`num ${indexClass(p.leagueAverage ? p.average / p.leagueAverage : null)} ${p.observations < 3 ? 'low-sample' : ''}`}
@@ -73,9 +76,10 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
         </table>
       </div>
       <p className="subtitle">
-        Score potentiel s’il joue = (30 % forme {upcoming.form === null ? '—' : fmtScore(upcoming.form)} + 70 % score atteignable
-        au poste contre l’adversaire) × avantage du terrain mesuré dans le championnat. Score atteignable = 40 % points concédés par
-        l’adversaire au poste + 60 % moyenne de la ligue au poste ajustée par la qualité adverse (note 1–100, 100 = adversaire le plus fort).
+        Score potentiel s’il joue = niveau L15 {upcoming.base === null ? '—' : fmtScore(upcoming.base)} (matchs joués)
+        × lieu (sa moyenne à domicile / à l’extérieur, ramenée vers l’avantage du championnat s’il a peu de matchs)
+        × adversaire (40 % points concédés au poste, 60 % qualité générale, effet doublé ; adversaire moyen = ×1).
+        Qualité adverse : note 1–100, 100 = adversaire le plus fort.
         {upcoming.startRate !== null && <> Probabilité d’être titulaire : {fmtPct(upcoming.startRate)} (5 derniers matchs).</>}
       </p>
     </>

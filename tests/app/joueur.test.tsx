@@ -30,11 +30,11 @@ const games: PlayerGameView[] = [
     score: 0, minutes: 0, status: 'absent', position: null, decisive: 0, allAround: 0 },
 ];
 const upcoming: UpcomingView = {
-  form: 60, startRate: 0.8, usualPosition: 'LB',
+  base: 80, homeAvg: 76, homeGames: 5, awayAvg: 84.6, awayGames: 5, startRate: 0.8, usualPosition: 'LB',
   fixtures: [
     { fixtureId: 9, date: '2099-01-01T20:00:00.000Z', opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true,
-      position: { average: 66, leagueAverage: 50, observations: 5 }, overall: { index: 1.1, rating: 30, observations: 20 }, venueFactor: 1.03 },
-    { fixtureId: 10, date: '2099-01-08T20:00:00.000Z', opponent: 'RC Lens', opponentSlug: 'lens', isHome: false, position: null, overall: null, venueFactor: 0.97 },
+      position: { average: 66, leagueAverage: 50, observations: 5 }, overall: { index: 1.1, rating: 30, observations: 20 }, leagueVenueFactor: 1.03 },
+    { fixtureId: 10, date: '2099-01-08T20:00:00.000Z', opponent: 'RC Lens', opponentSlug: 'lens', isHome: false, position: null, overall: null, leagueVenueFactor: 0.97 },
   ],
 };
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -60,26 +60,25 @@ describe('/joueurs/[slug]', () => {
     render(await Page(params('nuno-mendes')));
     const table = screen.getByRole('table', { name: 'Prochains matchs' });
     const rows = within(table).getAllByRole('row').slice(1);
-    // atteignable = 0,4 × 58 + 0,6 × 50 × 1,08 = 55,6 ; potentiel = (0,3 × 60 + 0,7 × 55,6) × 1,03 = 58,6
-    expect(within(rows[0]).getByText('58.6')).toBeInTheDocument();
+    // lieu : 76/80 = 0,95 ramené vers 1,03 → 0,99 ; adversaire : 1 + 2 × (0,4 × 1,16 + 0,6 × 1,08 − 1) = 1,224
+    // potentiel = 80 × 0,99 × 1,224 = 96,9
+    expect(within(rows[0]).getByText('96.9')).toBeInTheDocument();
     expect(within(rows[0]).getByRole('link', { name: /Olympique de Marseille/ })).toHaveAttribute('href', '/equipes/om');
     expect(within(rows[0]).getByText('66 pts')).toBeInTheDocument();
     expect(within(rows[0]).getByText('(ligue 50)')).toBeInTheDocument();
     expect(within(rows[0]).getByText('30/100')).toBeInTheDocument();
-    expect(within(rows[0]).getByText('+3 %')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('−3 %')).toBeInTheDocument();
-    // adversaire sans données : forme × extérieur
-    expect(within(rows[1]).getByText('58.2')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('−1 %')).toBeInTheDocument();
+    // extérieur sans données adverses : 84,6/80 ramené vers 0,97 → 1,014 ; 80 × 1,014 = 81,1
+    expect(within(rows[1]).getByText('81.1')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('+1 %')).toBeInTheDocument();
     expect(screen.getByText(/Probabilité d’être titulaire : 80 %/)).toBeInTheDocument();
   });
 
-  it('pas de forme : score atteignable au poste × lieu', async () => {
-    getUpcoming.mockResolvedValue({ ...upcoming, form: null });
+  it('aucun match joué : pas de score potentiel', async () => {
+    getUpcoming.mockResolvedValue({ ...upcoming, base: null, homeAvg: null, homeGames: 0, awayAvg: null, awayGames: 0 });
     render(await Page(params('nuno-mendes')));
     const rows = within(screen.getByRole('table', { name: 'Prochains matchs' })).getAllByRole('row').slice(1);
-    expect(within(rows[0]).getByText('57.3')).toBeInTheDocument();
-    // ni forme ni données adverses : pas de score
-    expect(within(rows[1]).getAllByText('—').length).toBeGreaterThan(0);
+    expect(within(rows[0]).getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('aucun match programmé', async () => {

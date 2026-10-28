@@ -21,8 +21,12 @@ export interface PlayerSummaryRow {
   startRate5: number; avgMinutes5: number; startRate15: number; avgMinutes15: number;
   decisive5: number; allAround5: number; decisive15: number; allAround15: number;
   usualPosition: DetailedPosition | null;
-  /** Forme (matchs joués uniquement), base du score potentiel. */
-  form: number | null;
+  /** Niveau de base (L15 sur les matchs joués) et moyennes à domicile / à l'extérieur : base du score potentiel. */
+  base: number | null;
+  homeAvg: number | null;
+  homeGames: number;
+  awayAvg: number | null;
+  awayGames: number;
 }
 
 export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
@@ -169,7 +173,8 @@ function createBaseRepo(sql: Sql) {
           player_id: r.playerId, l5: r.l5, l15: r.l15, l40: r.l40, std_dev5: r.stdDev5,
           start_rate5: r.startRate5, avg_minutes5: r.avgMinutes5, start_rate15: r.startRate15, avg_minutes15: r.avgMinutes15,
           decisive5: r.decisive5, all_around5: r.allAround5, decisive15: r.decisive15, all_around15: r.allAround15,
-          usual_position: r.usualPosition, form: r.form,
+          usual_position: r.usualPosition, base: r.base,
+          home_avg: r.homeAvg, home_games: r.homeGames, away_avg: r.awayAvg, away_games: r.awayGames,
         })),
       )}`;
     },
