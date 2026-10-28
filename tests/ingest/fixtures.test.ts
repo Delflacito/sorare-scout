@@ -12,8 +12,8 @@ const game = (id: string, date: string, home: string, away: string, status: Sora
   ({ id, date, homeClubSlug: home, awayClubSlug: away, competitionSlug, competitionName: competitionSlug.toUpperCase(),
     home: team(home, kind), away: team(away, kind), homeGoals: 1, awayGoals: 0, status });
 const pl = (slug: string) => ({ slug, displayName: slug });
-const score = (playerSlug: string, position: SorarePlayerScore['position'], s: number, minutes = 90, started = true): SorarePlayerScore =>
-  ({ playerSlug, displayName: playerSlug, position, score: s, decisive: 35, allAround: s - 35, minutes, started });
+const score = (playerSlug: string, position: SorarePlayerScore['position'], s: number, minutes = 90, started = true, actions: Record<string, number> = {}): SorarePlayerScore =>
+  ({ playerSlug, displayName: playerSlug, position, score: s, decisive: 35, allAround: s - 35, minutes, started, actions });
 
 const G1 = game('Game:1', '2026-10-25T19:00:00Z', 'psg', 'om');
 const G2 = game('Game:2', '2026-10-18T19:00:00Z', 'om', 'psg');
@@ -28,7 +28,7 @@ const DETAIL_G1: SorareGameDetail = {
   home: { starting: [[pl('donnarumma')], [pl('hakimi'), pl('marquinhos'), pl('pacho'), pl('nuno-mendes')], [pl('neves'), pl('vitinha'), pl('ruiz')], [pl('dembele'), pl('ramos'), pl('doue')]], bench: [pl('lee')] },
   away: { starting: [[pl('rulli')], [pl('murillo'), pl('balerdi'), pl('aguerd')], [pl('weah'), pl('hojbjerg'), pl('rongier'), pl('emerson')], [pl('greenwood'), pl('aubameyang')]], bench: [] },
   scores: [
-    score('nuno-mendes', 'Defender', 72), score('doue', 'Forward', 64), score('hakimi', 'Defender', 50),
+    score('nuno-mendes', 'Defender', 72), score('doue', 'Forward', 64, 90, true, { goals: 2, goal_assist: 1 }), score('hakimi', 'Defender', 50),
     score('lee', 'Midfielder', 38, 20, false), score('greenwood', 'Forward', 55), score('emerson', 'Defender', 41),
     score('not-on-sheet', 'Forward', 0, 0, false),
   ],
@@ -143,6 +143,20 @@ describeDb('importFixtures', () => {
     expect(nuno.sorare_slug).toBe('psg');
     const [spain] = await sql`select kind from teams where sorare_slug = 'spain'`;
     expect(spain.kind).toBe('national');
+  });
+
+  it('actions décisives enregistrées ; matchs importés avant leur ajout réimportés une fois', async () => {
+    await importFixtures({ ...fakeSorare(), repo }, [league]);
+    const [doue] = await sql`select a.decisive_actions from appearances a join players p on p.id = a.player_id join fixtures f on f.id = a.fixture_id
+      where p.sorare_slug = 'doue' and f.sorare_game_id = 'Game:1'`;
+    expect(doue.decisive_actions).toEqual({ goals: 2, goal_assist: 1 });
+    await sql`update fixtures set stats_version = 1 where sorare_game_id = 'Game:2'`;
+    const f = fakeSorare();
+    await importFixtures({ ...f, repo }, [league]);
+    expect(f.detailCalls).toEqual(['Game:2']);
+    const again = fakeSorare();
+    await importFixtures({ ...again, repo }, [league]);
+    expect(again.detailCalls).toEqual([]);
   });
 
   it('relance : aucun doublon, aucun match redemandé', async () => {

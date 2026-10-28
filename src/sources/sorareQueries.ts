@@ -33,7 +33,7 @@ export const GAME_DETAIL_QUERY = `query GameDetail($id: ID!) {
       score
       anyPlayer { slug displayName anyPositions }
       anyPlayerGameStats { ... on PlayerGameStats { minsPlayed gameStarted formationPlace } }
-      detailedScore { category stat totalScore }
+      detailedScore { category stat statValue totalScore }
     }
   } }
 }`;
@@ -48,3 +48,16 @@ export const CLUB_PLAYERS_QUERY = `query ClubPlayers($slug: String!) {
     activeNationalTeam { slug name pictureUrl }
   } } } }
 }`;
+
+/** Statistiques de championnat d'une saison (Sorare ne précise ni le club ni la compétition). */
+const SEASON_STATS = 'appearances substituteIn goals assists minutesPlayed yellowCards redCards';
+
+/** Identité et historique par saison de plusieurs joueurs en une requête (un alias par joueur et par saison). */
+export function playerProfilesQuery(count: number, seasons: number[]): string {
+  const vars = Array.from({ length: count }, (_, i) => `$p${i}: String!`).join(', ');
+  const players = Array.from({ length: count }, (_, i) => `p${i}: anyPlayer(slug: $p${i}) { ... on Player {
+    slug birthDate country { code name flagUrl }
+    ${seasons.map((y) => `s${y}: stats(seasonStartYear: ${y}) { ${SEASON_STATS} }`).join('\n    ')}
+  } }`).join('\n  ');
+  return `query PlayerProfiles(${vars}) {\n  ${players}\n}`;
+}

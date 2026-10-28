@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, playerProfilesQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -42,6 +42,22 @@ export interface SorareTeamLineup { starting: SorareLineupPlayer[][]; bench: Sor
 export interface SorarePlayerScore {
   playerSlug: string; displayName: string; position: GenericPosition;
   score: number; decisive: number; allAround: number; minutes: number; started: boolean;
+  /** Actions décisives du match (goals, goal_assist, clean_sheet_60, red_card…) et leur nombre. */
+  actions: Record<string, number>;
+}
+export interface SorareSeasonStats {
+  startYear: number; appearances: number; substituteIn: number; goals: number; assists: number;
+  minutes: number; yellowCards: number; redCards: number;
+}
+/** Identité et historique en championnat, saison par saison. */
+export interface SorarePlayerProfile {
+  slug: string; birthDate: string | null;
+  country: { code: string; name: string; flagUrl: string | null } | null;
+  seasons: SorareSeasonStats[];
+}
+interface RawSeasonStats {
+  appearances: number | null; substituteIn: number | null; goals: number | null; assists: number | null;
+  minutesPlayed: number | null; yellowCards: number | null; redCards: number | null;
 }
 export interface SorareGameDetail { home: SorareTeamLineup; away: SorareTeamLineup; scores: SorarePlayerScore[] }
 
@@ -55,11 +71,12 @@ interface RawScore {
   score: number | null;
   anyPlayer: { slug: string; displayName: string; anyPositions: GenericPosition[] };
   anyPlayerGameStats: { minsPlayed: number | null; gameStarted: number | null; formationPlace: number | null } | null;
-  detailedScore: { category: string; stat: string; totalScore: number }[] | null;
+  detailedScore: { category: string; stat: string; statValue?: number | null; totalScore: number }[] | null;
 }
 
 /** Catégories du détail de score qui ne relèvent pas de l'All-Around (le décisif est porté par level_score). */
 const NOT_ALL_AROUND = new Set(['UNKNOWN', 'POSITIVE_DECISIVE_STAT', 'NEGATIVE_DECISIVE_STAT']);
+const DECISIVE = new Set(['POSITIVE_DECISIVE_STAT', 'NEGATIVE_DECISIVE_STAT']);
 
 const toLineup = (l: RawLineup | null): SorareTeamLineup => ({ starting: l?.startingLineup ?? [], bench: l?.bench ?? [] });
 
@@ -75,6 +92,7 @@ function toScore(s: RawScore): SorarePlayerScore {
     allAround: sum(details.filter((d) => !NOT_ALL_AROUND.has(d.category))),
     minutes: s.anyPlayerGameStats?.minsPlayed ?? 0,
     started: s.anyPlayerGameStats?.gameStarted === 1,
+    actions: Object.fromEntries(details.filter((d) => DECISIVE.has(d.category) && d.statValue).map((d) => [d.stat, d.statValue!])),
   };
 }
 
@@ -151,6 +169,25 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
         NATIONAL_TEAM_GAMES_QUERY, { slug });
       const t = d.football.nationalTeam;
       return t ? [...t.latestGames.nodes, ...t.upcomingGames].map(toGame) : [];
+    },
+
+    /** Identité et statistiques de championnat par saison ; les joueurs introuvables sont ignorés. */
+    async playerProfiles(slugs: string[], seasons: number[]): Promise<SorarePlayerProfile[]> {
+      if (!slugs.length) return [];
+      type Raw = { slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null } & Record<string, unknown>;
+      const d = await query<Record<string, Raw | null>>(playerProfilesQuery(slugs.length, seasons), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
+      return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
+        slug: p.slug,
+        birthDate: p.birthDate ? p.birthDate.slice(0, 10) : null,
+        country: p.country ? { code: p.country.code, name: p.country.name, flagUrl: p.country.flagUrl ?? null } : null,
+        seasons: seasons
+          .map((y) => [y, p[`s${y}`] as RawSeasonStats | null] as const)
+          .filter(([, st]) => st && (st.appearances ?? 0) > 0)
+          .map(([y, st]) => ({
+            startYear: y, appearances: st!.appearances ?? 0, substituteIn: st!.substituteIn ?? 0, goals: st!.goals ?? 0,
+            assists: st!.assists ?? 0, minutes: st!.minutesPlayed ?? 0, yellowCards: st!.yellowCards ?? 0, redCards: st!.redCards ?? 0,
+          })),
+      }));
     },
 
     async gameDetail(gameId: string): Promise<SorareGameDetail> {

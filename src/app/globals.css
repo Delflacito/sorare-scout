@@ -153,3 +153,20 @@ td.strong { font-weight: 600; }
 .tabs { display: flex; gap: 4px; margin: 0 0 12px; border-bottom: 1px solid var(--border); }
 .tabs a { padding: 8px 14px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs a[aria-current='page'] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.chart-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
+.chart-filters select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.segmented button { padding: 5px 12px; border: none; background: var(--surface); color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button[aria-checked='true'] { background: var(--neutral-bg); color: var(--text); font-weight: 600; }
+.chart-avg { font-size: 14px; color: var(--muted); }
+.chart-avg strong { color: var(--text); }
+.chart-box .action-icon { font-size: 12px; }
+.actions-cell { white-space: nowrap; }
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs a { white-space: nowrap; }
+.hero-born { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.flag { width: 20px; height: 15px; object-fit: cover; border-radius: 2px; }
+.history-total td { font-weight: 600; border-top: 2px solid var(--border); }
+.chart-head .legend { flex-wrap: wrap; }
+.chart-head .legend > span { white-space: nowrap; }
