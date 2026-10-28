@@ -46,3 +46,39 @@ describeDb('searchPlayers', () => {
     expect(await q.listCompetitions()).toEqual([{ slug: 'ligue-1-fr', name: 'Ligue 1' }]);
   });
 });
+
+describeDb('fiche joueur', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('getPlayer : résumé, club, prochain match et concédé par l’adversaire', async () => {
+    const p = await q.getPlayer('nuno-mendes');
+    expect(p).toMatchObject({
+      name: 'Nuno Mendes', team: 'Paris Saint-Germain', teamSlug: 'psg', usualPosition: 'LB',
+      summary: { l5: 70, startRate5: 1 },
+      next: { opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true, date: '2099-01-01T20:00:00.000Z' },
+    });
+    expect(p!.nextConceded).toMatchObject({ position: 'LB', average: 55, leagueAverage: 60, observations: 2, lowSample: true });
+  });
+
+  it('getPlayer : inconnu → null', async () => {
+    expect(await q.getPlayer('personne')).toBeNull();
+  });
+
+  it('getPlayerGames : matchs d’équipe récents avec participation ou absence', async () => {
+    const games = await q.getPlayerGames('tagliafico', 15);
+    expect(games.map((g) => [g.opponent, g.score, g.status, g.position])).toEqual([
+      ['Olympique de Marseille', 50, 'started', 'LB'],
+      ['Olympique de Marseille', 60, 'started', 'LB'],
+      ['Paris Saint-Germain', 0, 'absent', null],
+    ]);
+  });
+});

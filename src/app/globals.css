@@ -41,3 +41,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .subtitle { color: var(--muted); margin-top: -10px; }
 .legend { display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
 .chips span { display: inline-block; padding: 2px 8px; margin-right: 6px; border-radius: 999px; background: var(--neutral-bg); font-size: 13px; }
+.score-chart { margin: 12px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.bar.started { fill: var(--accent); }
+.bar.sub { fill: var(--muted); }
+.bar.absent { fill: var(--border); }
+.bar-label { font-size: 10px; fill: var(--muted); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.dot.started { background: var(--accent); } .dot.sub { background: var(--muted); } .dot.absent { background: var(--border); }

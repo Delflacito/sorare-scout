@@ -22,6 +22,35 @@ export interface PlayerListRow {
   nextIndex: number | null; nextLowSample: boolean | null;
 }
 
+export interface ConcededView {
+  position: DetailedPosition; average: number | null; leagueAverage: number | null; index: number | null;
+  observations: number; lowSample: boolean;
+}
+
+export interface PlayerSummaryView {
+  l5: number; l15: number; l40: number; stdDev5: number; startRate5: number; avgMinutes5: number;
+  startRate15: number; avgMinutes15: number; decisive5: number; allAround5: number; decisive15: number; allAround15: number;
+}
+
+export interface PlayerDetail {
+  slug: string; name: string; position: GenericPosition; team: string | null; teamSlug: string | null; competition: string | null;
+  usualPosition: DetailedPosition | null; summary: PlayerSummaryView | null;
+  positions: { position: DetailedPosition; count: number }[];
+  next: { opponent: string; opponentSlug: string; isHome: boolean; date: string } | null;
+  nextConceded: ConcededView | null;
+}
+
+export type GameStatus = 'started' | 'sub' | 'absent';
+export interface PlayerGameView {
+  fixtureId: number; date: string; opponent: string; isHome: boolean; score: number; minutes: number;
+  status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
+}
+
+const toConceded = (r: postgres.Row): ConcededView => ({
+  position: r.detailed_position, average: r.average, leagueAverage: r.league_average, index: r.index,
+  observations: r.observations, lowSample: r.low_sample,
+});
+
 export function createQueries(sql: postgres.Sql) {
   const SORT_SQL: Record<Sort, postgres.PendingQuery<postgres.Row[]>> = {
     l5: sql`s.l5`, l15: sql`s.l15`, l40: sql`s.l40`, startRate: sql`s.start_rate5`, nextIndex: sql`cp.index`,
@@ -63,6 +92,71 @@ export function createQueries(sql: postgres.Sql) {
         usualPosition: r.usual_position, l5: r.l5, l15: r.l15, l40: r.l40, startRate: r.start_rate5,
         nextOpponent: r.next_opponent, nextOpponentSlug: r.next_opponent_slug, nextIsHome: r.is_home,
         nextIndex: r.next_index, nextLowSample: r.low_sample,
+      }));
+    },
+
+    async getPlayer(slug: string): Promise<PlayerDetail | null> {
+      const [r] = await sql`
+        with next_fx as (${nextFixtures()})
+        select p.id, p.sorare_slug, p.name, p.position, t.name as team, t.sorare_slug as team_slug, c.name as competition,
+          s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
+        from players p
+        left join player_summary s on s.player_id = p.id
+        left join teams t on t.id = p.team_id
+        left join competitions c on c.id = t.competition_id
+        left join next_fx n on n.team_id = p.team_id
+        left join teams o on o.id = n.opponent_id
+        where p.sorare_slug = ${slug}`;
+      if (!r) return null;
+      const positions = await sql`
+        select detailed_position, count(*)::int as count from (
+          select a.detailed_position from appearances a join fixtures f on f.id = a.fixture_id
+          where a.player_id = ${r.id} and a.started and a.detailed_position is not null
+          order by f.date desc limit 10
+        ) recent group by detailed_position order by count desc`;
+      const [conceded] = r.opponent_id && r.usual_position
+        ? await sql`select * from team_conceded_by_position
+            where team_id = ${r.opponent_id} and detailed_position = ${r.usual_position} and window_size = 5`
+        : [];
+      return {
+        slug: r.sorare_slug, name: r.name, position: r.position, team: r.team, teamSlug: r.team_slug, competition: r.competition,
+        usualPosition: r.usual_position,
+        summary: r.l5 === null ? null : {
+          l5: r.l5, l15: r.l15, l40: r.l40, stdDev5: r.std_dev5, startRate5: r.start_rate5, avgMinutes5: r.avg_minutes5,
+          startRate15: r.start_rate15, avgMinutes15: r.avg_minutes15, decisive5: r.decisive5, allAround5: r.all_around5,
+          decisive15: r.decisive15, allAround15: r.all_around15,
+        },
+        positions: positions.map((x) => ({ position: x.detailed_position, count: x.count })),
+        next: r.next_opponent
+          ? { opponent: r.next_opponent, opponentSlug: r.next_opponent_slug, isHome: r.is_home, date: (r.next_date as Date).toISOString() }
+          : null,
+        nextConceded: conceded ? toConceded(conceded) : null,
+      };
+    },
+
+    /**
+     * Derniers matchs complets du joueur : ceux où il a une participation, plus ceux de son club actuel où il était absent.
+     * Du plus récent au plus ancien.
+     */
+    async getPlayerGames(slug: string, limit: number): Promise<PlayerGameView[]> {
+      const rows = await sql`
+        with p as (select id, team_id from players where sorare_slug = ${slug}),
+        games as (
+          select f.id, f.date, f.home_team_id, f.away_team_id, coalesce(a.team_id, (select team_id from p)) as team_id,
+            a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score
+          from fixtures f
+          left join appearances a on a.fixture_id = f.id and a.player_id = (select id from p)
+          where f.status = 'played' and f.lineups_imported
+            and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
+        )
+        select g.*, o.name as opponent from games g
+        join teams o on o.id = case when g.home_team_id = g.team_id then g.away_team_id else g.home_team_id end
+        order by g.date desc limit ${limit}`;
+      return rows.map((g) => ({
+        fixtureId: g.id, date: (g.date as Date).toISOString(), opponent: g.opponent, isHome: g.home_team_id === g.team_id,
+        score: g.sorare_score ?? 0, minutes: g.minutes ?? 0,
+        status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
+        position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
       }));
     },
 
