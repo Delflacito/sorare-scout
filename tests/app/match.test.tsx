@@ -13,8 +13,8 @@ const { default: Page } = await import('@/app/matchs/[id]/page');
 
 const match: MatchView = {
   id: 7, date: '2026-10-26T19:30:00.000Z', status: 'played', competition: 'Ligue 1',
-  home: { name: 'Paris Saint-Germain', slug: 'psg', goals: 2, formation: '4-3-3' },
-  away: { name: 'Olympique Lyonnais', slug: 'ol', goals: 1, formation: '4-2-3-1' },
+  home: { name: 'Paris Saint-Germain', slug: 'psg', goals: 2, formation: '4-3-3', pictureUrl: 'https://t/psg.png' },
+  away: { name: 'Olympique Lyonnais', slug: 'ol', goals: 1, formation: '4-2-3-1', pictureUrl: null },
   players: [
     { side: 'home', slug: 'hakimi', name: 'Achraf Hakimi', detailedPosition: 'RB', grid: '2:1', started: true, minutes: 90, score: 64.2, decisive: 35, allAround: 29.2 },
     { side: 'home', slug: 'lee', name: 'Lee Kang-in', detailedPosition: null, grid: null, started: false, minutes: 20, score: 38, decisive: 35, allAround: 3 },
@@ -40,6 +40,7 @@ describe('/matchs/[id]', () => {
     const away = screen.getByRole('table', { name: 'Olympique Lyonnais (4-2-3-1)' });
     expect(within(away).getByRole('row', { name: /Nicolás Tagliafico/ })).toHaveTextContent('DG');
     expect(getMatch).toHaveBeenCalledWith(7);
+    expect(screen.getAllByRole('img', { name: 'Paris Saint-Germain' })[0]).toHaveAttribute('src', 'https://t/psg.png');
   });
 
   it('identifiant invalide ou match inconnu → notFound', async () => {

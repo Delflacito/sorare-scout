@@ -1,21 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getQueries, type PlayerGameView, type UpcomingView } from '@/db/queries';
+import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
+import { ClubLogo, PlayerAvatar } from '@/components/Media';
+import { StatusBadges } from '@/components/StatusBadges';
 import { fmtDate, fmtPct, fmtScore, indexClass } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
-
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card">
-      <div className="label">{label}</div>
-      <div className="value">{value}</div>
-    </div>
-  );
-}
 
 const STATUS_LABEL = { started: 'titulaire', sub: 'remplaçant', absent: 'absent' } as const;
 
@@ -26,6 +19,59 @@ const fmtVenue = (factor: number) => {
 
 /** Note 1–100 (100 = adversaire le plus fort) : couleur favorable (faible note) ou défavorable. */
 const ratingClass = (rating: number | null) => (rating === null ? '' : rating <= 33 ? 'hot' : rating >= 67 ? 'cold' : 'neutral');
+
+function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="tile">
+      <div className="tile-label">{label}</div>
+      <div className="tile-value">{value}</div>
+      {hint && <div className="tile-hint">{hint}</div>}
+    </div>
+  );
+}
+
+function Hero({ player, upcoming }: { player: PlayerDetail; upcoming: UpcomingView | null }) {
+  const next = upcoming?.fixtures[0];
+  const projected = next && upcoming ? projectForFixture(upcoming, next).projected : null;
+  return (
+    <section className="hero-card">
+      <div className="hero-id">
+        <PlayerAvatar name={player.name} url={player.pictureUrl} size={96} />
+        <div>
+          <h1>{player.name}</h1>
+          <p className="hero-meta">
+            {player.teamSlug ? (
+              <Link href={`/equipes/${player.teamSlug}`} className="club-link">
+                <ClubLogo name={player.team ?? ''} url={player.teamPictureUrl} size={22} />
+                {player.team}
+              </Link>
+            ) : '—'}
+            {player.competition && <span className="muted"> · {player.competition}</span>}
+            <span className="pos-chip">{player.usualPosition ? POSITION_LABEL_FR[player.usualPosition] : GENERIC_LABEL_FR[player.position]}</span>
+          </p>
+          <StatusBadges playingStatus={player.playingStatus} injury={player.injury} suspension={player.suspension} />
+        </div>
+      </div>
+      <div className="hero-next" data-testid="hero">
+        {next ? (
+          <>
+            <div className="hero-next-label">Prochain match · {fmtDate(next.date)}</div>
+            <div className="hero-next-match">
+              {next.isHome ? 'vs' : '@'} <ClubLogo name={next.opponent} url={next.opponentPictureUrl} size={18} /> {next.opponent}
+            </div>
+            <div className="hero-figure">{projected === null ? '—' : fmtScore(projected)}</div>
+            <div className="hero-next-label">Score potentiel s’il joue</div>
+            {player.sorareProjection !== null && (
+              <div className="hero-sorare"><span>Projection Sorare</span><strong>{Math.round(player.sorareProjection)}</strong></div>
+            )}
+          </>
+        ) : (
+          <div className="hero-next-label">Aucun match programmé</div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
   if (!upcoming.fixtures.length) return <p className="empty">Aucun match programmé</p>;
@@ -44,7 +90,13 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
               return (
                 <tr key={f.fixtureId}>
                   <td>{fmtDate(f.date)}</td>
-                  <td>{f.isHome ? 'vs' : '@'} <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
+                  <td>
+                    <Link href={`/equipes/${f.opponentSlug}`} className="club-link">
+                      <span className="muted">{f.isHome ? 'vs' : '@'}</span>
+                      <ClubLogo name={f.opponent} url={f.opponentPictureUrl} />
+                      {f.opponent}
+                    </Link>
+                  </td>
                   <td className="num">{fmtVenue(venueFactor)}</td>
                   <td className="num strong">{projected === null ? '—' : fmtScore(projected)}</td>
                   {p && p.average !== null ? (
@@ -65,7 +117,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
           </tbody>
         </table>
       </div>
-      <p className="subtitle">
+      <p className="note">
         Score potentiel s’il joue = niveau L15 {upcoming.base === null ? '—' : fmtScore(upcoming.base)} (matchs joués)
         × lieu (sa moyenne à domicile / à l’extérieur, ramenée vers l’avantage du championnat s’il a peu de matchs)
         × adversaire (40 % points concédés au poste, 60 % qualité générale ; adversaire moyen = ×1).
@@ -88,7 +140,13 @@ function LastGamesTable({ games }: { games: PlayerGameView[] }) {
           {games.map((g) => (
             <tr key={g.fixtureId}>
               <td>{fmtDate(g.date)}</td>
-              <td>{g.isHome ? 'vs' : '@'} <Link href={`/matchs/${g.fixtureId}`}>{g.opponent}</Link></td>
+              <td>
+                <Link href={`/matchs/${g.fixtureId}`} className="club-link">
+                  <span className="muted">{g.isHome ? 'vs' : '@'}</span>
+                  <ClubLogo name={g.opponent} url={g.opponentPictureUrl} />
+                  {g.opponent}
+                </Link>
+              </td>
               <td className="num">{g.goalsFor ?? '–'} – {g.goalsAgainst ?? '–'}</td>
               <td>{STATUS_LABEL[g.status]}</td>
               <td className="num">{g.minutes}</td>
@@ -114,47 +172,26 @@ export default async function JoueurPage({ params }: { params: Promise<{ slug: s
   const s = player.summary;
 
   return (
-    <main>
-      <h1>{player.name}</h1>
-      <p className="subtitle">
-        {player.teamSlug ? <Link href={`/equipes/${player.teamSlug}`}>{player.team}</Link> : '—'}
-        {player.competition && <> · {player.competition}</>}
-        {' · '}{player.usualPosition ? POSITION_LABEL_FR[player.usualPosition] : GENERIC_LABEL_FR[player.position]}
-      </p>
-
-      <h2>Prochains matchs</h2>
-      {upcoming && <UpcomingTable upcoming={upcoming} />}
+    <main className="player-page">
+      <Hero player={player} upcoming={upcoming} />
 
       {s ? (
-        <>
-          <h2>Scores</h2>
-          <div className="cards">
-            <Card label="L5" value={fmtScore(s.l5)} />
-            <Card label="L15" value={fmtScore(s.l15)} />
-            <Card label="L40" value={fmtScore(s.l40)} />
-            <Card label="Régularité (écart-type L5)" value={fmtScore(s.stdDev5)} />
-          </div>
-          <ScoreChart games={games} />
-
-          <h2>Temps de jeu</h2>
-          <div className="cards">
-            <Card label="% titu (5)" value={fmtPct(s.startRate5)} />
-            <Card label="Minutes moy. (5)" value={String(Math.round(s.avgMinutes5))} />
-            <Card label="% titu (15)" value={fmtPct(s.startRate15)} />
-            <Card label="Minutes moy. (15)" value={String(Math.round(s.avgMinutes15))} />
-          </div>
-
-          <h2>Détail du score</h2>
-          <div className="cards">
-            <Card label="Decisive (L5)" value={fmtScore(s.decisive5)} />
-            <Card label="All-Around (L5)" value={fmtScore(s.allAround5)} />
-            <Card label="Decisive (L15)" value={fmtScore(s.decisive15)} />
-            <Card label="All-Around (L15)" value={fmtScore(s.allAround15)} />
-          </div>
-        </>
+        <div className="tiles">
+          <Tile label="L5" value={fmtScore(s.l5)} hint={`écart-type ${fmtScore(s.stdDev5)}`} />
+          <Tile label="L15" value={fmtScore(s.l15)} />
+          <Tile label="L40" value={fmtScore(s.l40)} />
+          <Tile label="Titularisations (5)" value={fmtPct(s.startRate5)} hint={`${Math.round(s.avgMinutes5)} min en moyenne`} />
+          <Tile label="Décisif (L5)" value={fmtScore(s.decisive5)} hint={`L15 ${fmtScore(s.decisive15)}`} />
+          <Tile label="All-Around (L5)" value={fmtScore(s.allAround5)} hint={`L15 ${fmtScore(s.allAround15)}`} />
+        </div>
       ) : (
         <p className="empty">Pas encore de match importé pour ce joueur</p>
       )}
+
+      <ScoreChart games={games} l15={s?.l15 ?? null} />
+
+      <h2>Prochains matchs</h2>
+      {upcoming && <UpcomingTable upcoming={upcoming} />}
 
       <h2>Derniers matchs</h2>
       <LastGamesTable games={games} />

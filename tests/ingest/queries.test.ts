@@ -200,3 +200,50 @@ describeDb('matchs et projections', () => {
     expect(await q.getMatch(999999)).toBeNull();
   });
 });
+
+describeDb('photos, logos et statuts', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    await sql`update teams set picture_url = 'https://t/' || sorare_slug || '.png', short_name = upper(sorare_slug)`;
+    await db.repo.updatePlayerStatuses([
+      { slug: 'nuno-mendes', pictureUrl: 'https://p/nuno.png', playingStatus: 'SUBSTITUTE', injury: { kind: 'Thigh Injury', expectedEnd: '2026-11-10' }, suspension: null, projection: 41 },
+      { slug: 'greenwood', pictureUrl: null, playingStatus: 'STARTER', injury: null, suspension: { reason: 'Red card', end: '2026-11-02' }, projection: 70 },
+    ]);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('explorateur', async () => {
+    const rows = await q.searchPlayers({ sort: 'l5', offset: 0 });
+    expect(rows.find((r) => r.slug === 'nuno-mendes')).toMatchObject({
+      pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE', injuryKind: 'Thigh Injury',
+      suspensionReason: null, sorareProjection: 41,
+    });
+    expect(rows.find((r) => r.slug === 'greenwood')).toMatchObject({ suspensionReason: 'Red card', sorareProjection: 70 });
+  });
+
+  it('fiche joueur', async () => {
+    expect(await q.getPlayer('nuno-mendes')).toMatchObject({
+      pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
+      injury: { kind: 'Thigh Injury', end: '2026-11-10' }, suspension: null, sorareProjection: 41,
+    });
+    expect(await q.getPlayer('greenwood')).toMatchObject({ injury: null, suspension: { reason: 'Red card', end: '2026-11-02' } });
+  });
+
+  it('logos des adversaires dans les derniers et prochains matchs', async () => {
+    const [g] = await q.getPlayerGames('greenwood', 15);
+    expect(g).toMatchObject({ opponentPictureUrl: 'https://t/ol.png', opponentShortName: 'OL' });
+    const u = await q.getUpcoming('nuno-mendes', 5);
+    expect(u!.fixtures[0]).toMatchObject({ opponentPictureUrl: 'https://t/om.png' });
+  });
+
+  it('page match : logos des équipes', async () => {
+    const m = await q.getMatch(ids.g2);
+    expect(m).toMatchObject({ home: { pictureUrl: 'https://t/om.png' }, away: { pictureUrl: 'https://t/ol.png' } });
+  });
+});

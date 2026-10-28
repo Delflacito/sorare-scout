@@ -21,6 +21,8 @@ export interface PlayerListRow {
   usualPosition: DetailedPosition | null; l5: number; l15: number; l40: number; startRate: number;
   nextOpponent: string | null; nextOpponentSlug: string | null; nextIsHome: boolean | null;
   nextIndex: number | null; nextLowSample: boolean | null;
+  pictureUrl: string | null; teamPictureUrl: string | null; playingStatus: string | null;
+  injuryKind: string | null; suspensionReason: string | null; sorareProjection: number | null;
 }
 
 export interface ConcededView {
@@ -39,11 +41,16 @@ export interface PlayerDetail {
   positions: { position: DetailedPosition; count: number }[];
   next: { opponent: string; opponentSlug: string; isHome: boolean; date: string } | null;
   nextConceded: ConcededView | null;
+  pictureUrl: string | null; teamPictureUrl: string | null; teamShortName: string | null; playingStatus: string | null;
+  injury: { kind: string | null; end: string | null } | null;
+  suspension: { reason: string | null; end: string | null } | null;
+  sorareProjection: number | null;
 }
 
 export type GameStatus = 'started' | 'sub' | 'absent';
 export interface PlayerGameView {
   fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
+  opponentPictureUrl: string | null; opponentShortName: string | null;
   goalsFor: number | null; goalsAgainst: number | null; score: number; minutes: number;
   status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
 }
@@ -60,7 +67,7 @@ export interface ImportRunView {
 }
 
 export interface UpcomingFixture {
-  fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
+  fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean; opponentPictureUrl: string | null;
   /** Concédé par l'adversaire au poste habituel du joueur (5 derniers matchs) et moyenne de la ligue à ce poste. */
   position: { average: number | null; leagueAverage: number | null; observations: number } | null;
   /** Qualité défensive générale de l'adversaire (10 derniers matchs) : indice et note de 1 à 100 (100 = le plus fort). */
@@ -78,7 +85,7 @@ export interface MatchPlayerView {
   side: 'home' | 'away'; slug: string; name: string; detailedPosition: DetailedPosition | null; grid: string | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
 }
-export interface MatchSideView { name: string; slug: string; goals: number | null; formation: string | null }
+export interface MatchSideView { name: string; slug: string; goals: number | null; formation: string | null; pictureUrl: string | null }
 export interface MatchView {
   id: number; date: string; status: 'played' | 'scheduled' | 'postponed'; competition: string;
   home: MatchSideView; away: MatchSideView; players: MatchPlayerView[];
@@ -109,7 +116,8 @@ export function createQueries(sql: postgres.Sql) {
         with next_fx as (${nextFixtures()})
         select p.sorare_slug, p.name, p.position, t.name as team, t.sorare_slug as team_slug, c.name as competition,
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
-          o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample
+          o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
+          p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection
         from players p
         join player_summary s on s.player_id = p.id
         left join teams t on t.id = p.team_id
@@ -131,6 +139,8 @@ export function createQueries(sql: postgres.Sql) {
         usualPosition: r.usual_position, l5: r.l5, l15: r.l15, l40: r.l40, startRate: r.start_rate5,
         nextOpponent: r.next_opponent, nextOpponentSlug: r.next_opponent_slug, nextIsHome: r.is_home,
         nextIndex: r.next_index, nextLowSample: r.low_sample,
+        pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, playingStatus: r.playing_status,
+        injuryKind: r.injury_kind, suspensionReason: r.suspension_reason, sorareProjection: r.sorare_projection,
       }));
     },
 
@@ -138,6 +148,8 @@ export function createQueries(sql: postgres.Sql) {
       const [r] = await sql`
         with next_fx as (${nextFixtures()})
         select p.id, p.sorare_slug, p.name, p.position, t.name as team, t.sorare_slug as team_slug, c.name as competition,
+          p.picture_url, t.picture_url as team_picture_url, t.short_name as team_short_name, p.playing_status,
+          p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
@@ -170,6 +182,10 @@ export function createQueries(sql: postgres.Sql) {
           ? { opponent: r.next_opponent, opponentSlug: r.next_opponent_slug, isHome: r.is_home, date: (r.next_date as Date).toISOString() }
           : null,
         nextConceded: conceded ? toConceded(conceded) : null,
+        pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, teamShortName: r.team_short_name, playingStatus: r.playing_status,
+        injury: r.injury_kind || r.injury_end ? { kind: r.injury_kind, end: r.injury_end } : null,
+        suspension: r.suspension_reason || r.suspension_end ? { reason: r.suspension_reason, end: r.suspension_end } : null,
+        sorareProjection: r.sorare_projection,
       };
     },
 
@@ -189,11 +205,13 @@ export function createQueries(sql: postgres.Sql) {
           where f.status = 'played' and f.lineups_imported
             and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
         )
-        select g.*, o.name as opponent, o.sorare_slug as opponent_slug from games g
+        select g.*, o.name as opponent, o.sorare_slug as opponent_slug, o.picture_url as opponent_picture_url,
+          o.short_name as opponent_short_name from games g
         join teams o on o.id = case when g.home_team_id = g.team_id then g.away_team_id else g.home_team_id end
         order by g.date desc limit ${limit}`;
       return rows.map((g) => ({
         fixtureId: g.id, date: (g.date as Date).toISOString(), opponent: g.opponent, opponentSlug: g.opponent_slug,
+        opponentPictureUrl: g.opponent_picture_url, opponentShortName: g.opponent_short_name,
         isHome: g.home_team_id === g.team_id,
         goalsFor: g.home_team_id === g.team_id ? g.home_goals : g.away_goals,
         goalsAgainst: g.home_team_id === g.team_id ? g.away_goals : g.home_goals,
@@ -217,7 +235,7 @@ export function createQueries(sql: postgres.Sql) {
           where ${p.team_id} in (f.home_team_id, f.away_team_id) and f.status = 'scheduled' and f.date > now()
           order by f.date limit ${limit}
         )
-        select n.*, o.name as opponent, o.sorare_slug as opponent_slug,
+        select n.*, o.name as opponent, o.sorare_slug as opponent_slug, o.picture_url as opponent_picture_url,
           cp.average as pos_average, cp.league_average as pos_league, cp.observations as pos_obs,
           coalesce(cp.league_average, (select avg(league_average) from team_conceded_by_position
             where detailed_position = ${p.usual_position} and window_size = 5)) as pos_league_any,
@@ -235,6 +253,7 @@ export function createQueries(sql: postgres.Sql) {
         startRate: p.start_rate5, usualPosition: p.usual_position,
         fixtures: rows.map((r) => ({
           fixtureId: r.id, date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome: r.is_home,
+          opponentPictureUrl: r.opponent_picture_url,
           position: r.pos_league_any === null ? null
             : { average: r.pos_average, leagueAverage: r.pos_league_any, observations: r.pos_obs ?? 0 },
           overall: r.all_obs === null ? null : { index: r.all_index, rating: r.all_rating, observations: r.all_obs },
@@ -246,7 +265,8 @@ export function createQueries(sql: postgres.Sql) {
     async getMatch(id: number): Promise<MatchView | null> {
       const [f] = await sql`
         select f.id, f.date, f.status, f.home_goals, f.away_goals, f.home_formation, f.away_formation, f.home_team_id,
-          c.name as competition, h.name as home_name, h.sorare_slug as home_slug, a.name as away_name, a.sorare_slug as away_slug
+          c.name as competition, h.name as home_name, h.sorare_slug as home_slug, a.name as away_name, a.sorare_slug as away_slug,
+          h.picture_url as home_picture, a.picture_url as away_picture
         from fixtures f
         join competitions c on c.id = f.competition_id
         join teams h on h.id = f.home_team_id
@@ -261,8 +281,8 @@ export function createQueries(sql: postgres.Sql) {
         order by a.team_id = ${f.home_team_id} desc, a.started desc, a.grid nulls last, a.minutes desc, p.name`;
       return {
         id: f.id, date: (f.date as Date).toISOString(), status: f.status, competition: f.competition,
-        home: { name: f.home_name, slug: f.home_slug, goals: f.home_goals, formation: f.home_formation },
-        away: { name: f.away_name, slug: f.away_slug, goals: f.away_goals, formation: f.away_formation },
+        home: { name: f.home_name, slug: f.home_slug, goals: f.home_goals, formation: f.home_formation, pictureUrl: f.home_picture },
+        away: { name: f.away_name, slug: f.away_slug, goals: f.away_goals, formation: f.away_formation, pictureUrl: f.away_picture },
         players: players.map((r) => ({
           side: r.team_id === f.home_team_id ? 'home' : 'away', slug: r.sorare_slug, name: r.name,
           detailedPosition: r.detailed_position, grid: r.grid, started: r.started, minutes: r.minutes,

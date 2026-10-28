@@ -14,6 +14,8 @@ const row: PlayerListRow = {
   slug: 'nuno-mendes', name: 'Nuno Mendes', position: 'Defender', team: 'Paris Saint-Germain', teamSlug: 'psg', competition: 'Ligue 1',
   usualPosition: 'LB', l5: 62.4, l15: 58.1, l40: 50, startRate: 0.8,
   nextOpponent: 'Olympique de Marseille', nextOpponentSlug: 'om', nextIsHome: true, nextIndex: 1.234, nextLowSample: false,
+  pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
+  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41,
 };
 
 describe('/joueurs', () => {
@@ -30,6 +32,11 @@ describe('/joueurs', () => {
     expect(screen.getByText('123')).toBeInTheDocument();
     expect(screen.getByText(/vs Olympique de Marseille/)).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Club' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Nuno Mendes' })).toHaveAttribute('src', 'https://p/nuno.png');
+    expect(screen.getByRole('img', { name: 'Paris Saint-Germain' })).toHaveAttribute('src', 'https://t/psg.png');
+    expect(screen.getByLabelText('Blessé · Thigh Injury')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Proj. Sorare' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '41' })).toBeInTheDocument();
   });
 
   it('transmet les filtres de l’URL', async () => {

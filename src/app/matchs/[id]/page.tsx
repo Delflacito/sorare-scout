@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getQueries, type MatchPlayerView, type MatchSideView } from '@/db/queries';
 import { POSITION_LABEL_FR } from '@/domain/types';
 import { fmtDate, fmtScore } from '@/lib/format';
+import { ClubLogo } from '@/components/Media';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,10 @@ function TeamTable({ side, players }: { side: MatchSideView; players: MatchPlaye
   const label = `${side.name}${side.formation ? ` (${side.formation})` : ''}`;
   return (
     <section>
-      <h2><Link href={`/equipes/${side.slug}`}>{side.name}</Link>{side.formation && <span className="subtitle"> · {side.formation}</span>}</h2>
+      <h2>
+        <Link href={`/equipes/${side.slug}`} className="club-link"><ClubLogo name={side.name} url={side.pictureUrl} size={24} />{side.name}</Link>
+        {side.formation && <span className="subtitle"> · {side.formation}</span>}
+      </h2>
       <div className="table-wrap">
         <table aria-label={label}>
           <thead>
@@ -46,7 +50,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <main>
-      <h1>{match.home.name} {score} {match.away.name}</h1>
+      <h1 className="match-title">
+        <ClubLogo name={match.home.name} url={match.home.pictureUrl} size={36} /> {match.home.name} {score} {match.away.name}{' '}
+        <ClubLogo name={match.away.name} url={match.away.pictureUrl} size={36} />
+      </h1>
       <p className="subtitle">{match.competition} · {fmtDate(match.date)}</p>
       {match.players.length === 0 ? (
         <p className="empty">Compos et scores pas encore disponibles pour ce match</p>
