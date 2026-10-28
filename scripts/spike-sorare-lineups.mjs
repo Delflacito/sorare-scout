@@ -35,32 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Fiche joueur : naissance, nationalité, historique par saison, détail des actions décisives.
+// Historique par saison : quelles compétitions couvre stats(seasonStartYear) ? que donnent careerSeasons / seasonAppearances ?
 const P = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
-await probe('Player (identité)', P, [
-  'birthDate', 'age', 'country { code slug name }', 'country { flagUrl }', 'nationality', 'xyzCountry', 'birthPlace', 'height', 'preferredFoot',
+await probe('stats (arguments)', (c) => P(`stats(seasonStartYear: 2024, ${c}) { appearances }`), [
+  'competitionSlug: "laliga-es"', 'competitionSlugs: ["laliga-es"]', 'xyzCompetition: "x"', 'allCompetitions: true', 'xyzArg: 1',
 ]);
-await probe('Player (saisons)', P, [
-  'stats(seasonStartYear: 2024) { xyz }', 'xyzStats', 'seasonStats', 'careerStats', 'statsBySeason', 'seasons { xyz }',
-  'clubMemberships { xyz }', 'memberships { xyz }', 'xyzMembership',
-]);
-await probe('Stats (champs)', (c) => P(`stats(seasonStartYear: 2024) { ${c} }`), [
-  'appearances', 'goals', 'assists', 'minutesPlayed', 'gamesPlayed', 'xyzGoal', 'xyzAppear', 'xyzMinute', 'cleanSheets', 'yellowCards', 'xyzCard',
-]);
-await sample('player-identity', P('displayName birthDate age country { code slug name }'));
-await sample('player-stats', P('s2025: stats(seasonStartYear: 2025) { appearances goals assists minutesPlayed } s2024: stats(seasonStartYear: 2024) { appearances goals assists minutesPlayed }'));
-await sample('player-stats-all', P('stats(seasonStartYear: 2024) { __typename }'));
-await probe('Membership (champs)', (c) => P(`clubMemberships(first: 3) { nodes { ${c} } }`), [
-  'startDate', 'endDate', 'membershipTeam { slug name }', 'xyzTeam', 'xyzDate', 'club { slug }',
-]);
-// Détail du score : valeur de chaque statistique (nombre de buts, de passes…).
-const G = (c) => `{ football { game(id: "${process.env.GAME_ID ?? ''}") { playerGameScores { detailedScore { ${c} } } } } }`;
-const games = await gql('{ football { club(slug: "real-madrid-madrid") { latestGames(first: 1) { nodes { id } } } } }');
-process.env.GAME_ID = games.data?.football?.club?.latestGames?.nodes?.[0]?.id?.replace(/^Game:/, '') ?? '';
-await probe('DetailedScore (champs)', G, ['statValue', 'points', 'score', 'totalScore', 'xyzValue', 'xyzPoint']);
-await sample('detailed-score', G('category stat statValue totalScore'));
-await probe('PlayerGameStats (actions)', (c) => `{ football { game(id: "${process.env.GAME_ID}") { playerGameScores { anyPlayerGameStats { ... on PlayerGameStats { ${c} } } } } } }`, [
-  'goals', 'goalAssist', 'assists', 'xyzGoal', 'xyzAssist', 'cleanSheet', 'yellowCard', 'redCard', 'xyzCard',
+await probe('careerSeasons', P, ['careerSeasons { xyz }', 'careerSeasons']);
+await probe('seasonAppearances', P, ['seasonAppearances { xyz }', 'seasonAppearances(seasonStartYear: 2024) { xyz }', 'seasonAppearances']);
+await probe('Stats (autres champs)', (c) => P(`stats(seasonStartYear: 2024) { ${c} }`), [
+  'xyzCompetition', 'competition { slug }', 'season { startYear }', 'xyzSeason', 'substituteIn', 'xyzSub', 'redCards', 'cleanSheet', 'xyzClean', 'team { slug }', 'xyzTeam',
 ]);
 
 mkdirSync('spike-output', { recursive: true });
