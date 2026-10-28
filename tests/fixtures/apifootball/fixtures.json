@@ -1,4 +1,0 @@
-{ "errors": [], "results": 1, "response": [
-  { "fixture": { "id": 1001, "date": "2026-10-25T19:00:00+00:00", "status": { "short": "FT" } },
-    "teams": { "home": { "id": 85, "name": "Paris Saint Germain" }, "away": { "id": 81, "name": "Marseille" } } }
-] }

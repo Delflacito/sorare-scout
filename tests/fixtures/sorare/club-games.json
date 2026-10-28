@@ -1,0 +1,14 @@
+{ "data": { "football": { "club": {
+  "latestGames": { "nodes": [
+    { "id": "Game:aaa", "date": "2026-10-26T19:30:00Z", "statusTyped": "played", "homeGoals": 2, "awayGoals": 1,
+      "homeTeam": { "slug": "psg-paris" }, "awayTeam": { "slug": "olympique-lyonnais-lyon" }, "competition": { "slug": "ligue-1-fr" } },
+    { "id": "Game:bbb", "date": "2026-10-20T19:00:00Z", "statusTyped": "played", "homeGoals": 1, "awayGoals": 1,
+      "homeTeam": { "slug": "psg-paris" }, "awayTeam": { "slug": "barcelona-barcelona" }, "competition": { "slug": "champions-league-europe" } },
+    { "id": "Game:ccc", "date": "2026-10-11T19:00:00Z", "statusTyped": "postponed", "homeGoals": null, "awayGoals": null,
+      "homeTeam": { "slug": "lens-lens" }, "awayTeam": { "slug": "psg-paris" }, "competition": { "slug": "ligue-1-fr" } }
+  ] },
+  "upcomingGames": [
+    { "id": "Game:ddd", "date": "2026-11-01T20:00:00Z", "statusTyped": "scheduled", "homeGoals": null, "awayGoals": null,
+      "homeTeam": { "slug": "psg-paris" }, "awayTeam": { "slug": "marseille-marseille" }, "competition": { "slug": "ligue-1-fr" } }
+  ]
+} } } }

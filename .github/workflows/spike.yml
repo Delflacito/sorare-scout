@@ -18,7 +18,6 @@ jobs:
       - run: node scripts/spike-sorare-lineups.mjs
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
       # Réponses brutes publiées sur la branche spike-results (lisible sans téléchargement d'artefact).
       - run: |
           git config user.name "github-actions"

@@ -1,0 +1,32 @@
+{ "data": { "football": { "game": {
+  "homeFormation": {
+    "startingLineup": [
+      [{ "slug": "matvey-safonov", "displayName": "Matvey Safonov" }],
+      [{ "slug": "achraf-hakimi", "displayName": "Achraf Hakimi" }, { "slug": "illia-zabarnyi", "displayName": "Illia Zabarnyi" },
+       { "slug": "willian-pacho", "displayName": "Willian Pacho" }, { "slug": "nuno-mendes", "displayName": "Nuno Mendes" }],
+      [{ "slug": "joao-neves", "displayName": "João Neves" }, { "slug": "vitinha", "displayName": "Vitinha" }, { "slug": "fabian-ruiz", "displayName": "Fabián Ruiz" }],
+      [{ "slug": "maghnes-akliouche", "displayName": "Maghnes Akliouche" }, { "slug": "ferran-torres", "displayName": "Ferran Torres" }, { "slug": "desire-doue", "displayName": "Désiré Doué" }]
+    ],
+    "bench": [{ "slug": "lee-kang-in", "displayName": "Lee Kang-in" }]
+  },
+  "awayFormation": {
+    "startingLineup": [[{ "slug": "dominik-greif", "displayName": "Dominik Greif" }]],
+    "bench": []
+  },
+  "playerGameScores": [
+    { "score": 53.6, "anyPlayer": { "slug": "desire-doue", "displayName": "Désiré Doué", "anyPositions": ["Forward"] },
+      "anyPlayerGameStats": { "minsPlayed": 90, "gameStarted": 1, "formationPlace": 11 },
+      "detailedScore": [
+        { "category": "UNKNOWN", "stat": "level_score", "totalScore": 35 },
+        { "category": "POSSESSION", "stat": "duel_lost", "totalScore": -6 },
+        { "category": "POSSESSION", "stat": "duel_won", "totalScore": 5 },
+        { "category": "ATTACKING", "stat": "pen_area_entries", "totalScore": 6.5 },
+        { "category": "PASSING", "stat": "accurate_pass", "totalScore": 13.1 },
+        { "category": "POSITIVE_DECISIVE_STAT", "stat": "goals", "totalScore": 0 }
+      ] },
+    { "score": 38, "anyPlayer": { "slug": "lee-kang-in", "displayName": "Lee Kang-in", "anyPositions": ["Midfielder"] },
+      "anyPlayerGameStats": { "minsPlayed": 20, "gameStarted": null, "formationPlace": 0 }, "detailedScore": [] },
+    { "score": 0, "anyPlayer": { "slug": "absent-player", "displayName": "Absent", "anyPositions": ["Defender"] },
+      "anyPlayerGameStats": { "minsPlayed": null, "gameStarted": null, "formationPlace": null }, "detailedScore": [] }
+  ]
+} } } }

@@ -1,27 +1,30 @@
-// Requêtes GraphQL Sorare. Écrites d'après la connaissance du schéma public, à confirmer avec `node scripts/spike.mjs`
-// (voir docs/spike-results.md). Toute correction de schéma se fait ici et dans le mapping de sorare.ts.
+// Requêtes GraphQL Sorare, vérifiées sur l'API réelle (l'introspection est désactivée ; voir docs/spike-results.md).
 
 export const CLUBS_QUERY = `query Clubs($slug: String!) {
-  football { competition(slug: $slug) { slug clubs(first: 50) { nodes { slug name } } } }
+  football { competition(slug: $slug) { slug teams(first: 50) { nodes { ... on Club { slug name } } } } }
 }`;
+
+const GAME_FIELDS = 'id date statusTyped homeGoals awayGoals homeTeam { slug } awayTeam { slug } competition { slug }';
 
 export const CLUB_GAMES_QUERY = `query ClubGames($slug: String!) {
   football { club(slug: $slug) {
-    slug
-    latestGames(first: 40) { id date status homeGoals awayGoals homeTeam { slug name } awayTeam { slug name } }
-    upcomingGames(first: 5) { id date status homeGoals awayGoals homeTeam { slug name } awayTeam { slug name } }
+    latestGames(first: 40) { nodes { ${GAME_FIELDS} } }
+    upcomingGames(first: 5) { ${GAME_FIELDS} }
   } }
 }`;
 
-export const GAME_SCORES_QUERY = `query GameScores($id: ID!) {
+const LINEUP = 'startingLineup { slug displayName } bench { slug displayName }';
+
+/** football.game attend l'identifiant sans le préfixe « Game: ». */
+export const GAME_DETAIL_QUERY = `query GameDetail($id: ID!) {
   football { game(id: $id) {
-    id
+    homeFormation { ${LINEUP} }
+    awayFormation { ${LINEUP} }
     playerGameScores {
       score
-      decisiveScore { totalScore }
-      allAroundStats { totalScore }
-      playerGameStats { minsPlayed team { slug } }
-      anyPlayer { slug displayName position }
+      anyPlayer { slug displayName anyPositions }
+      anyPlayerGameStats { ... on PlayerGameStats { minsPlayed gameStarted formationPlace } }
+      detailedScore { category stat totalScore }
     }
   } }
 }`;
