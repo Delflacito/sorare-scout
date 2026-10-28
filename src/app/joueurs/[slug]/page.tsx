@@ -6,6 +6,7 @@ import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
+import { Venue } from '@/components/Venue';
 import { ageAt, fmtDate, fmtPct, fmtScore, indexClass, ratingClass } from '@/lib/format';
 import { actionItems, describeActions } from '@/domain/actions';
 import { one, oneOf, type SearchParams } from '@/lib/params';
@@ -75,7 +76,7 @@ function Hero({ player, upcoming }: { player: PlayerDetail; upcoming: UpcomingVi
           <>
             <div className="hero-next-label">Prochain match · {fmtDate(next.date)}</div>
             <div className="hero-next-match">
-              {next.isHome ? 'vs' : '@'} <ClubLogo name={next.opponent} url={next.opponentPictureUrl} size={18} /> {next.opponent}
+              <Venue isHome={next.isHome} /> <ClubLogo name={next.opponent} url={next.opponentPictureUrl} size={18} /> {next.opponent}
             </div>
             <div className="hero-figure">{projected === null ? '—' : fmtScore(projected)}</div>
             <div className="hero-next-label">Score potentiel s’il joue</div>
@@ -99,7 +100,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
       <div className="table-wrap">
         <table aria-label="Prochains matchs">
           <thead>
-            <tr><th>Date</th><th>Match</th><th>Lieu</th><th>Score potentiel</th><th>Adv. au poste ({pos})</th><th>Qualité adv.</th></tr>
+            <tr><th>Date</th><th>Match</th><th>Effet lieu</th><th>Score potentiel</th><th>Adv. au poste ({pos})</th><th>Qualité adv.</th></tr>
           </thead>
           <tbody>
             {upcoming.fixtures.map((f) => {
@@ -110,7 +111,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
                   <td>{fmtDate(f.date)}</td>
                   <td>
                     <Link href={`/equipes/${f.opponentSlug}`} className="club-link">
-                      <span className="muted">{f.isHome ? 'vs' : '@'}</span>
+                      <Venue isHome={f.isHome} />
                       <ClubLogo name={f.opponent} url={f.opponentPictureUrl} />
                       {f.opponent}
                     </Link>
@@ -160,7 +161,7 @@ function LastGamesTable({ games }: { games: PlayerGameView[] }) {
               <td>{fmtDate(g.date)}</td>
               <td>
                 <Link href={`/matchs/${g.fixtureId}`} className="club-link">
-                  <span className="muted">{g.isHome ? 'vs' : '@'}</span>
+                  <Venue isHome={g.isHome} />
                   <ClubLogo name={g.opponent} url={g.opponentPictureUrl} />
                   {g.opponent}
                 </Link>

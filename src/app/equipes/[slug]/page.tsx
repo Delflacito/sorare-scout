@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Venue } from '@/components/Venue';
 import { notFound } from 'next/navigation';
 import { getQueries, type ConcededView } from '@/db/queries';
 import type { DetailedPosition } from '@/domain/types';
@@ -50,7 +51,7 @@ export default async function EquipePage({ params, searchParams }: { params: Pro
               {fixtures.map((f) => (
                 <tr key={f.fixtureId}>
                   <td>{fmtDate(f.date)}</td>
-                  <td>{f.isHome ? 'vs' : '@'} <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
+                  <td><Venue isHome={f.isHome} /> <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
                   <td className="num">{f.goalsFor ?? '–'} – {f.goalsAgainst ?? '–'}</td>
                 </tr>
               ))}

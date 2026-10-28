@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getQueries, type RoundMatchup } from '@/db/queries';
 import { POSITION_LABEL_FR, type DetailedPosition } from '@/domain/types';
 import { ClubLogo } from '@/components/Media';
+import { Venue } from '@/components/Venue';
 import { fmtDate, indexClass, ratingClass, roundLabel } from '@/lib/format';
 import { one, oneOf, type SearchParams } from '@/lib/params';
 
@@ -66,7 +67,7 @@ export default async function JourneePage({ searchParams }: { searchParams: Sear
                     </td>
                     <td>
                       <span className="club-link">
-                        <span className="muted">{r.isHome ? 'vs' : '@'}</span>
+                        <Venue isHome={r.isHome} />
                         <ClubLogo name={r.opponent} url={r.opponentPictureUrl} />{r.opponent}
                       </span>
                       <div className="muted small">{fmtDate(r.date)}</div>

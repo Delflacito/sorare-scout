@@ -3,6 +3,7 @@ import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
+import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
 import { one, type SearchParams } from '@/lib/params';
 
@@ -43,13 +44,13 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
                     <span className="player-cell">
                       <PlayerAvatar name={p.name} url={p.pictureUrl} size={32} />
                       <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
+                      <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
                       <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />
                     </span>
                   </td>
                   <td>
                     <span className="club-link">
-                      <ClubLogo name={p.team} url={p.teamPictureUrl} />
-                      <span className="muted">{p.isHome ? 'vs' : '@'}</span>
+                      <Venue isHome={p.isHome} />
                       <ClubLogo name={p.opponent} url={p.opponentPictureUrl} />
                       {p.opponent}
                     </span>

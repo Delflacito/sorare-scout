@@ -145,6 +145,8 @@ describe('/joueurs/[slug]', () => {
     expect(within(rows[0]).getByRole('img', { name: 'Olympique de Marseille' })).toHaveAttribute('src', 'https://t/om.png');
     expect(within(rows[0]).getByText('66 pts')).toBeInTheDocument();
     expect(within(rows[0]).getByText('30/100')).toBeInTheDocument();
+    expect(within(rows[0]).getByTitle('Domicile')).toHaveTextContent('D');
+    expect(within(rows[1]).getByTitle('Extérieur')).toHaveTextContent('E');
     expect(within(rows[1]).getByText('81.1')).toBeInTheDocument();
   });
 

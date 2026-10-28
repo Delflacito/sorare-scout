@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayerGameView } from '@/db/queries';
 import { POSITION_LABEL_FR } from '@/domain/types';
 import { actionItems, describeActions } from '@/domain/actions';
+import { Venue } from './Venue';
 
 const BAR = 20;
 /** Largeur d'une bande par match : s'adapte à la carte, défilement horizontal en dessous du minimum. */
@@ -180,7 +181,7 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
               }}
             >
               <strong>{g.status === 'absent' ? 'Absent' : fmt(g.score)}</strong>
-              <span>{fmtDay(g.date)} · {g.isHome ? 'vs' : '@'} {g.opponent}{!g.isLeague && ` · ${g.competition}`}</span>
+              <span>{fmtDay(g.date)} · <Venue isHome={g.isHome} /> {g.opponent}{!g.isLeague && ` · ${g.competition}`}</span>
               {g.status !== 'absent' && (
                 <span>
                   {g.minutes} min{g.position ? ` · ${POSITION_LABEL_FR[g.position]}` : ''} · Décisif {fmt(g.decisive)} · AA {fmt(g.allAround)}
