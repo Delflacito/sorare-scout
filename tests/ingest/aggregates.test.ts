@@ -61,6 +61,14 @@ describeDb('recomputeAggregates', () => {
     expect(x.start_rate5).toBeCloseTo(2 / 3);
   });
 
+  it('arrivée en cours de saison : les matchs du club avant son arrivée ne comptent pas', async () => {
+    const y = await repo.upsertPlayer({ name: 'y', sorareSlug: 'y', position: 'Forward', teamId: ids.B });
+    await repo.upsertAppearance({ fixtureId: ids.f3, playerId: y, teamId: ids.B, grid: null, detailedPosition: 'ST', started: true, minutes: 90, score: 60, decisive: 0, allAround: 60 });
+    await recomputeAggregates(repo);
+    const [row] = await sql`select l5 from player_summary where player_id = ${y}`;
+    expect(row.l5).toBe(60);
+  });
+
   it('idempotent', async () => {
     await recomputeAggregates(repo);
     await recomputeAggregates(repo);

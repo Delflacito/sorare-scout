@@ -36,7 +36,7 @@ const SCORES_G1 = [
   score('bench-guy', 'Bench Guy', 'psg', 'Midfielder', 0, 0),
 ];
 
-function fakes(opts: { lineups?: Record<number, AfLineup[]>; budget?: number } = {}) {
+function fakes(opts: { lineups?: Record<number, AfLineup[]>; budget?: number; noScores?: boolean } = {}) {
   const lineupCalls: number[] = [];
   let calls = 0;
   const budget = opts.budget ?? Infinity;
@@ -45,7 +45,7 @@ function fakes(opts: { lineups?: Record<number, AfLineup[]>; budget?: number } =
     clubGames: async (slug: string) => slug === 'psg'
       ? [G1, G2, game('Game:9', '2026-10-21T19:00:00Z', 'psg', 'real-madrid'), game('Game:3', '2026-11-01T20:00:00Z', 'psg', 'om', 'scheduled')]
       : [G1, G2],
-    gameScores: async (id: string) => (id === 'Game:1' ? SCORES_G1 : [score('nuno-mendes', 'Nuno Mendes', 'psg', 'Defender', 30)]),
+    gameScores: async (id: string) => (opts.noScores ? [] : id === 'Game:1' ? SCORES_G1 : [score('nuno-mendes', 'Nuno Mendes', 'psg', 'Defender', 30)]),
   } as unknown as SorareClient;
   const lineups = opts.lineups ?? { 1001: LINEUPS_G1, 1002: [
     { teamId: 81, formation: '4-4-2', players: [] },
@@ -127,5 +127,79 @@ describeDb('importFixtures', () => {
     expect(r2).toMatchObject({ fixturesImported: 1, status: 'ok' });
     const [{ count }] = await sql`select count(*)::int as count from appearances`;
     expect(count).toBe(5);
+  });
+
+  it('réutilise les matchs API-Football déjà récupérés', async () => {
+    const f = fakes();
+    let calls = 0;
+    const apiFootball = { ...f.apiFootball, fixtures: async () => { calls++; return []; } } as unknown as ApiFootballClient;
+    const prefetched = new Map([[61, [afFx(1001, '2026-10-25T19:00:00+00:00', 85, 81), afFx(1002, '2026-10-18T19:00:00+00:00', 81, 85)]]]);
+    const r = await importFixtures({ ...f, apiFootball, repo }, 2026, [league], prefetched);
+    expect(calls).toBe(0);
+    expect(r.fixturesImported).toBe(2);
+  });
+
+  it('scores Sorare pas encore publiés : aucune requête API-Football de compo', async () => {
+    const f = fakes({ noScores: true });
+    const r = await importFixtures({ ...f, repo }, 2026, [league]);
+    expect(f.lineupCalls).toEqual([]);
+    expect(r.fixturesImported).toBe(0);
+  });
+
+  it('compo jamais publiée : abandon après 5 tentatives', async () => {
+    for (let i = 0; i < 5; i++) await importFixtures({ ...fakes({ lineups: { 1001: LINEUPS_G1 } }), repo }, 2026, [league]);
+    const f = fakes({ lineups: { 1001: LINEUPS_G1 } });
+    await importFixtures({ ...f, repo }, 2026, [league]);
+    expect(f.lineupCalls).toEqual([]);
+  });
+
+  it('un joueur de la compo n’est attribué qu’une fois (Gabriel / Gabriel Martinelli)', async () => {
+    const lineups = { 1001: [LINEUPS_G1[0], { ...LINEUPS_G1[1], players: [...LINEUPS_G1[1].players, { playerId: 11, name: 'Gabriel Martinelli', grid: '4:1', started: true }] }] };
+    const f = fakes({ lineups });
+    const sorare = {
+      ...f.sorare,
+      gameScores: async () => [score('gabriel-magalhaes', 'Gabriel', 'om', 'Defender', 0, 0), score('gabriel-martinelli', 'Gabriel Martinelli', 'om', 'Forward', 65), ...SCORES_G1],
+    } as unknown as SorareClient;
+    const r = await importFixtures({ ...f, sorare, repo }, 2026, [league]);
+    expect(r.errors).toEqual([]);
+    const rows = await sql`select sorare_slug, apifootball_id from players where sorare_slug like 'gabriel%' order by 1`;
+    expect(rows).toEqual([{ sorare_slug: 'gabriel-magalhaes', apifootball_id: null }, { sorare_slug: 'gabriel-martinelli', apifootball_id: 11 }]);
+    expect(await positions()).toContainEqual({ sorare_slug: 'gabriel-martinelli', sorare_game_id: 'Game:1', detailed_position: 'LW', started: true, sorare_score: 65 });
+  });
+
+  it('identifiant API-Football déjà pris par un autre joueur : non apparié, sans erreur', async () => {
+    const teamId = (await sql`select id from teams where sorare_slug = 'psg'`)[0].id;
+    await repo.upsertPlayer({ name: 'Autre', sorareSlug: 'autre', apifootballId: 42, position: 'Defender', teamId });
+    const r = await importFixtures({ ...fakes(), repo }, 2026, [league]);
+    expect(r.errors).toEqual([]);
+    const [nuno] = await sql`select apifootball_id from players where sorare_slug = 'nuno-mendes'`;
+    expect(nuno.apifootball_id).toBeNull();
+  });
+
+  it('formation inconnue signalée dans les erreurs, gardien conservé', async () => {
+    const lineups = { 1001: [LINEUPS_G1[0], { ...LINEUPS_G1[1], formation: '4-3-1-2' }] };
+    const r = await importFixtures({ ...fakes({ lineups }), repo }, 2026, [league]);
+    expect(r.errors).toContain('formation inconnue 4-3-1-2 (match Game:1)');
+    expect(r.fixturesImported).toBe(1);
+  });
+
+  it('erreur Sorare sur un club : signalée, le reste est importé', async () => {
+    const f = fakes();
+    const sorare = {
+      ...f.sorare,
+      clubGames: async (slug: string) => { if (slug === 'om') throw new Error('Sorare GraphQL: club introuvable'); return f.sorare.clubGames(slug); },
+    } as unknown as SorareClient;
+    const r = await importFixtures({ ...f, sorare, repo }, 2026, [league]);
+    expect(r.errors).toContain('club om : Sorare GraphQL: club introuvable');
+    expect(r.fixturesImported).toBe(2);
+  });
+
+  it('erreur sur une ligue : signalée, les autres ligues continuent', async () => {
+    const f = fakes();
+    const other: League = { key: 'laliga', name: 'LaLiga', sorareSlug: 'laliga-es', apifootballId: 140 };
+    const apiFootball = { ...f.apiFootball, fixtures: async (id: number) => { if (id === 140) throw new Error('API-Football down'); return f.apiFootball.fixtures(id, 2026); } } as unknown as ApiFootballClient;
+    const r = await importFixtures({ ...f, apiFootball, repo }, 2026, [other, league]);
+    expect(r.errors).toContain('ligue LaLiga : API-Football down');
+    expect(r.fixturesImported).toBe(2);
   });
 });

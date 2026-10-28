@@ -16,12 +16,13 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     q: one(p.q),
     position: oneOf(one(p.position), GENERIC),
     competition: one(p.competition),
+    team: one(p.team),
     detailedPosition: oneOf(one(p.detailedPosition), DETAILED_POSITIONS),
     sort: oneOf(one(p.sort), SORTS) ?? 'l5',
     offset: (pageNum - 1) * PAGE_SIZE,
   };
   const queries = getQueries();
-  const [rows, competitions] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions()]);
+  const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions(), queries.listTeams()]);
   const pageHref = (n: number) => {
     const qs = new URLSearchParams(Object.entries({ ...filters, offset: undefined, page: String(n) }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs?${qs}`;
@@ -35,6 +36,10 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
         <select name="competition" defaultValue={filters.competition ?? ''} aria-label="Compétition">
           <option value="">Toutes les ligues</option>
           {competitions.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+        </select>
+        <select name="team" defaultValue={filters.team ?? ''} aria-label="Club">
+          <option value="">Tous les clubs</option>
+          {teams.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
         </select>
         <select name="position" defaultValue={filters.position ?? ''} aria-label="Poste">
           <option value="">Tous les postes</option>

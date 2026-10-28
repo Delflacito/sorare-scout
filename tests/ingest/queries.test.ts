@@ -16,7 +16,7 @@ describeDb('searchPlayers', () => {
 
   it('trie par L5 et calcule l’indice du prochain adversaire', async () => {
     const rows = await q.searchPlayers({ sort: 'l5', offset: 0 });
-    // L5 : Nuno 70 (1 match PSG), Greenwood (80+40)/2, Tagliafico (0+60+50)/3, Lacazette (30+0+0)/3
+    // L5 : Nuno 70 (1 match PSG), Greenwood (80+40)/2, Tagliafico (60+50)/2 (arrivé au 2e match), Lacazette (30+0+0)/3
     expect(rows.map((r) => r.slug)).toEqual(['nuno-mendes', 'greenwood', 'tagliafico', 'lacazette']);
     expect(rows[0].l5).toBe(70);
     const nuno = rows.find((r) => r.slug === 'nuno-mendes')!;
@@ -35,15 +35,21 @@ describeDb('searchPlayers', () => {
     expect((await q.searchPlayers({ position: 'Forward', sort: 'l5', offset: 0 })).map((r) => r.slug)).toEqual(['greenwood', 'lacazette']);
     expect((await q.searchPlayers({ detailedPosition: 'LB', sort: 'l5', offset: 0 })).map((r) => r.slug)).toEqual(['nuno-mendes', 'tagliafico']);
     expect(await q.searchPlayers({ competition: 'autre', sort: 'l5', offset: 0 })).toEqual([]);
+    expect((await q.searchPlayers({ team: 'om', sort: 'l5', offset: 0 })).map((r) => r.slug)).toEqual(['greenwood']);
   });
 
   it('tri par taux de titularisation', async () => {
     const rows = await q.searchPlayers({ sort: 'startRate', offset: 0 });
-    expect(rows.map((r) => r.slug)).toEqual(['nuno-mendes', 'tagliafico', 'greenwood', 'lacazette']);
+    // Nuno et Tagliafico à 100 % : départage par nom
+    expect(rows.map((r) => r.slug)).toEqual(['tagliafico', 'nuno-mendes', 'greenwood', 'lacazette']);
   });
 
   it('liste des compétitions', async () => {
     expect(await q.listCompetitions()).toEqual([{ slug: 'ligue-1-fr', name: 'Ligue 1' }]);
+  });
+
+  it('liste des clubs', async () => {
+    expect((await q.listTeams()).map((t) => t.slug)).toEqual(['ol', 'om', 'psg']);
   });
 });
 

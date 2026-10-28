@@ -5,7 +5,7 @@ import type { PlayerListRow, SearchFilters } from '@/db/queries';
 const searchPlayers = vi.fn<(f: SearchFilters) => Promise<PlayerListRow[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
-  getQueries: () => ({ searchPlayers, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }] }),
+  getQueries: () => ({ searchPlayers, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }], listTeams: async () => [{ slug: 'om', name: 'Olympique de Marseille' }] }),
 }));
 
 const { default: Page } = await import('@/app/joueurs/page');
@@ -29,18 +29,19 @@ describe('/joueurs', () => {
     expect(screen.getByRole('cell', { name: 'DG' })).toBeInTheDocument();
     expect(screen.getByText('123')).toBeInTheDocument();
     expect(screen.getByText(/vs Olympique de Marseille/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Club' })).toBeInTheDocument();
   });
 
   it('transmet les filtres de l’URL', async () => {
     searchPlayers.mockResolvedValue([]);
-    await Page({ searchParams: Promise.resolve({ position: 'Defender', q: 'nuno', sort: 'l15', page: '2' }) });
-    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, detailedPosition: undefined, sort: 'l15', offset: 50 });
+    await Page({ searchParams: Promise.resolve({ position: 'Defender', q: 'nuno', sort: 'l15', page: '2', team: 'om' }) });
+    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, sort: 'l15', offset: 50 });
   });
 
   it('valeurs de filtre invalides ignorées', async () => {
     searchPlayers.mockResolvedValue([]);
     await Page({ searchParams: Promise.resolve({ position: 'Pilote', sort: 'DROP', detailedPosition: 'XX' }) });
-    expect(searchPlayers).toHaveBeenCalledWith({ q: undefined, position: undefined, competition: undefined, detailedPosition: undefined, sort: 'l5', offset: 0 });
+    expect(searchPlayers).toHaveBeenCalledWith({ q: undefined, position: undefined, competition: undefined, team: undefined, detailedPosition: undefined, sort: 'l5', offset: 0 });
   });
 
   it('liste vide → message', async () => {

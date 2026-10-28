@@ -1,6 +1,6 @@
 import type { Repo } from '@/db/repo';
 import type { SorareClient } from '@/sources/sorare';
-import type { ApiFootballClient } from '@/sources/apiFootball';
+import type { ApiFootballClient, AfFixture } from '@/sources/apiFootball';
 import { matchClub, type Candidate } from '@/domain/matching';
 import { LEAGUES, type League } from './leagues';
 
@@ -10,11 +10,14 @@ export interface UnmatchedClub { source: 'sorare' | 'apifootball'; name: string 
 export async function importClubs(deps: ClubsDeps, season: number, leagues: League[] = LEAGUES) {
   let matched = 0;
   const unmatched: UnmatchedClub[] = [];
+  const afFixtures = new Map<number, AfFixture[]>();
   for (const league of leagues) {
     const competitionId = await deps.repo.upsertCompetition({ slug: league.sorareSlug, name: league.name, apifootballId: league.apifootballId });
     const sorareClubs = await deps.sorare.clubs(league.sorareSlug);
     const afTeams = new Map<string, Candidate>();
-    for (const f of await deps.apiFootball.fixtures(league.apifootballId, season)) {
+    const fixtures = await deps.apiFootball.fixtures(league.apifootballId, season);
+    afFixtures.set(league.apifootballId, fixtures);
+    for (const f of fixtures) {
       afTeams.set(String(f.homeTeamId), { id: String(f.homeTeamId), name: f.homeName });
       afTeams.set(String(f.awayTeamId), { id: String(f.awayTeamId), name: f.awayName });
     }
@@ -29,7 +32,8 @@ export async function importClubs(deps: ClubsDeps, season: number, leagues: Leag
       }
       await deps.repo.upsertTeam({ name: club.name, sorareSlug: club.slug, apifootballId: afId ? Number(afId) : null, competitionId });
     }
+    await deps.repo.detachTeams(competitionId, sorareClubs.map((c) => c.slug));
     for (const t of afTeams.values()) if (!used.has(t.id)) unmatched.push({ source: 'apifootball', name: t.name });
   }
-  return { matched, unmatched };
+  return { matched, unmatched, afFixtures };
 }

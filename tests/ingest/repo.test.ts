@@ -37,6 +37,14 @@ describeDb('repo', () => {
     expect(p.apifootball_id).toBe(42);
   });
 
+  it('upsertPlayer ne remplace pas un apifootball_id déjà mémorisé', async () => {
+    const { home } = await seedFixture();
+    await repo.upsertPlayer({ name: 'Nuno Mendes', sorareSlug: 'nuno-mendes', apifootballId: 42, position: 'Defender', teamId: home });
+    await repo.upsertPlayer({ name: 'Nuno Mendes', sorareSlug: 'nuno-mendes', apifootballId: 99, position: 'Defender', teamId: home });
+    const [p] = await sql`select apifootball_id from players`;
+    expect(p.apifootball_id).toBe(42);
+  });
+
   it('upsertAppearance idempotent', async () => {
     const { fixtureId, playerId, home } = await seedFixture();
     const app = { fixtureId, playerId, teamId: home, grid: '2:1', detailedPosition: 'LB' as const, started: true, minutes: 90, score: 60, decisive: 20, allAround: 40 };
@@ -61,6 +69,15 @@ describeDb('repo', () => {
     ]);
     await repo.markLineupsImported(fixtureId, '4-3-3', '4-4-2');
     expect(await repo.fixturesNeedingLineups()).toEqual([]);
+  });
+
+  it('setFixtureApiFootballId : identifiant déjà pris → ignoré sans erreur', async () => {
+    const { fixtureId, competitionId, home, away } = await seedFixture();
+    const replay = await repo.upsertFixture({ date: '2026-10-26T19:00:00Z', competitionId, homeTeamId: home, awayTeamId: away, homeGoals: 0, awayGoals: 0, status: 'played', sorareGameId: 'g1-replay' });
+    await repo.setFixtureApiFootballId(fixtureId, 1001);
+    await repo.setFixtureApiFootballId(replay, 1001);
+    const rows = await sql`select sorare_game_id from fixtures where apifootball_fixture_id = 1001`;
+    expect(rows).toEqual([{ sorare_game_id: 'g1' }]);
   });
 
   it('transaction annulée en cas d’erreur', async () => {
@@ -97,5 +114,19 @@ describeDb('repo', () => {
     await repo.replaceConceded([{ ...row, average: 70 }]);
     const rows = await sql`select average from team_conceded_by_position`;
     expect(rows).toEqual([{ average: 70 }]);
+  });
+
+  it('replacePlayerSummaries : 5000 joueurs (au-delà de la limite de paramètres Postgres)', async () => {
+    const { home } = await seedFixture();
+    await sql`insert into players (name, sorare_slug, position, team_id)
+      select 'p' || i, 'p-' || i, 'Forward', ${home} from generate_series(1, 5000) i`;
+    const ids = await sql`select id from players where sorare_slug like 'p-%'`;
+    const rows = ids.map((r) => ({
+      playerId: r.id as number, l5: 1, l15: 1, l40: 1, stdDev5: 0, startRate5: 1, avgMinutes5: 90, startRate15: 1, avgMinutes15: 90,
+      decisive5: 0, allAround5: 1, decisive15: 0, allAround15: 1, usualPosition: null,
+    }));
+    await repo.replacePlayerSummaries(rows);
+    const [{ count }] = await sql`select count(*)::int as count from player_summary`;
+    expect(count).toBe(5000);
   });
 });

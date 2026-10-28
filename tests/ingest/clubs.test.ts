@@ -54,4 +54,17 @@ describeDb('importClubs', () => {
     const [{ count }] = await sql`select count(*)::int as count from teams`;
     expect(count).toBe(4);
   });
+
+  it('club relégué détaché de la compétition à la saison suivante', async () => {
+    await importClubs({ sorare, apiFootball, repo }, 2026, [league]);
+    const nextSeason = { clubs: async () => [{ slug: 'psg', name: 'Paris Saint-Germain', competitionSlug: 'ligue-1-fr' }] } as unknown as SorareClient;
+    await importClubs({ sorare: nextSeason, apiFootball, repo }, 2027, [league]);
+    const rows = await sql`select sorare_slug from teams t join competitions c on c.id = t.competition_id order by 1`;
+    expect(rows).toEqual([{ sorare_slug: 'psg' }]);
+  });
+
+  it('renvoie les matchs API-Football pour éviter de les redemander', async () => {
+    const r = await importClubs({ sorare, apiFootball, repo }, 2026, [league]);
+    expect(r.afFixtures.get(61)).toHaveLength(2);
+  });
 });
