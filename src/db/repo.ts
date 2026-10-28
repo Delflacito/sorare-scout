@@ -38,6 +38,9 @@ export interface PlayerSummaryRow {
   homeGames: number;
   awayAvg: number | null;
   awayGames: number;
+  /** Prochain match de championnat et score potentiel pour ce match. */
+  nextFixtureId?: number | null;
+  nextProjected?: number | null;
 }
 
 export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
@@ -232,8 +235,28 @@ function createBaseRepo(sql: Sql) {
           decisive5: r.decisive5, all_around5: r.allAround5, decisive15: r.decisive15, all_around15: r.allAround15,
           usual_position: r.usualPosition, base: r.base,
           home_avg: r.homeAvg, home_games: r.homeGames, away_avg: r.awayAvg, away_games: r.awayGames,
+          next_fixture_id: r.nextFixtureId ?? null, next_projected: r.nextProjected ?? null,
         })),
       )}`;
+    },
+
+    /** Club actuel de chaque joueur. */
+    async playerTeams(): Promise<Map<number, number>> {
+      const rows = await sql`select id, team_id from players where team_id is not null`;
+      return new Map(rows.map((r) => [r.id as number, r.team_id as number]));
+    },
+
+    /** Prochain match de championnat programmé de chaque équipe. */
+    async nextLeagueFixtures(): Promise<Map<number, { fixtureId: number; opponentId: number; isHome: boolean; competitionId: number }>> {
+      const rows = await sql`
+        select distinct on (t.id) t.id as team_id, f.id, f.competition_id, f.home_team_id = t.id as is_home,
+          case when f.home_team_id = t.id then f.away_team_id else f.home_team_id end as opponent_id
+        from teams t
+        join fixtures f on t.id in (f.home_team_id, f.away_team_id)
+        join competitions c on c.id = f.competition_id and c.is_league
+        where f.status = 'scheduled' and f.date > now()
+        order by t.id, f.date`;
+      return new Map(rows.map((r) => [r.team_id as number, { fixtureId: r.id, opponentId: r.opponent_id, isHome: r.is_home, competitionId: r.competition_id }]));
     },
 
     /** Matchs joués et complets, avec toutes leurs participations : entrée du recalcul des agrégats. */

@@ -1,7 +1,7 @@
 import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow, ConcededOverallRow, VenueFactorRow } from '@/db/repo';
 import { concededByPosition, concededOverall, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
 import type { DetailedPosition } from '@/domain/types';
-import { BASE_GAMES, baseScore, qualityRatings, venueFactors } from '@/domain/projection';
+import { BASE_GAMES, baseScore, projectForFixture, qualityRatings, venueFactors } from '@/domain/projection';
 
 export const CONCEDED_WINDOWS = [5, 10];
 const USUAL_POSITION_SAMPLE = 10;
@@ -129,10 +129,58 @@ export function computeAggregates(fixtures: CompletedFixture[], appearances: App
   return { ...conceded(fixtures, appearances), summaries: summaries(fixtures, appearances) };
 }
 
+export type Aggregates = ReturnType<typeof computeAggregates>;
+export interface FixtureSide { isHome: boolean; opponentId: number; competitionId: number }
+
+/**
+ * Score potentiel d'un joueur pour un match à partir des agrégats : concédé au poste (5 derniers matchs),
+ * qualité générale (10 derniers matchs), avantage du terrain du championnat. Même calcul que la fiche joueur.
+ */
+export function projector(agg: Aggregates, amplification?: number) {
+  const byPosition = new Map(agg.byPosition.filter((c) => c.window === 5).map((c) => [`${c.teamId}|${c.position}`, c]));
+  const leagueAtPosition = new Map<DetailedPosition, number[]>();
+  for (const c of agg.byPosition) {
+    if (c.window === 5 && c.leagueAverage !== null) leagueAtPosition.set(c.position, [...(leagueAtPosition.get(c.position) ?? []), c.leagueAverage]);
+  }
+  const mean = (xs: number[] | undefined) => (xs?.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const overall = new Map(agg.overall.filter((c) => c.window === 10).map((c) => [c.teamId, c]));
+  const venues = new Map(agg.venues.map((v) => [v.competitionId, v]));
+  return (s: PlayerSummaryRow, f: FixtureSide) => {
+    if (s.base === null || !s.usualPosition) return null;
+    const opp = String(f.opponentId);
+    const pos = byPosition.get(`${opp}|${s.usualPosition}`);
+    const all = overall.get(opp);
+    const venue = venues.get(f.competitionId);
+    return projectForFixture(s, {
+      isHome: f.isHome,
+      leagueVenueFactor: venue ? (f.isHome ? venue.home : venue.away) : 1,
+      position: { average: pos?.average ?? null, leagueAverage: pos?.leagueAverage ?? mean(leagueAtPosition.get(s.usualPosition)), observations: pos?.observations ?? 0 },
+      overall: all ? { index: all.index, observations: all.observations } : null,
+    }, amplification);
+  };
+}
+
+/** Prochain match de championnat de chaque joueur (selon son club actuel) et score potentiel associé. */
+export function withNextProjection(
+  agg: Aggregates,
+  playerTeams: Map<number, number>,
+  nextFixtures: Map<number, FixtureSide & { fixtureId: number }>,
+): PlayerSummaryRow[] {
+  const project = projector(agg);
+  return agg.summaries.map((s) => {
+    const team = playerTeams.get(s.playerId);
+    const next = team === undefined ? undefined : nextFixtures.get(team);
+    if (!next) return { ...s, nextFixtureId: null, nextProjected: null };
+    return { ...s, nextFixtureId: next.fixtureId, nextProjected: project(s, next)?.projected ?? null };
+  });
+}
+
 /** Recalcule team_conceded_by_position et player_summary à partir des matchs complets. */
 export async function recomputeAggregates(repo: Repo): Promise<{ conceded: number; players: number }> {
   const { fixtures, appearances } = await repo.aggregateInputs();
-  const { summaries: summaryRows, ...concededRows } = computeAggregates(fixtures, appearances);
+  const agg = computeAggregates(fixtures, appearances);
+  const { summaries: _, ...concededRows } = agg;
+  const summaryRows = withNextProjection(agg, await repo.playerTeams(), await repo.nextLeagueFixtures());
   await repo.transaction(async (tx) => {
     await tx.replaceConceded(concededRows.byPosition);
     await tx.replaceConcededOverall(concededRows.overall);

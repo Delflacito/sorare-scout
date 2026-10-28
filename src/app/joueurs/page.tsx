@@ -9,7 +9,7 @@ import { one, oneOf, type SearchParams } from '@/lib/params';
 export const dynamic = 'force-dynamic';
 
 const GENERIC = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
-const SORT_LABEL = { l5: 'L5', l15: 'L15', l40: 'L40', startRate: '% titu', nextIndex: 'Indice adversaire' } as const;
+const SORT_LABEL = { projected: 'score potentiel', l5: 'L5', l15: 'L15', l40: 'L40', startRate: '% titu', nextIndex: 'Indice adversaire' } as const;
 
 export default async function JoueursPage({ searchParams }: { searchParams: SearchParams }) {
   const p = await searchParams;
@@ -20,13 +20,15 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     competition: one(p.competition),
     team: one(p.team),
     detailedPosition: oneOf(one(p.detailedPosition), DETAILED_POSITIONS),
-    sort: oneOf(one(p.sort), SORTS) ?? 'l5',
+    available: one(p.dispo) === '1' || undefined,
+    sort: oneOf(one(p.sort), SORTS) ?? 'projected',
     offset: (pageNum - 1) * PAGE_SIZE,
   };
   const queries = getQueries();
   const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions(), queries.listTeams()]);
   const pageHref = (n: number) => {
-    const qs = new URLSearchParams(Object.entries({ ...filters, offset: undefined, page: String(n) }).filter(([, v]) => v) as [string, string][]);
+    const { available, offset: _, ...rest } = filters;
+    const qs = new URLSearchParams(Object.entries({ ...rest, dispo: available ? '1' : undefined, page: String(n) }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs?${qs}`;
   };
 
@@ -54,6 +56,9 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
         <select name="sort" defaultValue={filters.sort} aria-label="Tri">
           {SORTS.map((s) => <option key={s} value={s}>Trier par {SORT_LABEL[s]}</option>)}
         </select>
+        <label className="check">
+          <input type="checkbox" name="dispo" value="1" defaultChecked={filters.available} /> Masquer blessés et suspendus
+        </label>
         <button type="submit">Filtrer</button>
       </form>
 
@@ -65,7 +70,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
             <thead>
               <tr>
                 <th>Joueur</th><th>Club</th><th>Poste</th><th>L5</th><th>L15</th><th>L40</th><th>% titu</th>
-                <th>Prochain match</th><th>Indice adv.</th><th>Proj. Sorare</th>
+                <th>Prochain match</th><th>Potentiel</th><th>Indice adv.</th><th>Proj. Sorare</th>
               </tr>
             </thead>
             <tbody>
@@ -91,6 +96,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
                       <Link href={`/equipes/${r.nextOpponentSlug}`}>{r.nextIsHome ? 'vs' : '@'} {r.nextOpponent}</Link>
                     ) : '—'}
                   </td>
+                  <td className="num strong">{r.nextProjected === null ? '—' : fmtScore(r.nextProjected)}</td>
                   <td className={`num ${indexClass(r.nextIndex)} ${r.nextLowSample ? 'low-sample' : ''}`}>
                     {r.nextIndex === null ? '—' : fmtIndex(r.nextIndex)}
                   </td>

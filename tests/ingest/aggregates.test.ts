@@ -117,6 +117,18 @@ describeDb('recomputeAggregates', () => {
     expect(venues).toEqual([{ observations: 8 }]);
   });
 
+  it('score potentiel du prochain match de championnat', async () => {
+    const competitionId = (await sql`select id from competitions`)[0].id;
+    const next = await repo.upsertFixture({ date: '2099-01-01T20:00:00Z', competitionId, homeTeamId: ids.A, awayTeamId: ids.B, homeGoals: null, awayGoals: null, status: 'scheduled', sorareGameId: 'f9' });
+    await recomputeAggregates(repo);
+    const [a1] = await sql`select next_fixture_id, next_projected from player_summary where player_id = ${ids.a1}`;
+    expect(a1.next_fixture_id).toBe(next);
+    expect(a1.next_projected).toBeGreaterThan(0);
+    // C n'a pas de match programmé
+    const [c1] = await sql`select next_fixture_id, next_projected from player_summary where player_id = ${ids.c1}`;
+    expect(c1).toEqual({ next_fixture_id: null, next_projected: null });
+  });
+
   it('idempotent', async () => {
     await recomputeAggregates(repo);
     await recomputeAggregates(repo);

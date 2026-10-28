@@ -6,3 +6,15 @@ export const fmtDate = (iso: string) =>
 
 /** Classe CSS selon l'indice concédé (> 1,1 : adversaire généreux). */
 export const indexClass = (i: number | null) => (i === null ? '' : i > 1.1 ? 'hot' : i < 0.9 ? 'cold' : 'neutral');
+
+/** Note 1–100 de l'adversaire (100 = le plus fort) : favorable (faible note), neutre ou défavorable. */
+export const ratingClass = (rating: number | null) => (rating === null ? '' : rating <= 33 ? 'hot' : rating >= 67 ? 'cold' : 'neutral');
+
+/** Dates et nombre de matchs d'une journée. */
+export function roundLabel(fixtures: { date: string }[]): string {
+  if (!fixtures.length) return '';
+  const first = fmtDate(fixtures[0].date);
+  const last = fmtDate(fixtures.at(-1)!.date);
+  const n = `${fixtures.length} match${fixtures.length > 1 ? 's' : ''}`;
+  return first === last ? `${first} · ${n}` : `Du ${first} au ${last} · ${n}`;
+}
