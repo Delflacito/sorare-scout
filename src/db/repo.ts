@@ -186,13 +186,20 @@ function createBaseRepo(sql: Sql) {
         stats_version = ${STATS_VERSION} where id = ${fixtureId}`;
     },
 
-    async fixturesNeedingLineups(): Promise<FixtureToComplete[]> {
+    /**
+     * Matchs à compléter : jamais importés d'abord, puis ceux à réimporter ; à l'intérieur, les matchs des clubs
+     * des championnats prioritaires (`priorityCompetitionSlugs`) en premier, du plus récent au plus ancien.
+     */
+    async fixturesNeedingLineups(priorityCompetitionSlugs: string[] = []): Promise<FixtureToComplete[]> {
       const rows = await sql`
-        select id, sorare_game_id, home_team_id, away_team_id from fixtures
-        where status = 'played' and (
-          (not lineups_imported and lineups_attempts < ${MAX_LINEUP_ATTEMPTS})
-          or (lineups_imported and stats_version < ${STATS_VERSION}))
-        order by lineups_imported, date desc`;
+        select f.id, f.sorare_game_id, f.home_team_id, f.away_team_id from fixtures f
+        where f.status = 'played' and (
+          (not f.lineups_imported and f.lineups_attempts < ${MAX_LINEUP_ATTEMPTS})
+          or (f.lineups_imported and f.stats_version < ${STATS_VERSION}))
+        order by f.lineups_imported,
+          exists (select 1 from teams t join competitions c on c.id = t.competition_id
+            where t.id in (f.home_team_id, f.away_team_id) and c.slug = any(${priorityCompetitionSlugs})) desc,
+          f.date desc`;
       return rows.map((r) => ({ id: r.id, sorareGameId: r.sorare_game_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id }));
     },
 

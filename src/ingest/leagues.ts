@@ -4,9 +4,15 @@ export interface League {
   key: keyof typeof SORARE_COMPETITIONS;
   name: string;
   sorareSlug: string;
+  /** Championnat prioritaire : ses matchs sont complétés avant les autres. */
+  priority?: boolean;
 }
 
+/** Les championnats prioritaires d'abord (les plus joués). */
 export const LEAGUES: League[] = [
+  { key: 'eredivisie', name: 'Eredivisie', sorareSlug: SORARE_COMPETITIONS.eredivisie, priority: true },
+  { key: 'jupilerProLeague', name: 'Jupiler Pro League', sorareSlug: SORARE_COMPETITIONS.jupilerProLeague, priority: true },
+  { key: 'primeiraLiga', name: 'Primeira Liga', sorareSlug: SORARE_COMPETITIONS.primeiraLiga, priority: true },
   { key: 'ligue1', name: 'Ligue 1', sorareSlug: SORARE_COMPETITIONS.ligue1 },
   { key: 'premierLeague', name: 'Premier League', sorareSlug: SORARE_COMPETITIONS.premierLeague },
   { key: 'laliga', name: 'LaLiga', sorareSlug: SORARE_COMPETITIONS.laliga },

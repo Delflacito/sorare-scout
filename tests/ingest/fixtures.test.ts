@@ -211,6 +211,18 @@ describeDb('importFixtures', () => {
     expect(count).toBe(3);
   });
 
+  it('championnats prioritaires complétés en premier, même plus anciens', async () => {
+    const ere: League = { key: 'eredivisie', name: 'Eredivisie', sorareSlug: 'eredivisie', priority: true };
+    const nl = await repo.upsertCompetition({ slug: 'eredivisie', name: 'Eredivisie' });
+    await repo.upsertTeam({ name: 'PSV', sorareSlug: 'psv', competitionId: nl });
+    await repo.upsertTeam({ name: 'Ajax', sorareSlug: 'ajax', competitionId: nl });
+    const OLD_NL = game('Game:nl', '2026-10-01T19:00:00Z', 'psv', 'ajax', 'played', 'eredivisie');
+    const f = fakeSorare();
+    const sorare = { ...f.sorare, clubGames: async (slug: string) => (['psv', 'ajax'].includes(slug) ? [OLD_NL] : f.sorare.clubGames(slug)) } as unknown as SorareClient;
+    await importFixtures({ sorare, repo }, [league, ere]);
+    expect(f.detailCalls).toEqual(['Game:nl', 'Game:1', 'Game:2']);
+  });
+
   it('les matchs les plus récents sont complétés en premier', async () => {
     const f = fakeSorare();
     await importFixtures({ ...f, repo }, [league]);
