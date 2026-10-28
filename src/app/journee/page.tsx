@@ -44,7 +44,7 @@ export default async function JourneePage({ searchParams }: { searchParams: Sear
         <>
           <p className="note">
             Pour chaque équipe : points Sorare concédés en moyenne par son adversaire à chaque poste (5 derniers matchs).
-            Orange = adversaire plus généreux que la moyenne de la ligue (au moins +10 %), vert = plus avare. Valeurs pâles : moins de 3 matchs observés.
+            Vert = adversaire plus généreux que la moyenne de la ligue (au moins +10 %), rouge = plus avare. Valeurs pâles : moins de 3 matchs observés.
             Cliquer sur un poste trie les équipes par adversaire le plus généreux à ce poste.
           </p>
           <div className="table-wrap">
