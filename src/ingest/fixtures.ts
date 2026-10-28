@@ -159,7 +159,7 @@ export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEA
   }
   const teamsById = new Map((await deps.repo.allTeams()).map((t) => [t.id, t]));
   // Du plus récent au plus ancien : la forme récente est disponible dès le premier import.
-  const queue = await deps.repo.fixturesNeedingLineups();
+  const queue = await deps.repo.fixturesNeedingLineups(leagues.filter((l) => l.priority).map((l) => l.sorareSlug));
   const worker = async () => {
     for (let fixture = queue.shift(); fixture; fixture = queue.shift()) {
       if (opts.deadline !== undefined && Date.now() > opts.deadline) return;

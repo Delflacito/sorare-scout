@@ -4,8 +4,11 @@ import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY, N
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
-/** Slugs Sorare des compétitions du Big 5. */
+/** Slugs Sorare des championnats suivis. */
 export const SORARE_COMPETITIONS = {
+  eredivisie: 'eredivisie',
+  jupilerProLeague: 'jupiler-pro-league',
+  primeiraLiga: 'primeira-liga-pt',
   ligue1: 'ligue-1-fr',
   premierLeague: 'premier-league-gb-eng',
   laliga: 'laliga-es',
