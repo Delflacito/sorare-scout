@@ -1,4 +1,4 @@
-import { lastN, playingTime, scoreBreakdown, concededByPosition, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
+import { lastN, playingTime, scoreBreakdown, concededByPosition, concededOverall, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
 
 const tg = (id: string, day: number, teamId = 'A'): TeamGame => ({ fixtureId: id, date: `2026-10-${String(day).padStart(2, '0')}T20:00:00Z`, teamId });
 const pg = (id: string, score: number, extra: Partial<PlayerGame> = {}): PlayerGame => ({
@@ -77,5 +77,22 @@ describe('concededByPosition', () => {
   it('observation d’une autre équipe ignorée', () => {
     const rows = concededByPosition([ob('U', 't1', 'CB', 50)], { T: ['t1'] }, 5);
     expect(rows).toEqual([]);
+  });
+});
+
+describe('concededOverall', () => {
+  const ob = (team: string, fixtureId: string, position: ConcededObs['position'], score: number, started = true): ConcededObs => ({
+    opponentTeamId: team, fixtureId, date: '2026-10-01T00:00:00Z', position, score, started,
+  });
+  it('moyenne de tous les titulaires adverses, comparée à la ligue', () => {
+    const obs = [ob('T', 't1', 'LB', 60), ob('T', 't1', 'ST', 80), ob('T', 't1', 'CM', 10, false), ob('U', 'u1', 'ST', 40)];
+    const rows = concededOverall(obs, { T: ['t1'], U: ['u1'] }, 5);
+    const t = rows.find((r) => r.teamId === 'T')!;
+    expect(t).toMatchObject({ window: 5, average: 70, leagueAverage: 60, observations: 2 });
+    expect(t.index).toBeCloseTo(70 / 60);
+  });
+  it('fenêtre des N derniers matchs', () => {
+    const rows = concededOverall([ob('T', 'old', 'ST', 100), ob('T', 'new', 'ST', 50)], { T: ['new', 'old'] }, 1);
+    expect(rows[0].average).toBe(50);
   });
 });

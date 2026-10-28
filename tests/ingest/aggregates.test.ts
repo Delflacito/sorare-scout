@@ -69,6 +69,16 @@ describeDb('recomputeAggregates', () => {
     expect(row.l5).toBe(60);
   });
 
+  it('concédé tous postes confondus et forme des joueurs', async () => {
+    await recomputeAggregates(repo);
+    // A concède : f1 b1 ST 40 (+ x CM 20 du côté A → non, x joue pour A) ; f2 c1 LB 80
+    const [a] = await sql`select average, observations from team_conceded_overall where team_id = ${ids.A} and window_size = 5`;
+    expect(a).toEqual({ average: 60, observations: 2 });
+    // forme de a1 : matchs joués 50 (f2) puis 60 (f1) → 0,6 × 55 + 0,4 × 55
+    const [s] = await sql`select form from player_summary where player_id = ${ids.a1}`;
+    expect(s.form).toBeCloseTo(55);
+  });
+
   it('idempotent', async () => {
     await recomputeAggregates(repo);
     await recomputeAggregates(repo);

@@ -43,7 +43,8 @@ export interface PlayerDetail {
 
 export type GameStatus = 'started' | 'sub' | 'absent';
 export interface PlayerGameView {
-  fixtureId: number; date: string; opponent: string; isHome: boolean; score: number; minutes: number;
+  fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
+  goalsFor: number | null; goalsAgainst: number | null; score: number; minutes: number;
   status: GameStatus; position: DetailedPosition | null; decisive: number; allAround: number;
 }
 
@@ -56,6 +57,27 @@ export interface TeamFixtureView {
 export interface ImportRunView {
   startedAt: string; finishedAt: string | null; status: 'running' | 'ok' | 'error';
   fixturesImported: number; errors: string[];
+}
+
+export interface UpcomingFixture {
+  fixtureId: number; date: string; opponent: string; opponentSlug: string; isHome: boolean;
+  /** Concédé par l'adversaire au poste habituel du joueur (5 derniers matchs). */
+  position: { average: number | null; index: number | null; observations: number } | null;
+  /** Concédé par l'adversaire tous postes confondus (5 derniers matchs). */
+  overall: { average: number | null; index: number | null; observations: number } | null;
+}
+export interface UpcomingView {
+  form: number | null; startRate: number | null; usualPosition: DetailedPosition | null; fixtures: UpcomingFixture[];
+}
+
+export interface MatchPlayerView {
+  side: 'home' | 'away'; slug: string; name: string; detailedPosition: DetailedPosition | null; grid: string | null;
+  started: boolean; minutes: number; score: number; decisive: number; allAround: number;
+}
+export interface MatchSideView { name: string; slug: string; goals: number | null; formation: string | null }
+export interface MatchView {
+  id: number; date: string; status: 'played' | 'scheduled' | 'postponed'; competition: string;
+  home: MatchSideView; away: MatchSideView; players: MatchPlayerView[];
 }
 
 const toConceded = (r: postgres.Row): ConcededView => ({
@@ -155,22 +177,87 @@ export function createQueries(sql: postgres.Sql) {
       const rows = await sql`
         with p as (select id, team_id from players where sorare_slug = ${slug}),
         games as (
-          select f.id, f.date, f.home_team_id, f.away_team_id, coalesce(a.team_id, (select team_id from p)) as team_id,
+          select f.id, f.date, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals,
+            coalesce(a.team_id, (select team_id from p)) as team_id,
             a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score
           from fixtures f
           left join appearances a on a.fixture_id = f.id and a.player_id = (select id from p)
           where f.status = 'played' and f.lineups_imported
             and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
         )
-        select g.*, o.name as opponent from games g
+        select g.*, o.name as opponent, o.sorare_slug as opponent_slug from games g
         join teams o on o.id = case when g.home_team_id = g.team_id then g.away_team_id else g.home_team_id end
         order by g.date desc limit ${limit}`;
       return rows.map((g) => ({
-        fixtureId: g.id, date: (g.date as Date).toISOString(), opponent: g.opponent, isHome: g.home_team_id === g.team_id,
+        fixtureId: g.id, date: (g.date as Date).toISOString(), opponent: g.opponent, opponentSlug: g.opponent_slug,
+        isHome: g.home_team_id === g.team_id,
+        goalsFor: g.home_team_id === g.team_id ? g.home_goals : g.away_goals,
+        goalsAgainst: g.home_team_id === g.team_id ? g.away_goals : g.home_goals,
         score: g.sorare_score ?? 0, minutes: g.minutes ?? 0,
         status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
         position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
       }));
+    },
+
+    /** Prochains matchs du club du joueur, avec ce qu'en dit l'adversaire (base du score potentiel). */
+    async getUpcoming(slug: string, limit: number): Promise<UpcomingView | null> {
+      const [p] = await sql`
+        select p.id, p.team_id, s.form, s.start_rate5, s.usual_position
+        from players p left join player_summary s on s.player_id = p.id where p.sorare_slug = ${slug}`;
+      if (!p) return null;
+      const rows = p.team_id ? await sql`
+        with next as (
+          select f.id, f.date, f.home_team_id = ${p.team_id} as is_home,
+            case when f.home_team_id = ${p.team_id} then f.away_team_id else f.home_team_id end as opponent_id
+          from fixtures f
+          where ${p.team_id} in (f.home_team_id, f.away_team_id) and f.status = 'scheduled' and f.date > now()
+          order by f.date limit ${limit}
+        )
+        select n.*, o.name as opponent, o.sorare_slug as opponent_slug,
+          cp.average as pos_average, cp.index as pos_index, cp.observations as pos_obs,
+          co.average as all_average, co.index as all_index, co.observations as all_obs
+        from next n
+        join teams o on o.id = n.opponent_id
+        left join team_conceded_by_position cp
+          on cp.team_id = n.opponent_id and cp.detailed_position = ${p.usual_position} and cp.window_size = 5
+        left join team_conceded_overall co on co.team_id = n.opponent_id and co.window_size = 5
+        order by n.date` : [];
+      return {
+        form: p.form, startRate: p.start_rate5, usualPosition: p.usual_position,
+        fixtures: rows.map((r) => ({
+          fixtureId: r.id, date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome: r.is_home,
+          position: r.pos_obs === null ? null : { average: r.pos_average, index: r.pos_index, observations: r.pos_obs },
+          overall: r.all_obs === null ? null : { average: r.all_average, index: r.all_index, observations: r.all_obs },
+        })),
+      };
+    },
+
+    async getMatch(id: number): Promise<MatchView | null> {
+      const [f] = await sql`
+        select f.id, f.date, f.status, f.home_goals, f.away_goals, f.home_formation, f.away_formation, f.home_team_id,
+          c.name as competition, h.name as home_name, h.sorare_slug as home_slug, a.name as away_name, a.sorare_slug as away_slug
+        from fixtures f
+        join competitions c on c.id = f.competition_id
+        join teams h on h.id = f.home_team_id
+        join teams a on a.id = f.away_team_id
+        where f.id = ${id}`;
+      if (!f) return null;
+      const players = await sql`
+        select a.team_id, p.sorare_slug, p.name, a.detailed_position, a.grid, a.started, a.minutes,
+          a.sorare_score, a.decisive_score, a.all_around_score
+        from appearances a join players p on p.id = a.player_id
+        where a.fixture_id = ${id}
+        order by a.team_id = ${f.home_team_id} desc, a.started desc, a.grid nulls last, a.minutes desc, p.name`;
+      return {
+        id: f.id, date: (f.date as Date).toISOString(), status: f.status, competition: f.competition,
+        home: { name: f.home_name, slug: f.home_slug, goals: f.home_goals, formation: f.home_formation },
+        away: { name: f.away_name, slug: f.away_slug, goals: f.away_goals, formation: f.away_formation },
+        players: players.map((r) => ({
+          side: r.team_id === f.home_team_id ? 'home' : 'away', slug: r.sorare_slug, name: r.name,
+          detailedPosition: r.detailed_position, grid: r.grid, started: r.started, minutes: r.minutes,
+          score: r.sorare_score, decisive: r.decisive_score, allAround: r.all_around_score,
+        })),
+      };
     },
 
     async getTeam(slug: string): Promise<TeamView | null> {
