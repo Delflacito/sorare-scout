@@ -35,10 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Fiche joueur façon Sorare : prénom / nom, taille, numéro de maillot.
-await probe('Player (fiche)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`, [
-  'firstName', 'lastName', 'height', 'shirtNumber', 'xyzShirt', 'jerseyNumber', 'xyzNumber', 'pictureUrl', 'squaredPictureUrl', 'xyzPicture',
-]);
+// Slugs Sorare des championnats néerlandais, belge et portugais.
+for (const slug of ['eredivisie', 'eredivisie-nl', 'jupiler-pro-league', 'jupiler-pro-league-be', 'pro-league-be', 'first-division-a-be',
+  'primeira-liga', 'primeira-liga-pt', 'liga-portugal', 'liga-portugal-pt', 'liga-portugal-betclic-pt']) {
+  await sample(`comp-${slug}`, `{ football { competition(slug: "${slug}") { slug displayName teams(first: 3) { nodes { ... on Club { slug name } } } } } }`);
+}
+// Indices : compétitions des clubs connus de ces championnats.
+for (const club of ['psv-eindhoven', 'ajax-amsterdam', 'club-brugge-brugge', 'sl-benfica-lisboa', 'fc-porto-porto', 'sporting-cp-lisboa']) {
+  await sample(`club-${club}`, `{ football { club(slug: "${club}") { slug name latestGames(first: 2) { nodes { competition { slug displayName } } } } } }`);
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
