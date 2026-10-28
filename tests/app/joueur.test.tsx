@@ -27,7 +27,7 @@ const player: PlayerDetail = {
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', teamShortName: 'PSG', playingStatus: 'SUBSTITUTE',
   injury: { kind: 'Thigh Injury', end: '2026-11-10' }, suspension: null, sorareProjection: 41,
   birthDate: '2002-06-19', country: { code: 'pt', name: 'Portugal', flagUrl: 'https://f/PT.png' },
-  firstName: 'Nuno', lastName: 'Mendes', height: 176, shirtNumber: 25, bodyPictureUrl: null,
+  firstName: 'Nuno', lastName: 'Mendes', height: 176, shirtNumber: 25, bodyPictureUrl: null, cardPositions: ['Defender', 'Midfielder'],
 };
 const game = (fixtureId: number, day: number, score: number, status: PlayerGameView['status'], opponent = 'Olympique Lyonnais'): PlayerGameView => ({
   fixtureId, date: `2026-10-${String(day).padStart(2, '0')}T19:00:00.000Z`, opponent, opponentSlug: 'ol', isHome: fixtureId % 2 === 0,
@@ -76,6 +76,8 @@ describe('/joueurs/[slug]', () => {
     expect(screen.getByText('Né le 19 juin 2002')).toBeInTheDocument();
     expect(screen.getByText('Latéral gauche')).toBeInTheDocument();
     expect(screen.getByText('#25')).toBeInTheDocument();
+    expect(screen.getByText('Carte : Défenseur / Milieu')).toBeInTheDocument();
+    expect(screen.queryByText('Taille')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Postes occupés récemment : DG × 8, PG × 2' })).toBeInTheDocument();
   });
 

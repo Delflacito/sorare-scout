@@ -27,6 +27,8 @@ export interface PlayerListRow {
   injuryKind: string | null; suspensionReason: string | null; sorareProjection: number | null;
   /** Score potentiel du prochain match de championnat. */
   nextProjected: number | null;
+  /** Postes où ses cartes Sorare peuvent être alignées. */
+  cardPositions: GenericPosition[];
 }
 
 export interface GameWeekFixture {
@@ -41,6 +43,7 @@ export interface GameWeekPlayer {
   projected: number; startRate: number; l15: number; playingStatus: string | null; sorareProjection: number | null;
   /** Niveau habituel (L15 sur les matchs joués) : le score potentiel s'en écarte selon l'adversaire et le lieu. */
   base: number;
+  cardPositions: GenericPosition[];
 }
 /** Concédé par l'adversaire à chaque poste (5 derniers matchs), vu depuis une équipe qui joue la journée. */
 export interface RoundMatchup {
@@ -80,6 +83,7 @@ export interface PlayerDetail {
   birthDate: string | null;
   country: { code: string; name: string; flagUrl: string | null } | null;
   firstName: string | null; lastName: string | null; height: number | null; shirtNumber: number | null;
+  cardPositions: GenericPosition[];
   /** Photo détourée de la carte Sorare (à défaut, la photo carrée). */
   bodyPictureUrl: string | null;
 }
@@ -171,7 +175,7 @@ export function createQueries(sql: postgres.Sql) {
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
           p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
-          s.next_projected
+          s.next_projected, coalesce(p.card_positions, array[p.position]) as card_positions
         from players p
         join player_summary s on s.player_id = p.id
         left join teams t on t.id = p.team_id
@@ -196,7 +200,7 @@ export function createQueries(sql: postgres.Sql) {
         nextIndex: r.next_index, nextLowSample: r.low_sample,
         pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, playingStatus: r.playing_status,
         injuryKind: r.injury_kind, suspensionReason: r.suspension_reason, sorareProjection: r.sorare_projection,
-        nextProjected: r.next_projected,
+        nextProjected: r.next_projected, cardPositions: r.card_positions,
       }));
     },
 
@@ -235,6 +239,7 @@ export function createQueries(sql: postgres.Sql) {
           select p.sorare_slug, p.name, g.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
             o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
             s.next_projected, s.start_rate5, s.l15, s.base, p.playing_status, p.sorare_projection,
+            coalesce(p.card_positions, array[p.position]) as card_positions,
             row_number() over (partition by g.position order by
               ${f.sort === 'boost' ? sql`s.next_projected - s.base` : sql`s.next_projected`} desc, p.name) as rank
           from player_summary s
@@ -255,6 +260,7 @@ export function createQueries(sql: postgres.Sql) {
         team: r.team, teamPictureUrl: r.team_picture, pictureUrl: r.picture_url,
         opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
         projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
+        cardPositions: r.card_positions,
       }));
     },
 
@@ -295,6 +301,7 @@ export function createQueries(sql: postgres.Sql) {
           p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
           p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
           p.first_name, p.last_name, p.height, p.shirt_number, p.body_picture_url,
+          coalesce(p.card_positions, array[p.position]) as card_positions,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
@@ -334,6 +341,7 @@ export function createQueries(sql: postgres.Sql) {
         birthDate: r.birth_date,
         country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
         firstName: r.first_name, lastName: r.last_name, height: r.height, shirtNumber: r.shirt_number, bodyPictureUrl: r.body_picture_url,
+        cardPositions: r.card_positions,
       };
     },
 

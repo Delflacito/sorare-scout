@@ -15,7 +15,7 @@ const row: PlayerListRow = {
   usualPosition: 'LB', l5: 62.4, l15: 58.1, l40: 50, startRate: 0.8,
   nextOpponent: 'Olympique de Marseille', nextOpponentSlug: 'om', nextIsHome: true, nextIndex: 1.234, nextLowSample: false,
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
-  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3,
+  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3, cardPositions: ['Defender', 'Midfielder'],
 };
 
 describe('/joueurs', () => {
@@ -28,7 +28,7 @@ describe('/joueurs', () => {
     expect(screen.getByRole('link', { name: 'Nuno Mendes' })).toHaveAttribute('href', '/joueurs/nuno-mendes');
     expect(screen.getByText('62.4')).toBeInTheDocument();
     expect(screen.getByText('80 %')).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'DG' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: /^Défenseur \/ Milieu\s*· DG$/ })).toBeInTheDocument();
     expect(screen.getByText('123')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Olympique de Marseille' })).toHaveAttribute('href', '/equipes/om');
     expect(screen.getByTitle('Domicile')).toHaveTextContent('D');
