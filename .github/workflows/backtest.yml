@@ -6,7 +6,7 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,6 +15,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsx scripts/backtest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npx tsx scripts/tune.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Résultats publiés sur la branche backtest-results (lisible sans téléchargement d'artefact).

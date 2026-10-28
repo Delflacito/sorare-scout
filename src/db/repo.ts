@@ -30,7 +30,10 @@ export interface PlayerSummaryRow {
 }
 
 export interface FixtureToComplete { id: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
-export interface CompletedFixture { id: number; competitionId: number; homeTeamId: number; awayTeamId: number; date: string }
+export interface CompletedFixture {
+  id: number; competitionId: number; homeTeamId: number; awayTeamId: number; date: string;
+  homeGoals?: number | null; awayGoals?: number | null;
+}
 export interface AppearanceRow {
   fixtureId: number; playerId: number; teamId: number; detailedPosition: DetailedPosition | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
@@ -182,7 +185,7 @@ function createBaseRepo(sql: Sql) {
     /** Matchs joués et complets, avec toutes leurs participations : entrée du recalcul des agrégats. */
     async aggregateInputs(): Promise<{ fixtures: CompletedFixture[]; appearances: AppearanceRow[] }> {
       const fixtures = await sql`
-        select id, competition_id, home_team_id, away_team_id, date from fixtures
+        select id, competition_id, home_team_id, away_team_id, date, home_goals, away_goals from fixtures
         where status = 'played' and lineups_imported order by date`;
       const appearances = await sql`
         select a.fixture_id, a.player_id, a.team_id, a.detailed_position, a.started, a.minutes,
@@ -192,7 +195,7 @@ function createBaseRepo(sql: Sql) {
       return {
         fixtures: fixtures.map((f) => ({
           id: f.id, competitionId: f.competition_id, homeTeamId: f.home_team_id, awayTeamId: f.away_team_id,
-          date: (f.date as Date).toISOString(),
+          date: (f.date as Date).toISOString(), homeGoals: f.home_goals, awayGoals: f.away_goals,
         })),
         appearances: appearances.map((a) => ({
           fixtureId: a.fixture_id, playerId: a.player_id, teamId: a.team_id, detailedPosition: a.detailed_position,
