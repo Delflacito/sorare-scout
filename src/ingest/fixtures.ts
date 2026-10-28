@@ -8,9 +8,11 @@ export interface FixturesResult { fixturesImported: number; errors: string[] }
 export interface FixturesOptions {
   /** Heure (ms) après laquelle on ne complète plus de match : le reste sera repris au prochain import. */
   deadline?: number;
+  /** Début de période (ISO) : les matchs antérieurs ne sont ni importés ni conservés. */
+  since?: string;
 }
 
-async function syncLeague(deps: FixturesDeps, league: League, errors: string[]): Promise<void> {
+async function syncLeague(deps: FixturesDeps, league: League, errors: string[], since?: string): Promise<void> {
   const competitionId = await deps.repo.upsertCompetition({ slug: league.sorareSlug, name: league.name });
   const teams = await deps.repo.teamsByCompetition(competitionId);
   const bySlug = new Map(teams.map((t) => [t.sorareSlug, t]));
@@ -28,6 +30,7 @@ async function syncLeague(deps: FixturesDeps, league: League, errors: string[]):
     const home = bySlug.get(g.homeClubSlug);
     const away = bySlug.get(g.awayClubSlug);
     if (!home || !away || (g.competitionSlug && g.competitionSlug !== league.sorareSlug)) continue; // coupe, Europe…
+    if (since && Date.parse(g.date) < Date.parse(since)) continue; // saison précédente
     await deps.repo.upsertFixture({
       date: g.date, competitionId, homeTeamId: home.id, awayTeamId: away.id,
       homeGoals: g.homeGoals, awayGoals: g.awayGoals, status: g.status, sorareGameId: g.id,
@@ -80,9 +83,10 @@ async function completeFixture(deps: FixturesDeps, fixture: FixtureToComplete, t
 export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEAGUES, opts: FixturesOptions = {}): Promise<FixturesResult> {
   let fixturesImported = 0;
   const errors: string[] = [];
+  if (opts.since) await deps.repo.deleteFixturesBefore(opts.since);
   for (const league of leagues) {
     try {
-      await syncLeague(deps, league, errors);
+      await syncLeague(deps, league, errors, opts.since);
     } catch (e) {
       errors.push(`ligue ${league.name} : ${(e as Error).message}`);
     }
