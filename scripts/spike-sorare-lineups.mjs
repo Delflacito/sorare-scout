@@ -35,27 +35,20 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-const PLAYER = 'lamine-yamal-nasraoui-ebana';
-const NEXT_GAME = 'b0b4da9b-1789-4b4c-bd51-54eef22ccd4a'; // prochain match à domicile du PSG
-const PAST_GAME = '1038dc4a-ca15-454a-b30a-dc7748e8be75'; // Angers – Lorient, joué
-
-const PROJ = (game) => (c) => `{ football { game(id: "${game}") { playerGameScores { anyPlayer { slug } projection { ${c} } } } } }`;
-const FIELDS = [
-  'score', 'projectedScore', 'value', 'grade', 'decisiveScore', 'allAroundScore', 'averageScore', 'reliability', 'confidence',
-  'startingProbability', 'startOdds', 'lineupStatus', 'playingStatus', 'minutes', 'expectedMinutes', 'status', 'xyzScore',
-  'xyzProbability', 'xyzStatus', 'xyzMinutes', 'xyz',
-];
-await probe('Projection (à venir)', PROJ(NEXT_GAME), FIELDS);
-await probe('Projection (match joué)', PROJ(PAST_GAME), FIELDS.slice(0, 6));
-await probe('Injury', (c) => `{ anyPlayer(slug: "${PLAYER}") { ... on Player { injuries { ${c} } } } }`, [
-  'status', 'kind', 'expectedEndDate', 'startDate', 'active', 'xyz',
-]);
-await probe('Player (statut)', (c) => `{ anyPlayer(slug: "${PLAYER}") { ... on Player { ${c} } } }`, [
-  'playingStatus', 'xyzPlayingStatus', 'reliability', 'xyzReliability', 'startingProbability', 'nextGameStartingProbability',
-]);
-await sample('injuries-history', `{ anyPlayer(slug: "${PLAYER}") { ... on Player { injuries { status kind expectedEndDate startDate } } } }`);
-// Échantillon de statuts de jeu dans un club
-await sample('psg-statuses', `{ football { club(slug: "psg-paris") { activePlayers(first: 40) { nodes { slug playingStatus activeInjuries { status kind expectedEndDate } activeSuspensions { reason endDate } } } } } }`);
+// Statuts de tous les joueurs d'un club en une requête, et projections des prochains matchs.
+const PLAYER_FIELDS = 'slug displayName playingStatus activeInjuries { status kind expectedEndDate } activeSuspensions { reason endDate }';
+await sample('club-players', `{ football { club(slug: "psg-paris") { activePlayers(first: 60) { nodes { ${PLAYER_FIELDS} nextClassicFixtureProjectedScore } } } } }`);
+await sample('club-players-no-proj', `{ football { club(slug: "psg-paris") { activePlayers(first: 60) { totalCount pageInfo { hasNextPage } nodes { ${PLAYER_FIELDS} } } } } }`);
+await sample('club-players-100', `{ football { club(slug: "psg-paris") { activePlayers(first: 100) { nodes { slug } } } } }`);
+await sample('players-batch', `{ players(slugs: ["lamine-yamal-nasraoui-ebana", "desire-doue"]) { slug nextClassicFixtureProjectedScore playingStatus } }`);
+await sample('anyPlayers-batch', `{ anyPlayers(slugs: ["lamine-yamal-nasraoui-ebana", "desire-doue"]) { ... on Player { slug nextClassicFixtureProjectedScore } } }`);
+await probe('Query (lots de joueurs)', (c) => `{ ${c}(slugs: ["desire-doue"]) { slug } }`, ['players', 'anyPlayers', 'footballPlayers']);
+// Projections des prochains matchs : celles des 5 prochains matchs du PSG
+const next = await gql('{ football { club(slug: "psg-paris") { upcomingGames(first: 5) { id date } } } }');
+out.samples.next = next.data;
+for (const g of next.data?.football?.club?.upcomingGames ?? []) {
+  await sample(`proj-${g.date}`, `{ football { game(id: "${g.id.replace(/^Game:/, '')}") { playerGameScores { anyPlayer { slug } projection { score grade } } } } }`);
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
