@@ -35,20 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Statuts de tous les joueurs d'un club en une requête, et projections des prochains matchs.
-const PLAYER_FIELDS = 'slug displayName playingStatus activeInjuries { status kind expectedEndDate } activeSuspensions { reason endDate }';
-await sample('club-players', `{ football { club(slug: "psg-paris") { activePlayers(first: 60) { nodes { ${PLAYER_FIELDS} nextClassicFixtureProjectedScore } } } } }`);
-await sample('club-players-no-proj', `{ football { club(slug: "psg-paris") { activePlayers(first: 60) { totalCount pageInfo { hasNextPage } nodes { ${PLAYER_FIELDS} } } } } }`);
-await sample('club-players-100', `{ football { club(slug: "psg-paris") { activePlayers(first: 100) { nodes { slug } } } } }`);
-await sample('players-batch', `{ players(slugs: ["lamine-yamal-nasraoui-ebana", "desire-doue"]) { slug nextClassicFixtureProjectedScore playingStatus } }`);
-await sample('anyPlayers-batch', `{ anyPlayers(slugs: ["lamine-yamal-nasraoui-ebana", "desire-doue"]) { ... on Player { slug nextClassicFixtureProjectedScore } } }`);
-await probe('Query (lots de joueurs)', (c) => `{ ${c}(slugs: ["desire-doue"]) { slug } }`, ['players', 'anyPlayers', 'footballPlayers']);
-// Projections des prochains matchs : celles des 5 prochains matchs du PSG
-const next = await gql('{ football { club(slug: "psg-paris") { upcomingGames(first: 5) { id date } } } }');
-out.samples.next = next.data;
-for (const g of next.data?.football?.club?.upcomingGames ?? []) {
-  await sample(`proj-${g.date}`, `{ football { game(id: "${g.id.replace(/^Game:/, '')}") { playerGameScores { anyPlayer { slug } projection { score grade } } } } }`);
-}
+// Photos des joueurs et logos des clubs
+await probe('Player (images)', (c) => `{ anyPlayer(slug: "desire-doue") { ... on Player { ${c} } } }`, [
+  'pictureUrl', 'avatarPictureUrl', 'squaredPictureUrl', 'avatarUrl', 'imageUrl', 'photoUrl', 'xyzPicture', 'xyzAvatar', 'xyzImage', 'xyzUrl',
+]);
+await probe('Club (images)', (c) => `{ football { club(slug: "psg-paris") { ${c} } } }`, [
+  'pictureUrl', 'emblemUrl', 'logoUrl', 'crestUrl', 'shieldUrl', 'imageUrl', 'xyzPicture', 'xyzEmblem', 'xyzLogo', 'xyzUrl',
+  'code', 'shortName', 'xyzName', 'domesticLeague { slug }',
+]);
+await sample('club-players-images', `{ football { club(slug: "psg-paris") { pictureUrl activePlayers(first: 3) { nodes { slug pictureUrl avatarPictureUrl squaredPictureUrl } } } } }`);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
