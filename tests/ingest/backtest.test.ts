@@ -1,4 +1,4 @@
-import { lastRound, backtestRound, summarize } from '@/ingest/backtest';
+import { lastRound, lastRounds, backtestRound, summarize } from '@/ingest/backtest';
 import type { CompletedFixture, AppearanceRow } from '@/db/repo';
 
 const fx = (id: number, day: number, home: number, away: number, competitionId = 1): CompletedFixture =>
@@ -19,7 +19,23 @@ describe('lastRound', () => {
   });
 });
 
+describe('lastRounds', () => {
+  it('N dernières journées, de la plus récente à la plus ancienne', () => {
+    const comp1 = fixtures.filter((f) => f.competitionId === 1);
+    expect(lastRounds(comp1, 2)).toEqual([
+      { cutoff: '2026-10-24T20:00:00.000Z', fixtureIds: [4, 5] },
+      { cutoff: '2026-10-15T20:00:00.000Z', fixtureIds: [3] },
+    ]);
+  });
+});
+
 describe('backtestRound', () => {
+  it('amplification de l’effet adversaire transmise', () => {
+    const round = { cutoff: '2026-10-24T20:00:00.000Z', fixtureIds: [4] };
+    const rows = backtestRound(fixtures, apps, round, 0);
+    expect(rows.every((r) => r.opponent === 1)).toBe(true);
+  });
+
   it('projette avec les seules données antérieures à la journée', () => {
     const rows = backtestRound(fixtures, apps, { cutoff: '2026-10-24T20:00:00.000Z', fixtureIds: [4] });
     const p10 = rows.find((r) => r.playerId === 10)!;

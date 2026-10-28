@@ -20,8 +20,26 @@ export function lastRound(fixtures: CompletedFixture[]): Round | null {
   return { cutoff: round[0].date, fixtureIds: round.map((f) => f.id) };
 }
 
+/** Les N dernières journées d'un championnat, de la plus récente à la plus ancienne. */
+export function lastRounds(fixtures: CompletedFixture[], n: number): Round[] {
+  const rounds: Round[] = [];
+  let remaining = fixtures;
+  for (let i = 0; i < n; i++) {
+    const r = lastRound(remaining);
+    if (!r) break;
+    rounds.push(r);
+    remaining = remaining.filter((f) => Date.parse(f.date) < Date.parse(r.cutoff));
+  }
+  return rounds;
+}
+
 /** Projette chaque joueur ayant joué la journée, avec les seules données antérieures à la coupure, et compare au score réel. */
-export function backtestRound(fixtures: CompletedFixture[], appearances: AppearanceRow[], round: Round): BacktestRow[] {
+export function backtestRound(
+  fixtures: CompletedFixture[],
+  appearances: AppearanceRow[],
+  round: Round,
+  amplification?: number,
+): BacktestRow[] {
   const cutoff = Date.parse(round.cutoff);
   const history = fixtures.filter((f) => Date.parse(f.date) < cutoff);
   const historyIds = new Set(history.map((f) => f.id));
@@ -51,7 +69,7 @@ export function backtestRound(fixtures: CompletedFixture[], appearances: Appeara
       leagueVenueFactor: venue ? (isHome ? venue.home : venue.away) : 1,
       position: { average: pos?.average ?? null, leagueAverage: pos?.leagueAverage ?? leagueAtPosition.get(s.usualPosition) ?? null, observations: pos?.observations ?? 0 },
       overall: all ? { index: all.index, observations: all.observations } : null,
-    });
+    }, amplification);
     rows.push({
       competitionId: f.competitionId, fixtureId: f.id, playerId: a.playerId, isHome, started: a.started,
       actual: a.score, base: s.base, projected: projected!, venueFactor, opponent,

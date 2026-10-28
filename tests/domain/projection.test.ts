@@ -46,6 +46,11 @@ describe('opponentMultiplier', () => {
     const r = opponentMultiplier({ positionAverage: 38, positionObs: 3, positionLeagueAverage: 52, teamIndex: 0.92, teamObs: 110 });
     expect(r).toBeCloseTo(1 + 2 * (0.4 * pos + 0.6 * team - 1));
   });
+  it('amplification réglable (0 = pas d’effet adversaire)', () => {
+    const input = { positionAverage: 38, positionObs: 3, positionLeagueAverage: 52, teamIndex: 0.92, teamObs: 110 };
+    expect(opponentMultiplier(input, 0)).toBe(1);
+    expect(opponentMultiplier(input, 1) - 1).toBeCloseTo((opponentMultiplier(input, 2) - 1) / 2);
+  });
   it('sans données → 1', () => {
     expect(opponentMultiplier({ positionAverage: null, positionObs: 0, positionLeagueAverage: null, teamIndex: null, teamObs: 0 })).toBe(1);
   });

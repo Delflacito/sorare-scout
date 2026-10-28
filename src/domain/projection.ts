@@ -47,10 +47,10 @@ export interface OpponentInput {
 }
 
 /** Effet adversaire (1 = adversaire moyen) : 40 % concédé au poste + 60 % qualité générale, écart amplifié. */
-export function opponentMultiplier(p: OpponentInput): number {
+export function opponentMultiplier(p: OpponentInput, amplification = OPPONENT_AMPLIFICATION): number {
   const positionIndex = p.positionAverage !== null && p.positionLeagueAverage ? p.positionAverage / p.positionLeagueAverage : null;
   const combined = POSITION_WEIGHT * shrink(positionIndex, p.positionObs) + TEAM_WEIGHT * shrink(p.teamIndex, p.teamObs);
-  return Math.max(0, 1 + OPPONENT_AMPLIFICATION * (combined - 1));
+  return Math.max(0, 1 + amplification * (combined - 1));
 }
 
 /** Score potentiel s’il joue : L15 × lieu × adversaire, plafonné à 100. */
@@ -93,7 +93,7 @@ export interface FixtureContext {
 }
 
 /** Score potentiel d'un joueur pour un match donné, avec ses deux composantes (utilisé par le site et le test sur le passé). */
-export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext) {
+export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext, amplification = OPPONENT_AMPLIFICATION) {
   const venueFactor = playerVenueFactor({
     venueAverage: f.isHome ? p.homeAvg : p.awayAvg,
     venueGames: f.isHome ? p.homeGames : p.awayGames,
@@ -104,6 +104,6 @@ export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext) {
     positionAverage: f.position?.average ?? null, positionObs: f.position?.observations ?? 0,
     positionLeagueAverage: f.position?.leagueAverage ?? null,
     teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
-  });
+  }, amplification);
   return { venueFactor, opponent, projected: projectedScore({ base: p.base, venueFactor, opponent }) };
 }
