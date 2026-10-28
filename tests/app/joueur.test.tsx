@@ -33,8 +33,8 @@ const upcoming: UpcomingView = {
   form: 60, startRate: 0.8, usualPosition: 'LB',
   fixtures: [
     { fixtureId: 9, date: '2099-01-01T20:00:00.000Z', opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true,
-      position: { average: 66, index: 1.2, observations: 5 }, overall: { average: 50, index: 1, observations: 20 } },
-    { fixtureId: 10, date: '2099-01-08T20:00:00.000Z', opponent: 'RC Lens', opponentSlug: 'lens', isHome: false, position: null, overall: null },
+      position: { average: 66, leagueAverage: 50, observations: 5 }, overall: { index: 1.1, rating: 30, observations: 20 }, venueFactor: 1.03 },
+    { fixtureId: 10, date: '2099-01-08T20:00:00.000Z', opponent: 'RC Lens', opponentSlug: 'lens', isHome: false, position: null, overall: null, venueFactor: 0.97 },
   ],
 };
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -60,20 +60,26 @@ describe('/joueurs/[slug]', () => {
     render(await Page(params('nuno-mendes')));
     const table = screen.getByRole('table', { name: 'Prochains matchs' });
     const rows = within(table).getAllByRole('row').slice(1);
-    // 60 × (0,4 × (1 + 0,2 × 5/10) + 0,6 × (1 + 0 × 20/25)) × 1,03 = 64,3
-    expect(within(rows[0]).getByText('64.3')).toBeInTheDocument();
+    // atteignable = 0,4 × 58 + 0,6 × 50 × 1,08 = 55,6 ; potentiel = (0,3 × 60 + 0,7 × 55,6) × 1,03 = 58,6
+    expect(within(rows[0]).getByText('58.6')).toBeInTheDocument();
     expect(within(rows[0]).getByRole('link', { name: /Olympique de Marseille/ })).toHaveAttribute('href', '/equipes/om');
-    expect(within(rows[0]).getByText('120')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('66 pts')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('(ligue 50)')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('30/100')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('+3 %')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('−3 %')).toBeInTheDocument();
     // adversaire sans données : forme × extérieur
     expect(within(rows[1]).getByText('58.2')).toBeInTheDocument();
     expect(screen.getByText(/Probabilité d’être titulaire : 80 %/)).toBeInTheDocument();
   });
 
-  it('pas de forme → pas de score potentiel', async () => {
+  it('pas de forme : score atteignable au poste × lieu', async () => {
     getUpcoming.mockResolvedValue({ ...upcoming, form: null });
     render(await Page(params('nuno-mendes')));
     const rows = within(screen.getByRole('table', { name: 'Prochains matchs' })).getAllByRole('row').slice(1);
-    expect(within(rows[0]).getAllByText('—').length).toBeGreaterThan(0);
+    expect(within(rows[0]).getByText('57.3')).toBeInTheDocument();
+    // ni forme ni données adverses : pas de score
+    expect(within(rows[1]).getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('aucun match programmé', async () => {

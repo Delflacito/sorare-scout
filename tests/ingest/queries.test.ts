@@ -172,10 +172,11 @@ describeDb('matchs et projections', () => {
     expect(u!.fixtures).toHaveLength(1);
     expect(u!.fixtures[0]).toMatchObject({
       fixtureId: ids.next, opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true,
-      position: { average: 55, observations: 2 },
-      overall: { observations: 2 },
+      position: { average: 55, leagueAverage: 60, observations: 2 },
+      overall: { observations: 2, rating: expect.any(Number) },
     });
-    expect(u!.fixtures[0].position!.index).toBeCloseTo(55 / 60);
+    // titulaires à domicile en Ligue 1 (démo) : 70, 80, 50 ; à l'extérieur : 30, 60 ; tous : 58
+    expect(u!.fixtures[0].venueFactor).toBeCloseTo((200 / 3) / 58);
   });
 
   it('getUpcoming : joueur inconnu → null', async () => {

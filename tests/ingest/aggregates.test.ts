@@ -79,6 +79,19 @@ describeDb('recomputeAggregates', () => {
     expect(s.form).toBeCloseTo(55);
   });
 
+  it('note de qualité défensive (1 à 100) et avantage du terrain mesuré', async () => {
+    await recomputeAggregates(repo);
+    const ratings = await sql`select t.sorare_slug, o.rating from team_conceded_overall o join teams t on t.id = o.team_id
+      where o.window_size = 10 order by 1`;
+    // concédé : A 60, B 40, C 60 → B meilleure défense
+    expect(ratings).toEqual([{ sorare_slug: 'A', rating: 1 }, { sorare_slug: 'B', rating: 100 }, { sorare_slug: 'C', rating: 1 }]);
+    const [v] = await sql`select home_factor, away_factor, observations from venue_factors`;
+    // titulaires à domicile : 60, 20, 80, 70 (moy. 57,5) ; à l'extérieur : 40, 50, 30, 50 (42,5) ; tous : 50
+    expect(v.home_factor).toBeCloseTo(1.15);
+    expect(v.away_factor).toBeCloseTo(0.85);
+    expect(v.observations).toBe(8);
+  });
+
   it('idempotent', async () => {
     await recomputeAggregates(repo);
     await recomputeAggregates(repo);

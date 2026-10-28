@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerGameView, type UpcomingView } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR } from '@/domain/types';
-import { projectedScore } from '@/domain/projection';
+import { achievableScore, projectedScore } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
-import { fmtDate, fmtIndex, fmtPct, fmtScore, indexClass } from '@/lib/format';
+import { fmtDate, fmtPct, fmtScore, indexClass } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,14 +19,13 @@ function Card({ label, value }: { label: string; value: string }) {
 
 const STATUS_LABEL = { started: 'titulaire', sub: 'remplaçant', absent: 'absent' } as const;
 
-function IndexCell({ v }: { v: { index: number | null; observations: number } | null }) {
-  if (!v || v.index === null) return <td className="num">—</td>;
-  return (
-    <td className={`num ${indexClass(v.index)} ${v.observations < 3 ? 'low-sample' : ''}`} title={`${v.observations} observation(s)`}>
-      {fmtIndex(v.index)}
-    </td>
-  );
-}
+const fmtVenue = (factor: number) => {
+  const pct = Math.round((factor - 1) * 100);
+  return pct > 0 ? `+${pct} %` : pct < 0 ? `−${-pct} %` : '0 %';
+};
+
+/** Note 1–100 (100 = adversaire le plus fort) : couleur favorable (faible note) ou défavorable. */
+const ratingClass = (rating: number | null) => (rating === null ? '' : rating <= 33 ? 'hot' : rating >= 67 ? 'cold' : 'neutral');
 
 function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
   if (!upcoming.fixtures.length) return <p className="empty">Aucun match programmé</p>;
@@ -36,33 +35,47 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
       <div className="table-wrap">
         <table aria-label="Prochains matchs">
           <thead>
-            <tr><th>Date</th><th>Match</th><th>Score potentiel</th><th>Adv. au poste ({pos})</th><th>Qualité adv.</th></tr>
+            <tr><th>Date</th><th>Match</th><th>Lieu</th><th>Score potentiel</th><th>Adv. au poste ({pos})</th><th>Qualité adv.</th></tr>
           </thead>
           <tbody>
-            {upcoming.fixtures.map((f) => (
-              <tr key={f.fixtureId}>
-                <td>{fmtDate(f.date)}</td>
-                <td>{f.isHome ? 'vs' : '@'} <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
-                <td className="num strong">
-                  {upcoming.form === null
-                    ? '—'
-                    : fmtScore(projectedScore({
-                        form: upcoming.form,
-                        positionIndex: f.position?.index ?? null, positionObs: f.position?.observations ?? 0,
-                        teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
-                        isHome: f.isHome,
-                      }))}
-                </td>
-                <IndexCell v={f.position} />
-                <IndexCell v={f.overall} />
-              </tr>
-            ))}
+            {upcoming.fixtures.map((f) => {
+              const achievable = f.position
+                ? achievableScore({
+                    positionAverage: f.position.average, positionObs: f.position.observations,
+                    positionLeagueAverage: f.position.leagueAverage,
+                    teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
+                  })
+                : null;
+              const projected = projectedScore({ form: upcoming.form, achievable, venueFactor: f.venueFactor });
+              const p = f.position;
+              return (
+                <tr key={f.fixtureId}>
+                  <td>{fmtDate(f.date)}</td>
+                  <td>{f.isHome ? 'vs' : '@'} <Link href={`/equipes/${f.opponentSlug}`}>{f.opponent}</Link></td>
+                  <td className="num">{fmtVenue(f.venueFactor)}</td>
+                  <td className="num strong">{projected === null ? '—' : fmtScore(projected)}</td>
+                  {p && p.average !== null ? (
+                    <td className={`num ${indexClass(p.leagueAverage ? p.average / p.leagueAverage : null)} ${p.observations < 3 ? 'low-sample' : ''}`}
+                      title={`${p.observations} observation(s)`}>
+                      <span>{Math.round(p.average)} pts</span>{' '}
+                      {p.leagueAverage !== null && <span className="muted">(ligue {Math.round(p.leagueAverage)})</span>}
+                    </td>
+                  ) : (
+                    <td className="num">—</td>
+                  )}
+                  <td className={`num ${ratingClass(f.overall?.rating ?? null)}`}>
+                    {f.overall?.rating == null ? '—' : `${f.overall.rating}/100`}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       <p className="subtitle">
-        Score potentiel s’il joue : forme {upcoming.form === null ? '—' : fmtScore(upcoming.form)} (0,6 × 5 derniers matchs joués + 0,4 × 15)
-        × adversaire (60 % qualité générale, 40 % concédé au poste, indice 100 = moyenne de la ligue) × domicile +3 % / extérieur −3 %.
+        Score potentiel s’il joue = (30 % forme {upcoming.form === null ? '—' : fmtScore(upcoming.form)} + 70 % score atteignable
+        au poste contre l’adversaire) × avantage du terrain mesuré dans le championnat. Score atteignable = 40 % points concédés par
+        l’adversaire au poste + 60 % moyenne de la ligue au poste ajustée par la qualité adverse (note 1–100, 100 = adversaire le plus fort).
         {upcoming.startRate !== null && <> Probabilité d’être titulaire : {fmtPct(upcoming.startRate)} (5 derniers matchs).</>}
       </p>
     </>

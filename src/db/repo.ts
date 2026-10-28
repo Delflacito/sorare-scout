@@ -31,6 +31,8 @@ export interface AppearanceRow {
   fixtureId: number; playerId: number; teamId: number; detailedPosition: DetailedPosition | null;
   started: boolean; minutes: number; score: number; decisive: number; allAround: number;
 }
+export interface ConcededOverallRow extends ConcededOverall { rating: number | null }
+export interface VenueFactorRow { competitionId: number; home: number; away: number; observations: number }
 export interface TeamRow { id: number; name: string; sorareSlug: string }
 
 /** Nombre de tentatives d'import de compo pour un match avant de l'abandonner. */
@@ -142,12 +144,20 @@ function createBaseRepo(sql: Sql) {
       )}`;
     },
 
-    async replaceConcededOverall(rows: ConcededOverall[]): Promise<void> {
+    async replaceVenueFactors(rows: VenueFactorRow[]): Promise<void> {
+      await sql`delete from venue_factors`;
+      if (!rows.length) return;
+      await sql`insert into venue_factors ${sql(
+        rows.map((r) => ({ competition_id: r.competitionId, home_factor: r.home, away_factor: r.away, observations: r.observations })),
+      )}`;
+    },
+
+    async replaceConcededOverall(rows: ConcededOverallRow[]): Promise<void> {
       await sql`delete from team_conceded_overall`;
       for (const chunk of chunks(rows)) await sql`insert into team_conceded_overall ${sql(
         chunk.map((r) => ({
           team_id: Number(r.teamId), window_size: r.window, average: r.average, league_average: r.leagueAverage,
-          index: r.index, observations: r.observations,
+          index: r.index, observations: r.observations, rating: r.rating,
         })),
       )}`;
     },

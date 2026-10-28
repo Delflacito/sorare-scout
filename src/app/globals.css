@@ -65,3 +65,4 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.strong { font-weight: 600; }
 .match-teams { display: grid; gap: 16px; }
 @media (min-width: 900px) { .match-teams { grid-template-columns: 1fr 1fr; } }
+.muted { color: var(--muted); font-weight: normal; }
