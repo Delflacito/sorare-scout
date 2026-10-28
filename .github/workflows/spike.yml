@@ -12,6 +12,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: node scripts/check-sorare-key.mjs
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
       - run: node scripts/spike-sorare-lineups.mjs
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
