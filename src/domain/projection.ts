@@ -5,8 +5,11 @@ export const BASE_GAMES = 15;
 /** Dans l'effet adversaire : concédé au poste vs qualité générale. */
 export const POSITION_WEIGHT = 0.4;
 export const TEAM_WEIGHT = 0.6;
-/** Amplification de l'effet adversaire (2 : un adversaire à −10 % fait baisser le score de 20 %). */
-export const OPPONENT_AMPLIFICATION = 2;
+/**
+ * Amplification de l'effet adversaire. Réglée par le test sur le passé (5 journées, 4 612 titulaires) :
+ * ×1 donne la meilleure corrélation avec les scores réels ; ×2 exagérait les écarts.
+ */
+export const OPPONENT_AMPLIFICATION = 1;
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 

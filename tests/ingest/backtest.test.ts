@@ -55,4 +55,12 @@ describe('summarize', () => {
     expect(s).toMatchObject({ n: 2, maeModel: 5, maeBase: 10, biasModel: 0, biasBase: 0 });
     expect(s.buckets.find((b) => b.label === 'adversaire favorable (> ×1,1)')).toBeUndefined();
   });
+  it('joueur à L15 nul ignoré dans les ratios (pas de division par zéro)', () => {
+    const s = summarize([
+      { competitionId: 1, fixtureId: 1, playerId: 1, isHome: true, started: true, actual: 60, base: 50, projected: 50, venueFactor: 1, opponent: 1 },
+      { competitionId: 1, fixtureId: 1, playerId: 2, isHome: true, started: true, actual: 30, base: 0, projected: 0, venueFactor: 1, opponent: 1 },
+    ]);
+    expect(s.buckets[0].actualOverBase).toBe(1.2);
+    expect(Number.isFinite(s.buckets[0].projectedOverBase)).toBe(true);
+  });
 });

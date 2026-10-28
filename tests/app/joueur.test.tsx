@@ -60,9 +60,9 @@ describe('/joueurs/[slug]', () => {
     render(await Page(params('nuno-mendes')));
     const table = screen.getByRole('table', { name: 'Prochains matchs' });
     const rows = within(table).getAllByRole('row').slice(1);
-    // lieu : 76/80 = 0,95 ramené vers 1,03 → 0,99 ; adversaire : 1 + 2 × (0,4 × 1,16 + 0,6 × 1,08 − 1) = 1,224
-    // potentiel = 80 × 0,99 × 1,224 = 96,9
-    expect(within(rows[0]).getByText('96.9')).toBeInTheDocument();
+    // lieu : 76/80 = 0,95 ramené vers 1,03 → 0,99 ; adversaire : 0,4 × 1,16 + 0,6 × 1,08 = 1,112
+    // potentiel = 80 × 0,99 × 1,112 = 88,1
+    expect(within(rows[0]).getByText('88.1')).toBeInTheDocument();
     expect(within(rows[0]).getByRole('link', { name: /Olympique de Marseille/ })).toHaveAttribute('href', '/equipes/om');
     expect(within(rows[0]).getByText('66 pts')).toBeInTheDocument();
     expect(within(rows[0]).getByText('(ligue 50)')).toBeInTheDocument();
