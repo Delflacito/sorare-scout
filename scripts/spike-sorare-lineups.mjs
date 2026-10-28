@@ -47,8 +47,8 @@ await probe('Query', (c) => `{ ${c} }`, ['game', 'anyGame', 'football', 'so5', '
 let gameIds = [];
 for (const list of GAME_LISTS) {
   for (const args of ['(first: 5)', '(last: 5)', '']) {
-    const r = await gql(`{ football { club(slug: "${clubSlug}") { ${list}${args} { id date status } } } }`);
-    const r2 = r.errors ? await gql(`{ football { club(slug: "${clubSlug}") { ${list}${args} { nodes { id date status } } } } }`) : r;
+    const r = await gql(`{ football { club(slug: "${clubSlug}") { ${list}${args} { id date statusTyped } } } }`);
+    const r2 = r.errors ? await gql(`{ football { club(slug: "${clubSlug}") { ${list}${args} { nodes { id date statusTyped } } } } }`) : r;
     const raw = r2.data?.football?.club?.[list];
     const games = Array.isArray(raw) ? raw : raw?.nodes;
     if (games?.length) {
@@ -65,7 +65,7 @@ out.gameId = gameId;
 
 if (gameId) {
   const GAME_FIELDS = [
-    'id', 'date', 'status', 'statusTyped', 'homeTeam', 'awayTeam', 'homeGoals', 'awayGoals', 'competition', 'so5Fixture',
+    'id', 'date', 'status', 'statusTyped', 'formationHome', 'homeTeamFormation', 'lineUp', 'lineUps', 'teamLineups', 'gameLineups', 'compositions', 'composition', 'homeTeam', 'awayTeam', 'homeGoals', 'awayGoals', 'competition', 'so5Fixture',
     'homeFormation', 'awayFormation', 'formation', 'formations', 'lineups', 'lineup', 'homeLineup', 'awayLineup',
     'startingLineup', 'homeStartingLineup', 'playerGameScores', 'playerGameStats', 'so5Scores', 'scores', 'players',
     'homePlayers', 'awayPlayers', 'gameStats', 'stats', 'events', 'periodType', 'minute', 'coverageStatus',
@@ -84,7 +84,7 @@ if (gameId) {
   }
   const STAT_FIELDS = [
     'minsPlayed', 'formationPlace', 'formation_place', 'position', 'positionTyped', 'detailedPosition', 'playingPosition',
-    'onGameSheet', 'gameStarted', 'substituteIn', 'substituteOut', 'team', 'teamId', 'goals', 'totalCross', 'accuratePass',
+    'onGameSheet', 'gameStarted', 'formationPosition', 'fieldPosition', 'pitchPosition', 'positionOnPitch', 'grid', 'shirtNumber', 'started', 'starter', 'isStarter', 'substitute', 'substituteIn', 'substituteOut', 'team', 'teamId', 'goals', 'totalCross', 'accuratePass',
   ];
   await probe('PlayerGameStats', (c) => `{ football { game(id: "${gameId}") { playerGameScores { playerGameStats { ${c} } } } } }`, STAT_FIELDS);
   await probe('PlayerGameScore', (c) => `{ football { game(id: "${gameId}") { playerGameScores { ${c} } } } }`, [
