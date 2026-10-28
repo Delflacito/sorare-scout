@@ -39,7 +39,12 @@
     "slug": "real-madrid-madrid",
     "name": "Real Madrid",
     "pictureUrl": "https://t/rm.png"
-   }
+   },
+   "firstName": "Kylian",
+   "lastName": "Mbapp\u00e9",
+   "height": 178,
+   "shirtNumber": 10,
+   "pictureUrl": "https://p/mbappe-trimmed.png"
   },
   "p1": null
  }

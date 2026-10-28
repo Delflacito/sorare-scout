@@ -27,6 +27,7 @@ const player: PlayerDetail = {
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', teamShortName: 'PSG', playingStatus: 'SUBSTITUTE',
   injury: { kind: 'Thigh Injury', end: '2026-11-10' }, suspension: null, sorareProjection: 41,
   birthDate: '2002-06-19', country: { code: 'pt', name: 'Portugal', flagUrl: 'https://f/PT.png' },
+  firstName: 'Nuno', lastName: 'Mendes', height: 176, shirtNumber: 25, bodyPictureUrl: null,
 };
 const game = (fixtureId: number, day: number, score: number, status: PlayerGameView['status'], opponent = 'Olympique Lyonnais'): PlayerGameView => ({
   fixtureId, date: `2026-10-${String(day).padStart(2, '0')}T19:00:00.000Z`, opponent, opponentSlug: 'ol', isHome: fixtureId % 2 === 0,
@@ -35,6 +36,7 @@ const game = (fixtureId: number, day: number, score: number, status: PlayerGameV
   decisive: status === 'absent' ? 0 : 35, allAround: status === 'absent' ? 0 : score - 35,
   competition: fixtureId === 3 ? 'Champions League' : 'Ligue 1', isLeague: fixtureId !== 3,
   actions: fixtureId === 4 ? { goals: 2, goal_assist: 1 } : {},
+  team: 'Paris Saint-Germain', teamShortName: 'PSG', teamPictureUrl: 'https://t/psg.png',
 });
 const games: PlayerGameView[] = [game(4, 25, 70, 'started'), game(3, 18, 44, 'sub'), game(2, 11, 0, 'absent'), game(1, 4, 81.5, 'started')];
 const upcoming: UpcomingView = {
@@ -71,7 +73,10 @@ describe('/joueurs/[slug]', () => {
     expect(screen.getByText('Remplaçant')).toBeInTheDocument();
     expect(screen.getByText(/Blessé · Thigh Injury · retour prévu le 10\/11/)).toBeInTheDocument();
     expect(screen.getByText('Portugal')).toBeInTheDocument();
-    expect(screen.getByText(/\d+ ans \(né le 19 juin 2002\)/)).toBeInTheDocument();
+    expect(screen.getByText('Né le 19 juin 2002')).toBeInTheDocument();
+    expect(screen.getByText('Latéral gauche')).toBeInTheDocument();
+    expect(screen.getByText('#25')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Postes occupés récemment : DG × 8, PG × 2' })).toBeInTheDocument();
   });
 
   it('onglets : Aperçu par défaut, liens vers Matchs et Historique', async () => {
@@ -93,25 +98,27 @@ describe('/joueurs/[slug]', () => {
     expect(within(hero).getByText('41')).toBeInTheDocument();
   });
 
-  it('indicateurs', async () => {
+  it('cartes Forme, Performance, Temps de jeu', async () => {
     render(await Page(params('nuno-mendes')));
-    for (const [label, value] of [['L5', '62.4'], ['L15', '58.1'], ['Titularisations (5)', '80 %'], ['Décisif (L5)', '20.5'], ['All-Around (L5)', '41.9']]) {
-      const tile = screen.getByText(label).closest('.tile') as HTMLElement;
-      expect(within(tile).getByText(value)).toBeInTheDocument();
-    }
+    const l5 = screen.getByTestId('form-L5');
+    expect(within(l5).getByText('62')).toHaveClass('t55');
+    // 4 derniers matchs d'équipe, 3 joués
+    expect(within(l5).getByText('75 %')).toBeInTheDocument();
+    expect(screen.getByLabelText('L5 : 2 buts, 1 passes décisives')).toBeInTheDocument();
+    expect(screen.getByText('Titularisations').nextSibling).toHaveTextContent('80 %');
   });
 
   it('graphique : une colonne par match, légende, ligne du L15, info-bulle au survol', async () => {
     render(await Page(params('nuno-mendes')));
     const chart = screen.getByRole('img', { name: /Scores Sorare des 4 derniers matchs/ });
     expect(within(chart).getAllByTestId('score-bar')).toHaveLength(4);
-    expect(screen.getByText('Titulaire')).toBeInTheDocument();
-    expect(screen.getByText('Entré en jeu')).toBeInTheDocument();
     expect(within(chart).getByText('L15 58.1')).toBeInTheDocument();
     fireEvent.mouseEnter(within(chart).getAllByTestId('score-hit')[3]);
     expect(screen.getByRole('tooltip')).toHaveTextContent('70.0');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Titulaire · 90 min');
     expect(screen.getByRole('tooltip')).toHaveTextContent('2 buts · 1 passe décisive');
-    expect(within(chart).getAllByTestId('action-icon').map((i) => i.textContent)).toEqual(['⚽2', '🎯']);
+    expect(within(chart).getAllByTestId('action-icon').map((i) => i.textContent)).toEqual(['⚽', '🎯']);
+    expect(within(chart).getAllByTestId('score-bar')[3]).toHaveClass('t70');
   });
 
   it('graphique : filtres par compétition et par lieu', async () => {

@@ -7,6 +7,12 @@ export const POSITION_LABEL_FR: Record<DetailedPosition, string> = {
   DM: 'MDC', CM: 'MC', AM: 'MOC', LW: 'AG', RW: 'AD', ST: 'BU',
 };
 
+/** Nom complet du poste précis. */
+export const POSITION_NAME_FR: Record<DetailedPosition, string> = {
+  GK: 'Gardien', LB: 'Latéral gauche', CB: 'Défenseur central', RB: 'Latéral droit', LWB: 'Piston gauche', RWB: 'Piston droit',
+  DM: 'Milieu défensif', CM: 'Milieu central', AM: 'Milieu offensif', LW: 'Ailier gauche', RW: 'Ailier droit', ST: 'Avant-centre',
+};
+
 export const GENERIC_OF: Record<DetailedPosition, GenericPosition> = {
   GK: 'Goalkeeper',
   LB: 'Defender', CB: 'Defender', RB: 'Defender', LWB: 'Defender', RWB: 'Defender',

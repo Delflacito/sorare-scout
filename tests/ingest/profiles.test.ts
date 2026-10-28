@@ -28,7 +28,8 @@ describeDb('importProfiles', () => {
     playerProfiles: async (slugs: string[]): Promise<SorarePlayerProfile[]> => {
       calls.push(slugs);
       return slugs.filter((s) => s !== 'c').map((slug) => ({
-        slug, birthDate: '1998-12-20', country: { code: 'fr', name: 'France', flagUrl: 'https://f/FR.png' }, activeClub: { slug: 'fenerbahce', name: 'Fenerbahçe', pictureUrl: null },
+        slug, birthDate: '1998-12-20', firstName: 'Kylian', lastName: slug, height: 178, shirtNumber: 10, bodyPictureUrl: 'https://p/body.png',
+        country: { code: 'fr', name: 'France', flagUrl: 'https://f/FR.png' }, activeClub: { slug: 'fenerbahce', name: 'Fenerbahçe', pictureUrl: null },
         seasons: [season(2025, 10), season(2024, 7)],
       }));
     },
@@ -39,8 +40,10 @@ describeDb('importProfiles', () => {
     const r = await importProfiles({ sorare: fake(calls), repo }, { batchSize: 2, seasons: [2025, 2024] });
     expect(r).toEqual({ updated: 2, errors: [] });
     expect(calls).toEqual([['a', 'b'], ['c']]);
-    const [a] = await sql`select birth_date::text, country_code, country_name, country_flag_url from players where sorare_slug = 'a'`;
-    expect(a).toEqual({ birth_date: '1998-12-20', country_code: 'fr', country_name: 'France', country_flag_url: 'https://f/FR.png' });
+    const [a] = await sql`select birth_date::text, country_code, country_name, country_flag_url, first_name, last_name, height, shirt_number, body_picture_url
+      from players where sorare_slug = 'a'`;
+    expect(a).toEqual({ birth_date: '1998-12-20', country_code: 'fr', country_name: 'France', country_flag_url: 'https://f/FR.png',
+      first_name: 'Kylian', last_name: 'a', height: 178, shirt_number: 10, body_picture_url: 'https://p/body.png' });
     const seasons = await sql`select start_year, goals from player_seasons s join players p on p.id = s.player_id where p.sorare_slug = 'a' order by 1 desc`;
     expect(seasons).toEqual([{ start_year: 2025, goals: 10 }, { start_year: 2024, goals: 7 }]);
     const again: string[][] = [];
