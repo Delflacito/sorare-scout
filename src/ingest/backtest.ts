@@ -99,7 +99,7 @@ export function summarize(rows: BacktestRow[]) {
     { label: 'adversaire favorable (> ×1,1)', test: (r: BacktestRow) => r.opponent > 1.1 },
   ]
     .map((b) => {
-      const sel = rows.filter(b.test);
+      const sel = rows.filter((r) => b.test(r) && r.base > 0);
       return {
         label: b.label, n: sel.length,
         /** Score réel / L15 : le modèle a raison si c'est < 1 pour « difficile » et > 1 pour « favorable ». */

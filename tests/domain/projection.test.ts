@@ -39,12 +39,12 @@ describe('opponentMultiplier', () => {
   it('adversaire moyen → 1', () => {
     expect(opponentMultiplier({ positionAverage: 50, positionObs: 10, positionLeagueAverage: 50, teamIndex: 1, teamObs: 50 })).toBeCloseTo(1);
   });
-  it('40 % poste + 60 % qualité, écarts ramenés vers 1 puis doublés', () => {
+  it('40 % poste + 60 % qualité, écarts ramenés vers 1', () => {
     // poste : 38/52 → 1 + (38/52 − 1) × 3/8 ; qualité : 1 + (0,92 − 1) × 110/115
     const pos = 1 + (38 / 52 - 1) * (3 / 8);
     const team = 1 + (0.92 - 1) * (110 / 115);
     const r = opponentMultiplier({ positionAverage: 38, positionObs: 3, positionLeagueAverage: 52, teamIndex: 0.92, teamObs: 110 });
-    expect(r).toBeCloseTo(1 + 2 * (0.4 * pos + 0.6 * team - 1));
+    expect(r).toBeCloseTo(0.4 * pos + 0.6 * team);
   });
   it('amplification réglable (0 = pas d’effet adversaire)', () => {
     const input = { positionAverage: 38, positionObs: 3, positionLeagueAverage: 52, teamIndex: 0.92, teamObs: 110 };

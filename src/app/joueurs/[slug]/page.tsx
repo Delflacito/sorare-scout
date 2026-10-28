@@ -68,7 +68,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
       <p className="subtitle">
         Score potentiel s’il joue = niveau L15 {upcoming.base === null ? '—' : fmtScore(upcoming.base)} (matchs joués)
         × lieu (sa moyenne à domicile / à l’extérieur, ramenée vers l’avantage du championnat s’il a peu de matchs)
-        × adversaire (40 % points concédés au poste, 60 % qualité générale, effet doublé ; adversaire moyen = ×1).
+        × adversaire (40 % points concédés au poste, 60 % qualité générale ; adversaire moyen = ×1).
         Qualité adverse : note 1–100, 100 = adversaire le plus fort.
         {upcoming.startRate !== null && <> Probabilité d’être titulaire : {fmtPct(upcoming.startRate)} (5 derniers matchs).</>}
       </p>
