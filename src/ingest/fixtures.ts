@@ -5,6 +5,10 @@ import { LEAGUES, type League } from './leagues';
 
 export interface FixturesDeps { sorare: SorareClient; repo: Repo }
 export interface FixturesResult { fixturesImported: number; errors: string[] }
+export interface FixturesOptions {
+  /** Heure (ms) après laquelle on ne complète plus de match : le reste sera repris au prochain import. */
+  deadline?: number;
+}
 
 async function syncLeague(deps: FixturesDeps, league: League, errors: string[]): Promise<void> {
   const competitionId = await deps.repo.upsertCompetition({ slug: league.sorareSlug, name: league.name });
@@ -73,7 +77,7 @@ async function completeFixture(deps: FixturesDeps, fixture: FixtureToComplete, t
   return true;
 }
 
-export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEAGUES): Promise<FixturesResult> {
+export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEAGUES, opts: FixturesOptions = {}): Promise<FixturesResult> {
   let fixturesImported = 0;
   const errors: string[] = [];
   for (const league of leagues) {
@@ -84,7 +88,9 @@ export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEA
     }
   }
   const teamsById = new Map((await deps.repo.allTeams()).map((t) => [t.id, t]));
+  // Du plus récent au plus ancien : la forme récente est disponible dès le premier import.
   for (const fixture of await deps.repo.fixturesNeedingLineups()) {
+    if (opts.deadline !== undefined && Date.now() > opts.deadline) break;
     try {
       if (await completeFixture(deps, fixture, teamsById)) fixturesImported++;
     } catch (e) {

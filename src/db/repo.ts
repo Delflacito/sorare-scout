@@ -93,7 +93,7 @@ function createBaseRepo(sql: Sql) {
       const rows = await sql`
         select id, sorare_game_id, home_team_id, away_team_id from fixtures
         where status = 'played' and not lineups_imported and lineups_attempts < ${MAX_LINEUP_ATTEMPTS}
-        order by date`;
+        order by date desc`;
       return rows.map((r) => ({ id: r.id, sorareGameId: r.sorare_game_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id }));
     },
 
