@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node scripts/check-sorare-key.mjs
+      - run: mkdir -p spike-output && node scripts/check-sorare-key.mjs | tee spike-output/key-check.txt
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
       - run: node scripts/spike-sorare-lineups.mjs
