@@ -19,8 +19,8 @@ describe('client Sorare', () => {
     const f = fakeFetch([[/teams/, fixture('clubs')]]);
     const clubs = await createSorareClient('k3y', f.impl).clubs('ligue-1-fr');
     expect(clubs).toEqual([
-      { slug: 'psg', name: 'Paris Saint-Germain', competitionSlug: 'ligue-1-fr' },
-      { slug: 'om', name: 'Olympique de Marseille', competitionSlug: 'ligue-1-fr' },
+      { slug: 'psg', name: 'Paris Saint-Germain', shortName: 'PSG', pictureUrl: 'https://assets.sorare.com/team/psg.png', competitionSlug: 'ligue-1-fr' },
+      { slug: 'om', name: 'Olympique de Marseille', shortName: 'OM', pictureUrl: null, competitionSlug: 'ligue-1-fr' },
     ]);
     expect(f.requests[0].headers.get('APIKEY')).toBe('k3y');
   });
@@ -49,6 +49,17 @@ describe('client Sorare', () => {
     });
     expect(d.scores[1]).toMatchObject({ playerSlug: 'lee-kang-in', minutes: 20, started: false, decisive: 0, allAround: 0 });
     expect(d.scores[2]).toMatchObject({ playerSlug: 'absent-player', minutes: 0, started: false });
+  });
+
+  it('joueurs d’un club : statut, blessure, suspension, projection et photo', async () => {
+    const f = fakeFetch([[/activePlayers/, fixture('club-players')]]);
+    const players = await createSorareClient('k', f.impl).clubPlayers('psg');
+    expect(players).toEqual([
+      { slug: 'nuno-mendes', pictureUrl: 'https://assets.sorare.com/p/nuno-sq.png', playingStatus: 'SUBSTITUTE',
+        injury: { kind: 'Thigh Injury', expectedEnd: '2026-11-10' }, suspension: null, projection: 41 },
+      { slug: 'vitinha', pictureUrl: null, playingStatus: 'STARTER',
+        injury: null, suspension: { reason: 'Red card', end: '2026-11-02' }, projection: null },
+    ]);
   });
 
   it('erreur GraphQL → exception explicite', async () => {

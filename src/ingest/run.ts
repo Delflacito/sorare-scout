@@ -5,6 +5,7 @@ import { createRepo } from '@/db/repo';
 import { createSorareClient } from '@/sources/sorare';
 import { importClubs } from './clubs';
 import { importFixtures } from './fixtures';
+import { importPlayerStatuses } from './playerStatuses';
 import { recomputeAggregates } from './aggregates';
 import { seasonStart } from './leagues';
 
@@ -24,7 +25,10 @@ async function main() {
     const { clubs } = await importClubs(deps);
     const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 4 });
     const agg = await recomputeAggregates(repo);
-    await repo.finishRun(runId, 'ok', result.fixturesImported, result.errors);
+    // Après l'import des matchs : les nouveaux joueurs existent déjà en base.
+    const statuses = await importPlayerStatuses(deps);
+    console.log(`Statuts mis à jour : ${statuses.updated}`);
+    await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);
   } catch (e) {

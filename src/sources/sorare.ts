@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, GAME_DETAIL_QUERY } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -13,7 +13,20 @@ export const SORARE_COMPETITIONS = {
   bundesliga: 'bundesliga-de',
 } as const;
 
-export interface SorareClub { slug: string; name: string; competitionSlug: string }
+export interface SorareClub { slug: string; name: string; shortName: string | null; pictureUrl: string | null; competitionSlug: string }
+/** Statut actuel d'un joueur (STARTER, REGULAR, SUBSTITUTE, NOT_PLAYING…), blessure, suspension, projection Sorare du prochain match. */
+export interface SorarePlayerStatus {
+  slug: string; pictureUrl: string | null; playingStatus: string | null;
+  injury: { kind: string | null; expectedEnd: string | null } | null;
+  suspension: { reason: string | null; end: string | null } | null;
+  projection: number | null;
+}
+interface RawPlayerStatus {
+  slug: string; squaredPictureUrl: string | null; playingStatus: string | null;
+  activeInjuries: { kind: string | null; expectedEndDate: string | null }[] | null;
+  activeSuspensions: { reason: string | null; endDate: string | null }[] | null;
+  nextClassicFixtureProjectedScore: number | null;
+}
 export interface SorareGame {
   id: string; date: string; homeClubSlug: string; awayClubSlug: string; competitionSlug: string | null;
   homeGoals: number | null; awayGoals: number | null; status: 'played' | 'scheduled' | 'postponed';
@@ -91,9 +104,25 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
 
   return {
     async clubs(competitionSlug: string): Promise<SorareClub[]> {
-      const d = await query<{ football: { competition: { teams: { nodes: { slug: string; name: string }[] } } } }>(
+      const d = await query<{ football: { competition: { teams: { nodes: { slug: string; name: string; shortName: string | null; pictureUrl: string | null }[] } } } }>(
         CLUBS_QUERY, { slug: competitionSlug });
-      return d.football.competition.teams.nodes.map((c) => ({ slug: c.slug, name: c.name, competitionSlug }));
+      return d.football.competition.teams.nodes.map((c) => ({
+        slug: c.slug, name: c.name, shortName: c.shortName ?? null, pictureUrl: c.pictureUrl ?? null, competitionSlug,
+      }));
+    },
+
+    async clubPlayers(clubSlug: string): Promise<SorarePlayerStatus[]> {
+      const d = await query<{ football: { club: { activePlayers: { nodes: RawPlayerStatus[] } } } }>(CLUB_PLAYERS_QUERY, { slug: clubSlug });
+      return d.football.club.activePlayers.nodes.map((p) => {
+        const injury = p.activeInjuries?.[0];
+        const suspension = p.activeSuspensions?.[0];
+        return {
+          slug: p.slug, pictureUrl: p.squaredPictureUrl ?? null, playingStatus: p.playingStatus ?? null,
+          injury: injury ? { kind: injury.kind ?? null, expectedEnd: injury.expectedEndDate ?? null } : null,
+          suspension: suspension ? { reason: suspension.reason ?? null, end: suspension.endDate ?? null } : null,
+          projection: p.nextClassicFixtureProjectedScore ?? null,
+        };
+      });
     },
 
     async clubGames(clubSlug: string): Promise<SorareGame[]> {

@@ -1,3 +1,4 @@
 { "data": { "football": { "competition": { "slug": "ligue-1-fr", "teams": { "nodes": [
-  { "slug": "psg", "name": "Paris Saint-Germain" }, { "slug": "om", "name": "Olympique de Marseille" }
+  { "slug": "psg", "name": "Paris Saint-Germain", "shortName": "PSG", "pictureUrl": "https://assets.sorare.com/team/psg.png" },
+  { "slug": "om", "name": "Olympique de Marseille", "shortName": "OM", "pictureUrl": null }
 ] } } } } }
