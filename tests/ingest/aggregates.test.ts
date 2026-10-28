@@ -74,9 +74,9 @@ describeDb('recomputeAggregates', () => {
     // A concède : f1 b1 ST 40 (+ x CM 20 du côté A → non, x joue pour A) ; f2 c1 LB 80
     const [a] = await sql`select average, observations from team_conceded_overall where team_id = ${ids.A} and window_size = 5`;
     expect(a).toEqual({ average: 60, observations: 2 });
-    // forme de a1 : matchs joués 50 (f2) puis 60 (f1) → 0,6 × 55 + 0,4 × 55
-    const [s] = await sql`select form from player_summary where player_id = ${ids.a1}`;
-    expect(s.form).toBeCloseTo(55);
+    // a1 : 60 à domicile (f1), 50 à l'extérieur (f2) → base L15 = 55
+    const [s] = await sql`select base, home_avg, home_games, away_avg, away_games from player_summary where player_id = ${ids.a1}`;
+    expect(s).toEqual({ base: 55, home_avg: 60, home_games: 1, away_avg: 50, away_games: 1 });
   });
 
   it('note de qualité défensive (1 à 100) et avantage du terrain mesuré', async () => {

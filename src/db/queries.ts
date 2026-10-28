@@ -65,11 +65,13 @@ export interface UpcomingFixture {
   position: { average: number | null; leagueAverage: number | null; observations: number } | null;
   /** Qualité défensive générale de l'adversaire (10 derniers matchs) : indice et note de 1 à 100 (100 = le plus fort). */
   overall: { index: number | null; rating: number | null; observations: number } | null;
-  /** Avantage du terrain mesuré dans le championnat pour le club du joueur (domicile ou extérieur). */
-  venueFactor: number;
+  /** Avantage du terrain mesuré dans le championnat (domicile ou extérieur, selon le lieu du match). */
+  leagueVenueFactor: number;
 }
 export interface UpcomingView {
-  form: number | null; startRate: number | null; usualPosition: DetailedPosition | null; fixtures: UpcomingFixture[];
+  /** Niveau de base (L15 sur les matchs joués) et moyennes du joueur à domicile / à l'extérieur. */
+  base: number | null; homeAvg: number | null; homeGames: number; awayAvg: number | null; awayGames: number;
+  startRate: number | null; usualPosition: DetailedPosition | null; fixtures: UpcomingFixture[];
 }
 
 export interface MatchPlayerView {
@@ -204,7 +206,7 @@ export function createQueries(sql: postgres.Sql) {
     /** Prochains matchs du club du joueur, avec ce qu'en dit l'adversaire (base du score potentiel). */
     async getUpcoming(slug: string, limit: number): Promise<UpcomingView | null> {
       const [p] = await sql`
-        select p.id, p.team_id, s.form, s.start_rate5, s.usual_position
+        select p.id, p.team_id, s.base, s.home_avg, s.home_games, s.away_avg, s.away_games, s.start_rate5, s.usual_position
         from players p left join player_summary s on s.player_id = p.id where p.sorare_slug = ${slug}`;
       if (!p) return null;
       const rows = p.team_id ? await sql`
@@ -229,13 +231,14 @@ export function createQueries(sql: postgres.Sql) {
         left join venue_factors v on v.competition_id = o.competition_id
         order by n.date` : [];
       return {
-        form: p.form, startRate: p.start_rate5, usualPosition: p.usual_position,
+        base: p.base, homeAvg: p.home_avg, homeGames: p.home_games ?? 0, awayAvg: p.away_avg, awayGames: p.away_games ?? 0,
+        startRate: p.start_rate5, usualPosition: p.usual_position,
         fixtures: rows.map((r) => ({
           fixtureId: r.id, date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome: r.is_home,
           position: r.pos_league_any === null ? null
             : { average: r.pos_average, leagueAverage: r.pos_league_any, observations: r.pos_obs ?? 0 },
           overall: r.all_obs === null ? null : { index: r.all_index, rating: r.all_rating, observations: r.all_obs },
-          venueFactor: r.venue_factor ?? 1,
+          leagueVenueFactor: r.venue_factor ?? 1,
         })),
       };
     },

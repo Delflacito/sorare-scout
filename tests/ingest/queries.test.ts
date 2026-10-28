@@ -168,7 +168,7 @@ describeDb('matchs et projections', () => {
 
   it('getUpcoming : prochains matchs, forme et indices de l’adversaire', async () => {
     const u = await q.getUpcoming('nuno-mendes', 5);
-    expect(u).toMatchObject({ form: 70, startRate: 1, usualPosition: 'LB' });
+    expect(u).toMatchObject({ base: 70, homeAvg: 70, homeGames: 1, awayAvg: null, awayGames: 0, startRate: 1, usualPosition: 'LB' });
     expect(u!.fixtures).toHaveLength(1);
     expect(u!.fixtures[0]).toMatchObject({
       fixtureId: ids.next, opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true,
@@ -176,7 +176,7 @@ describeDb('matchs et projections', () => {
       overall: { observations: 2, rating: expect.any(Number) },
     });
     // titulaires à domicile en Ligue 1 (démo) : 70, 80, 50 ; à l'extérieur : 30, 60 ; tous : 58
-    expect(u!.fixtures[0].venueFactor).toBeCloseTo((200 / 3) / 58);
+    expect(u!.fixtures[0].leagueVenueFactor).toBeCloseTo((200 / 3) / 58);
   });
 
   it('getUpcoming : joueur inconnu → null', async () => {

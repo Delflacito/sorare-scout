@@ -85,7 +85,7 @@ describeDb('repo', () => {
     const ids = await sql`select id from players where sorare_slug like 'p-%'`;
     const rows = ids.map((r) => ({
       playerId: r.id as number, l5: 1, l15: 1, l40: 1, stdDev5: 0, startRate5: 1, avgMinutes5: 90, startRate15: 1, avgMinutes15: 90,
-      decisive5: 0, allAround5: 1, decisive15: 0, allAround15: 1, usualPosition: null, form: 50,
+      decisive5: 0, allAround5: 1, decisive15: 0, allAround15: 1, usualPosition: null, base: 50, homeAvg: null, homeGames: 0, awayAvg: null, awayGames: 0,
     }));
     await repo.replacePlayerSummaries(rows);
     const [{ count }] = await sql`select count(*)::int as count from player_summary`;
