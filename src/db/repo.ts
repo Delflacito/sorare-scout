@@ -84,6 +84,12 @@ function createBaseRepo(sql: Sql) {
       return r.id;
     },
 
+    /** Supprime les matchs antérieurs à `since` (et leurs participations). */
+    async deleteFixturesBefore(since: string): Promise<number> {
+      const rows = await sql`delete from fixtures where date < ${since} returning id`;
+      return rows.length;
+    },
+
     async markLineupsImported(fixtureId: number, homeFormation: string | null, awayFormation: string | null): Promise<void> {
       await sql`update fixtures set lineups_imported = true, home_formation = ${homeFormation}, away_formation = ${awayFormation}
         where id = ${fixtureId}`;

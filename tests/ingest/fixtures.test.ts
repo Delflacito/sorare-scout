@@ -142,4 +142,15 @@ describeDb('importFixtures', () => {
     await importFixtures({ ...f, repo }, [league]);
     expect(f.detailCalls).toEqual(['Game:1', 'Game:2']);
   });
+
+  it('saison en cours uniquement : matchs antérieurs ignorés et anciens matchs supprimés', async () => {
+    const competitionId = (await sql`select id from competitions`)[0].id;
+    const [psg, om] = (await sql`select id from teams order by sorare_slug desc`).map((r) => r.id);
+    await repo.upsertFixture({ date: '2026-05-01T19:00:00Z', competitionId, homeTeamId: psg, awayTeamId: om, homeGoals: 0, awayGoals: 0, status: 'played', sorareGameId: 'Game:old' });
+    const f = fakeSorare();
+    await importFixtures({ ...f, repo }, [league], { since: '2026-10-20T00:00:00.000Z' });
+    const games = await sql`select sorare_game_id from fixtures order by 1`;
+    expect(games.map((g) => g.sorare_game_id)).toEqual(['Game:1', 'Game:3']);
+    expect(f.detailCalls).toEqual(['Game:1']);
+  });
 });

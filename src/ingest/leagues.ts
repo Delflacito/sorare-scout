@@ -13,3 +13,9 @@ export const LEAGUES: League[] = [
   { key: 'serieA', name: 'Serie A', sorareSlug: SORARE_COMPETITIONS.serieA },
   { key: 'bundesliga', name: 'Bundesliga', sorareSlug: SORARE_COMPETITIONS.bundesliga },
 ];
+
+/** Début de la saison en cours : 1er août (UTC). Les matchs antérieurs ne sont pas importés. */
+export function seasonStart(now = new Date()): string {
+  const year = now.getUTCMonth() >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  return new Date(Date.UTC(year, 7, 1)).toISOString();
+}

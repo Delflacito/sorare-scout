@@ -6,6 +6,7 @@ import { createSorareClient } from '@/sources/sorare';
 import { importClubs } from './clubs';
 import { importFixtures } from './fixtures';
 import { recomputeAggregates } from './aggregates';
+import { seasonStart } from './leagues';
 
 config({ path: '.env.local', quiet: true });
 
@@ -21,7 +22,7 @@ async function main() {
   try {
     // Chaque jour : suit les promotions / relégations.
     const { clubs } = await importClubs(deps);
-    const result = await importFixtures(deps, undefined, { deadline });
+    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart() });
     const agg = await recomputeAggregates(repo);
     await repo.finishRun(runId, 'ok', result.fixturesImported, result.errors);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
