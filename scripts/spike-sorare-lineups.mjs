@@ -35,16 +35,19 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Historique par saison : quelles compétitions couvre stats(seasonStartYear) ? que donnent careerSeasons / seasonAppearances ?
-const P = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
-await probe('stats (arguments)', (c) => P(`stats(seasonStartYear: 2024, ${c}) { appearances }`), [
-  'competitionSlug: "laliga-es"', 'competitionSlugs: ["laliga-es"]', 'xyzCompetition: "x"', 'allCompetitions: true', 'xyzArg: 1',
-]);
-await probe('careerSeasons', P, ['careerSeasons { xyz }', 'careerSeasons']);
-await probe('seasonAppearances', P, ['seasonAppearances { xyz }', 'seasonAppearances(seasonStartYear: 2024) { xyz }', 'seasonAppearances']);
-await probe('Stats (autres champs)', (c) => P(`stats(seasonStartYear: 2024) { ${c} }`), [
-  'xyzCompetition', 'competition { slug }', 'season { startYear }', 'xyzSeason', 'substituteIn', 'xyzSub', 'redCards', 'cleanSheet', 'xyzClean', 'team { slug }', 'xyzTeam',
-]);
+// Postes Sorare : anyPositions (ordre ? plusieurs ?) et champ de poste principal ; ordre des lignes de 5 (formationPlace).
+for (const slug of ['timothy-weah', 'mats-wieffer', 'warren-zaire-emery', 'ainsley-maitland-niles', 'anthony-caci', 'achraf-hakimi']) {
+  await sample(`pos-${slug}`, `{ anyPlayer(slug: "${slug}") { ... on Player { displayName anyPositions position activeClub { slug } } } }`);
+}
+await probe('Player (poste)', (c) => `{ anyPlayer(slug: "timothy-weah") { ... on Player { ${c} } } }`, ['position', 'xyzPosition', 'positions', 'cardPositions', 'activeClub { slug }', 'xyzClub']);
+const mainz = await gql('{ football { club(slug: "mainz-05-mainz") { latestGames(first: 3) { nodes { id } } } } }');
+for (const n of mainz.data?.football?.club?.latestGames?.nodes ?? []) {
+  await sample(`lineup-${n.id}`, `{ football { game(id: "${n.id.replace(/^Game:/, '')}") {
+    homeTeam { slug } homeFormation { startingLineup { slug displayName } }
+    awayFormation { startingLineup { slug displayName } }
+    playerGameScores { anyPlayer { slug } anyPlayerGameStats { ... on PlayerGameStats { formationPlace } } }
+  } } }`);
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
