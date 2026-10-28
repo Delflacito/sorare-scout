@@ -52,23 +52,11 @@ for (const id of [uuid, fullId]) await sample(`game-id-${id === uuid ? 'uuid' : 
 const idOk = out.samples['game-id-uuid']?.football ? uuid : fullId;
 const G = (sel) => `{ football { game(id: "${idOk}") { ${sel} } } }`;
 
-await probe('PlayerGameScore', (c) => G(`playerGameScores { ${c} }`), [
-  'decisiveScore', 'allAroundStats', 'allAroundScore', 'totalScore', 'xyzScore',
-  'detailedScore { category stat statValue points score totalScore }',
+await probe('StatScore', (c) => G(`playerGameScores { detailedScore { ${c} } }`), [
+  'category', 'stat', 'statValue', 'points', 'score', 'totalScore', 'xyz',
 ]);
-await probe('PlayerGameStats', (c) => G(`playerGameScores { anyPlayerGameStats { ... on PlayerGameStats { ${c} } } }`), [
-  'minsPlayed', 'formationPlace', 'gameStarted', 'onGameSheet', 'team', 'teamId', 'xyz',
-]);
-// Repères : compo PSG (Hakimi latéral droit, Nuno Mendes latéral gauche) sur les 3 derniers matchs joués
-for (const g of played.slice(0, 3)) {
-  const id = g.id.replace(/^Game:/, '');
-  await sample(`lineup-${g.date}`, `{ football { game(id: "${id}") {
-    homeTeam { slug } awayTeam { slug }
-    homeFormation { startingLineup { slug displayName } }
-    awayFormation { startingLineup { slug displayName } }
-    playerGameScores { score anyPlayer { slug } anyPlayerGameStats { ... on PlayerGameStats { minsPlayed formationPlace } } }
-  } } }`);
-}
+await sample('detailed', G(`playerGameScores { score anyPlayer { slug } detailedScore { category stat statValue points totalScore } }`));
+await sample('detailed-min', G(`playerGameScores { score anyPlayer { slug } detailedScore { category stat totalScore } }`));
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
