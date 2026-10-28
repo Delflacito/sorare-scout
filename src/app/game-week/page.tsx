@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getQueries, type GameWeekPlayer } from '@/db/queries';
+import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
@@ -13,6 +13,18 @@ const SECTIONS: [GenericPosition, string][] = [
 ];
 const PER_POSITION = 10;
 
+/** Écart entre le score potentiel et le niveau habituel, en points et en %. */
+function Boost({ p }: { p: GameWeekPlayer }) {
+  const diff = p.projected - p.base;
+  const pct = p.base ? Math.round((diff / p.base) * 100) : 0;
+  const sign = diff >= 0 ? '+' : '−';
+  return (
+    <td className={`num ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`}>
+      {sign}{fmtScore(Math.abs(diff))} <span className="muted small">({sign}{Math.abs(pct)} %)</span>
+    </td>
+  );
+}
+
 function PlayersTable({ title, players }: { title: string; players: GameWeekPlayer[] }) {
   return (
     <section>
@@ -21,7 +33,7 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
         <div className="table-wrap">
           <table aria-label={title}>
             <thead>
-              <tr><th>#</th><th>Joueur</th><th>Match</th><th>Poste</th><th>Potentiel</th><th>L15</th><th>% titu</th><th>Proj. Sorare</th></tr>
+              <tr><th>#</th><th>Joueur</th><th>Match</th><th>Poste</th><th>Potentiel</th><th>Habitude (L15)</th><th>vs habitude</th><th>% titu</th><th>Proj. Sorare</th></tr>
             </thead>
             <tbody>
               {players.map((p, i) => (
@@ -45,7 +57,8 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
                   </td>
                   <td>{p.usualPosition ? POSITION_LABEL_FR[p.usualPosition] : GENERIC_LABEL_FR[p.position]}</td>
                   <td className="num strong">{fmtScore(p.projected)}</td>
-                  <td className="num">{fmtScore(p.l15)}</td>
+                  <td className="num">{fmtScore(p.base)}</td>
+                  <Boost p={p} />
                   <td className="num">{fmtPct(p.startRate)}</td>
                   <td className="num">{p.sorareProjection === null ? '—' : Math.round(p.sorareProjection)}</td>
                 </tr>
@@ -62,9 +75,14 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const p = await searchParams;
   const competition = one(p.competition);
   const startersOnly = one(p.tous) !== '1';
+  const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
+  const tabHref = (vue?: string) => {
+    const qs = new URLSearchParams(Object.entries({ competition, tous: startersOnly ? undefined : '1', vue }).filter(([, v]) => v) as [string, string][]);
+    return `/game-week${qs.size ? `?${qs}` : ''}`;
+  };
   const queries = getQueries();
   const [fixtures, competitions] = await Promise.all([queries.getGameWeekFixtures(competition), queries.listCompetitions()]);
-  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, startersOnly, limit: PER_POSITION });
+  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, startersOnly, limit: PER_POSITION, sort });
 
   return (
     <main>
@@ -78,10 +96,18 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
         <label className="check">
           <input type="checkbox" name="tous" value="1" defaultChecked={!startersOnly} /> Inclure les remplaçants
         </label>
+        {sort === 'boost' && <input type="hidden" name="vue" value="boost" />}
         <button type="submit">Filtrer</button>
       </form>
+      <nav className="tabs" aria-label="Classement">
+        <Link href={tabHref()} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
+        <Link href={tabHref('boost')} aria-current={sort === 'boost' ? 'page' : undefined}>Plus gros boosts</Link>
+      </nav>
       <p className="note">
-        Meilleurs scores potentiels de la prochaine journée, poste par poste. Blessés et suspendus exclus
+        {sort === 'boost'
+          ? 'Joueurs dont le match s’annonce nettement au-dessus de leur niveau habituel (score potentiel − L15), poste par poste. '
+          : 'Meilleurs scores potentiels de la prochaine journée, poste par poste. '}
+        Blessés et suspendus exclus
         {startersOnly && ', ainsi que les joueurs titulaires moins de 3 fois sur leurs 5 derniers matchs'}.{' '}
         <Link href={competition ? `/journee?competition=${competition}` : '/journee'}>Voir les adversaires poste par poste →</Link>
       </p>
