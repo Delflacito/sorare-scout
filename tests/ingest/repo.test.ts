@@ -53,10 +53,12 @@ describeDb('repo', () => {
   });
 
   it('fixturesNeedingLineups et markLineupsImported', async () => {
-    const { fixtureId } = await seedFixture();
+    const { fixtureId, home, away } = await seedFixture();
     expect(await repo.fixturesNeedingLineups()).toEqual([]);
     await repo.setFixtureApiFootballId(fixtureId, 1001);
-    expect(await repo.fixturesNeedingLineups()).toEqual([{ id: fixtureId, apifootballFixtureId: 1001 }]);
+    expect(await repo.fixturesNeedingLineups()).toEqual([
+      { id: fixtureId, apifootballFixtureId: 1001, sorareGameId: 'g1', homeTeamId: home, awayTeamId: away },
+    ]);
     await repo.markLineupsImported(fixtureId, '4-3-3', '4-4-2');
     expect(await repo.fixturesNeedingLineups()).toEqual([]);
   });

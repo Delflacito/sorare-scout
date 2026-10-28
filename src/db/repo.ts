@@ -24,6 +24,9 @@ export interface PlayerSummaryRow {
   usualPosition: DetailedPosition | null;
 }
 
+export interface FixtureToComplete { id: number; apifootballFixtureId: number; sorareGameId: string; homeTeamId: number; awayTeamId: number }
+export interface TeamRow { id: number; name: string; sorareSlug: string; apifootballId: number | null }
+
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 function createBaseRepo(sql: Sql) {
@@ -78,12 +81,33 @@ function createBaseRepo(sql: Sql) {
         where id = ${fixtureId}`;
     },
 
-    async fixturesNeedingLineups(): Promise<{ id: number; apifootballFixtureId: number }[]> {
+    async fixturesNeedingLineups(): Promise<FixtureToComplete[]> {
       const rows = await sql`
-        select id, apifootball_fixture_id from fixtures
+        select id, apifootball_fixture_id, sorare_game_id, home_team_id, away_team_id from fixtures
         where status = 'played' and not lineups_imported and apifootball_fixture_id is not null
         order by date`;
-      return rows.map((r) => ({ id: r.id, apifootballFixtureId: r.apifootball_fixture_id }));
+      return rows.map((r) => ({
+        id: r.id, apifootballFixtureId: r.apifootball_fixture_id, sorareGameId: r.sorare_game_id,
+        homeTeamId: r.home_team_id, awayTeamId: r.away_team_id,
+      }));
+    },
+
+    async teamsByCompetition(competitionId: number): Promise<TeamRow[]> {
+      const rows = await sql`select id, name, sorare_slug, apifootball_id from teams where competition_id = ${competitionId}`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug, apifootballId: r.apifootball_id }));
+    },
+
+    async allTeams(): Promise<TeamRow[]> {
+      const rows = await sql`select id, name, sorare_slug, apifootball_id from teams`;
+      return rows.map((r) => ({ id: r.id, name: r.name, sorareSlug: r.sorare_slug, apifootballId: r.apifootball_id }));
+    },
+
+    /** apifootball_id déjà connus pour ces joueurs Sorare. */
+    async knownPlayerIds(sorareSlugs: string[]): Promise<Map<string, number>> {
+      if (!sorareSlugs.length) return new Map();
+      const rows = await sql`select sorare_slug, apifootball_id from players
+        where sorare_slug in ${sql(sorareSlugs)} and apifootball_id is not null`;
+      return new Map(rows.map((r) => [r.sorare_slug as string, r.apifootball_id as number]));
     },
 
     async upsertAppearance(a: AppearanceInput): Promise<void> {
