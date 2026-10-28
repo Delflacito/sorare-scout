@@ -30,7 +30,8 @@ describe('/joueurs', () => {
     expect(screen.getByText('80 %')).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'DG' })).toBeInTheDocument();
     expect(screen.getByText('123')).toBeInTheDocument();
-    expect(screen.getByText(/vs Olympique de Marseille/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Olympique de Marseille' })).toHaveAttribute('href', '/equipes/om');
+    expect(screen.getByTitle('Domicile')).toHaveTextContent('D');
     expect(screen.getByRole('combobox', { name: 'Club' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Nuno Mendes' })).toHaveAttribute('src', 'https://p/nuno.png');
     expect(screen.getByRole('img', { name: 'Paris Saint-Germain' })).toHaveAttribute('src', 'https://t/psg.png');

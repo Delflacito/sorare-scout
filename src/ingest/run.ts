@@ -28,11 +28,11 @@ async function main() {
     // (Un joueur apparu aujourd'hui aura son statut au prochain import.)
     const statuses = await importPlayerStatuses(deps);
     console.log(`Statuts mis à jour : ${statuses.updated}`);
-    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 4 });
-    const agg = await recomputeAggregates(repo);
-    // Identité et historique par saison : 10 minutes au plus, le reste est repris le lendemain.
-    const profiles = await importProfiles(deps, { deadline: Date.now() + 10 * 60_000, concurrency: 3 });
+    // Identité et historique par saison (rapide, avant les matchs) : 8 minutes au plus, le reste est repris le lendemain.
+    const profiles = await importProfiles(deps, { deadline: Date.now() + 8 * 60_000, concurrency: 3 });
     console.log(`Profils mis à jour : ${profiles.updated}`);
+    const result = await importFixtures(deps, undefined, { deadline: deadline + 8 * 60_000, since: seasonStart(), concurrency: 4 });
+    const agg = await recomputeAggregates(repo);
     await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);

@@ -4,6 +4,7 @@ import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPo
 import { fmtIndex, fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
+import { Venue } from '@/components/Venue';
 import { one, oneOf, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
@@ -93,7 +94,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
                   <td className="num">{fmtPct(r.startRate)}</td>
                   <td>
                     {r.nextOpponent && r.nextOpponentSlug ? (
-                      <Link href={`/equipes/${r.nextOpponentSlug}`}>{r.nextIsHome ? 'vs' : '@'} {r.nextOpponent}</Link>
+                      <span className="club-link">{r.nextIsHome !== null && <Venue isHome={r.nextIsHome} />}<Link href={`/equipes/${r.nextOpponentSlug}`}>{r.nextOpponent}</Link></span>
                     ) : '—'}
                   </td>
                   <td className="num strong">{r.nextProjected === null ? '—' : fmtScore(r.nextProjected)}</td>
