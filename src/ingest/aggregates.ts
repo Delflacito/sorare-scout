@@ -117,11 +117,15 @@ function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerS
   });
 }
 
+/** Calcule tous les agrégats à partir de matchs complets (fonction pure, réutilisée par le test sur le passé). */
+export function computeAggregates(fixtures: CompletedFixture[], appearances: AppearanceRow[]) {
+  return { ...conceded(fixtures, appearances), summaries: summaries(fixtures, appearances) };
+}
+
 /** Recalcule team_conceded_by_position et player_summary à partir des matchs complets. */
 export async function recomputeAggregates(repo: Repo): Promise<{ conceded: number; players: number }> {
   const { fixtures, appearances } = await repo.aggregateInputs();
-  const concededRows = conceded(fixtures, appearances);
-  const summaryRows = summaries(fixtures, appearances);
+  const { summaries: summaryRows, ...concededRows } = computeAggregates(fixtures, appearances);
   await repo.transaction(async (tx) => {
     await tx.replaceConceded(concededRows.byPosition);
     await tx.replaceConcededOverall(concededRows.overall);
