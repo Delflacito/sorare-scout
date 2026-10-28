@@ -1,0 +1,21 @@
+name: Spike API
+on:
+  workflow_dispatch:
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/spike.mjs
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spike-output
+          path: spike-output/
+          retention-days: 7

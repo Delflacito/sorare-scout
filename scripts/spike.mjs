@@ -1,15 +1,21 @@
 // Spike de faisabilité (Task 0) — à lancer sur une machine ayant accès à Internet :
 //   node scripts/spike.mjs
-// Lit .env.local, interroge Sorare et API-Football, écrit les réponses brutes dans spike-output/.
-// Envoie ensuite le dossier spike-output/ (ou son contenu) pour finaliser docs/spike-results.md.
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+// ou via le workflow GitHub « Spike API » (onglet Actions), qui publie spike-output/ en artefact.
+// Lit les clés dans les variables d'environnement ou .env.local, écrit les réponses brutes dans spike-output/.
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 
-const env = Object.fromEntries(
-  readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
-    .split('\n')
-    .filter((l) => l.includes('='))
-    .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
-);
+const envFile = new URL('../.env.local', import.meta.url);
+const env = {
+  ...(existsSync(envFile)
+    ? Object.fromEntries(
+        readFileSync(envFile, 'utf8')
+          .split('\n')
+          .filter((l) => l.includes('='))
+          .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
+      )
+    : {}),
+  ...Object.fromEntries(['SORARE_API_KEY', 'API_FOOTBALL_KEY'].filter((k) => process.env[k]).map((k) => [k, process.env[k]])),
+};
 const out = new URL('../spike-output/', import.meta.url);
 mkdirSync(out, { recursive: true });
 const save = (name, data) => {
