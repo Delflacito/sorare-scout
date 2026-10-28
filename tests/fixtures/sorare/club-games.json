@@ -1,9 +1,0 @@
-{ "data": { "football": { "club": { "slug": "psg", "latestGames": [
-  { "id": "Game:1", "date": "2026-10-25T19:00:00Z", "status": "played", "homeGoals": 2, "awayGoals": 1,
-    "homeTeam": { "slug": "psg", "name": "Paris Saint-Germain" }, "awayTeam": { "slug": "om", "name": "Olympique de Marseille" } },
-  { "id": "Game:0", "date": "2026-10-18T19:00:00Z", "status": "postponed", "homeGoals": null, "awayGoals": null,
-    "homeTeam": { "slug": "lens", "name": "RC Lens" }, "awayTeam": { "slug": "psg", "name": "Paris Saint-Germain" } }
-], "upcomingGames": [
-  { "id": "Game:2", "date": "2026-11-01T20:00:00Z", "status": "scheduled", "homeGoals": null, "awayGoals": null,
-    "homeTeam": { "slug": "psg", "name": "Paris Saint-Germain" }, "awayTeam": { "slug": "lyon", "name": "Olympique Lyonnais" } }
-] } } } }
