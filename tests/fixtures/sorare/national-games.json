@@ -1,0 +1,36 @@
+{
+ "data": {
+  "football": {
+   "nationalTeam": {
+    "latestGames": {
+     "nodes": [
+      {
+       "id": "Game:nt1",
+       "date": "2026-10-05T18:45:00Z",
+       "statusTyped": "played",
+       "homeGoals": 2,
+       "awayGoals": 0,
+       "homeTeam": {
+        "__typename": "NationalTeam",
+        "slug": "france",
+        "name": "France",
+        "pictureUrl": "https://f/FR.png"
+       },
+       "awayTeam": {
+        "__typename": "NationalTeam",
+        "slug": "belgium",
+        "name": "Belgium",
+        "pictureUrl": null
+       },
+       "competition": {
+        "slug": "uefa-nations-league",
+        "displayName": "Nations League"
+       }
+      }
+     ]
+    },
+    "upcomingGames": []
+   }
+  }
+ }
+}

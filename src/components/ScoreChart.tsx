@@ -120,7 +120,7 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
               }}
             >
               <strong>{g.status === 'absent' ? 'Absent' : fmt(g.score)}</strong>
-              <span>{fmtDay(g.date)} · {g.isHome ? 'vs' : '@'} {g.opponent}</span>
+              <span>{fmtDay(g.date)} · {g.isHome ? 'vs' : '@'} {g.opponent}{!g.isLeague && ` · ${g.competition}`}</span>
               {g.status !== 'absent' && (
                 <span>
                   {g.minutes} min{g.position ? ` · ${POSITION_LABEL_FR[g.position]}` : ''} · Décisif {fmt(g.decisive)} · AA {fmt(g.allAround)}

@@ -36,6 +36,26 @@ describe('client Sorare', () => {
     ]);
   });
 
+  it('matchs d’un club : équipes (club ou sélection), nom de la compétition', async () => {
+    const f = fakeFetch([[/latestGames/, fixture('club-games')]]);
+    const [, ucl] = await createSorareClient('k', f.impl).clubGames('psg-paris');
+    expect(ucl).toMatchObject({
+      competitionSlug: 'champions-league-europe', competitionName: 'Champions League',
+      home: { slug: 'psg-paris', name: 'PSG', pictureUrl: null, kind: 'club' },
+      away: { slug: 'barcelona-barcelona', name: 'BARCELONA', pictureUrl: 'https://t/barca.png', kind: 'club' },
+    });
+  });
+
+  it('matchs d’une sélection', async () => {
+    const f = fakeFetch([[/nationalTeam/, fixture('national-games')]]);
+    const [g] = await createSorareClient('k', f.impl).nationalTeamGames('france');
+    expect(g).toMatchObject({
+      id: 'Game:nt1', competitionSlug: 'uefa-nations-league', competitionName: 'Nations League', status: 'played',
+      home: { slug: 'france', name: 'France', kind: 'national' }, away: { slug: 'belgium', kind: 'national' },
+    });
+    expect(f.requests[0].body.variables).toEqual({ slug: 'france' });
+  });
+
   it('détail d’un match : compos, scores, décisif et All-Around', async () => {
     const f = fakeFetch([[/startingLineup/, fixture('game-detail')]]);
     const d = await createSorareClient('k', f.impl).gameDetail('Game:aaa');
@@ -56,9 +76,10 @@ describe('client Sorare', () => {
     const players = await createSorareClient('k', f.impl).clubPlayers('psg');
     expect(players).toEqual([
       { slug: 'nuno-mendes', pictureUrl: 'https://assets.sorare.com/p/nuno-sq.png', playingStatus: 'SUBSTITUTE',
-        injury: { kind: 'Thigh Injury', expectedEnd: '2026-11-10' }, suspension: null, projection: 41 },
+        injury: { kind: 'Thigh Injury', expectedEnd: '2026-11-10' }, suspension: null, projection: 41,
+        nationalTeam: { slug: 'portugal', name: 'Portugal', pictureUrl: 'https://f/PT.png' } },
       { slug: 'vitinha', pictureUrl: null, playingStatus: 'STARTER',
-        injury: null, suspension: { reason: 'Red card', end: '2026-11-02' }, projection: null },
+        injury: null, suspension: { reason: 'Red card', end: '2026-11-02' }, projection: null, nationalTeam: null },
     ]);
   });
 

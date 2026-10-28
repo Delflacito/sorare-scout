@@ -82,6 +82,7 @@ td.strong { font-weight: 600; }
 .club-logo { object-fit: contain; vertical-align: middle; flex: none; }
 .club-link { display: inline-flex; align-items: center; gap: 6px; }
 .pos-chip { padding: 2px 10px; border-radius: 999px; background: var(--neutral-bg); font-size: 13px; font-weight: 600; }
+.comp-chip { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--neutral-bg); color: var(--muted, inherit); font-size: 11px; font-weight: 600; white-space: nowrap; vertical-align: middle; }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .badge-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 13px;
   background: var(--neutral-bg); color: var(--text); }

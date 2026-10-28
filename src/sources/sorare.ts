@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -20,15 +20,20 @@ export interface SorarePlayerStatus {
   injury: { kind: string | null; expectedEnd: string | null } | null;
   suspension: { reason: string | null; end: string | null } | null;
   projection: number | null;
+  nationalTeam: { slug: string; name: string; pictureUrl: string | null } | null;
 }
 interface RawPlayerStatus {
   slug: string; squaredPictureUrl: string | null; playingStatus: string | null;
   activeInjuries: { kind: string | null; expectedEndDate: string | null }[] | null;
   activeSuspensions: { reason: string | null; endDate: string | null }[] | null;
   nextClassicFixtureProjectedScore: number | null;
+  activeNationalTeam: { slug: string; name: string; pictureUrl: string | null } | null;
 }
+/** Équipe d'un match : club ou sélection nationale. */
+export interface SorareTeam { slug: string; name: string; pictureUrl: string | null; kind: 'club' | 'national' }
 export interface SorareGame {
-  id: string; date: string; homeClubSlug: string; awayClubSlug: string; competitionSlug: string | null;
+  id: string; date: string; homeClubSlug: string; awayClubSlug: string; competitionSlug: string | null; competitionName: string | null;
+  home: SorareTeam; away: SorareTeam;
   homeGoals: number | null; awayGoals: number | null; status: 'played' | 'scheduled' | 'postponed';
 }
 export interface SorareLineupPlayer { slug: string; displayName: string }
@@ -42,8 +47,9 @@ export interface SorareGameDetail { home: SorareTeamLineup; away: SorareTeamLine
 
 interface RawGame {
   id: string; date: string; statusTyped: string; homeGoals: number | null; awayGoals: number | null;
-  homeTeam: { slug: string }; awayTeam: { slug: string }; competition: { slug: string } | null;
+  homeTeam: RawTeam; awayTeam: RawTeam; competition: { slug: string; displayName: string | null } | null;
 }
+interface RawTeam { __typename?: string; slug: string; name?: string | null; pictureUrl?: string | null }
 interface RawLineup { startingLineup: SorareLineupPlayer[][] | null; bench: SorareLineupPlayer[] | null }
 interface RawScore {
   score: number | null;
@@ -79,8 +85,14 @@ function gameStatus(s: string): SorareGame['status'] {
   return 'scheduled';
 }
 
+const toTeam = (t: RawTeam): SorareTeam => ({
+  slug: t.slug, name: t.name ?? t.slug, pictureUrl: t.pictureUrl ?? null, kind: t.__typename === 'NationalTeam' ? 'national' : 'club',
+});
+
 const toGame = (g: RawGame): SorareGame => ({
-  id: g.id, date: g.date, homeClubSlug: g.homeTeam.slug, awayClubSlug: g.awayTeam.slug, competitionSlug: g.competition?.slug ?? null,
+  id: g.id, date: g.date, homeClubSlug: g.homeTeam.slug, awayClubSlug: g.awayTeam.slug,
+  competitionSlug: g.competition?.slug ?? null, competitionName: g.competition?.displayName ?? null,
+  home: toTeam(g.homeTeam), away: toTeam(g.awayTeam),
   homeGoals: g.homeGoals, awayGoals: g.awayGoals, status: gameStatus(g.statusTyped),
 });
 
@@ -121,6 +133,9 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
           injury: injury ? { kind: injury.kind ?? null, expectedEnd: injury.expectedEndDate ?? null } : null,
           suspension: suspension ? { reason: suspension.reason ?? null, end: suspension.endDate ?? null } : null,
           projection: p.nextClassicFixtureProjectedScore ?? null,
+          nationalTeam: p.activeNationalTeam
+            ? { slug: p.activeNationalTeam.slug, name: p.activeNationalTeam.name, pictureUrl: p.activeNationalTeam.pictureUrl ?? null }
+            : null,
         };
       });
     },
@@ -129,6 +144,13 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
       const d = await query<{ football: { club: { latestGames: { nodes: RawGame[] }; upcomingGames: RawGame[] } } }>(
         CLUB_GAMES_QUERY, { slug: clubSlug });
       return [...d.football.club.latestGames.nodes, ...d.football.club.upcomingGames].map(toGame);
+    },
+
+    async nationalTeamGames(slug: string): Promise<SorareGame[]> {
+      const d = await query<{ football: { nationalTeam: { latestGames: { nodes: RawGame[] }; upcomingGames: RawGame[] } | null } }>(
+        NATIONAL_TEAM_GAMES_QUERY, { slug });
+      const t = d.football.nationalTeam;
+      return t ? [...t.latestGames.nodes, ...t.upcomingGames].map(toGame) : [];
     },
 
     async gameDetail(gameId: string): Promise<SorareGameDetail> {

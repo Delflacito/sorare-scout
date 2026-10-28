@@ -1,8 +1,48 @@
-{ "data": { "football": { "club": { "activePlayers": { "nodes": [
-  { "slug": "nuno-mendes", "displayName": "Nuno Mendes", "pictureUrl": "https://assets.sorare.com/p/nuno.png", "squaredPictureUrl": "https://assets.sorare.com/p/nuno-sq.png",
-    "playingStatus": "SUBSTITUTE", "activeInjuries": [{ "kind": "Thigh Injury", "expectedEndDate": "2026-11-10" }], "activeSuspensions": [],
-    "nextClassicFixtureProjectedScore": 41 },
-  { "slug": "vitinha", "displayName": "Vitinha", "pictureUrl": null, "squaredPictureUrl": null,
-    "playingStatus": "STARTER", "activeInjuries": [], "activeSuspensions": [{ "reason": "Red card", "endDate": "2026-11-02" }],
-    "nextClassicFixtureProjectedScore": null }
-] } } } } }
+{
+ "data": {
+  "football": {
+   "club": {
+    "activePlayers": {
+     "nodes": [
+      {
+       "slug": "nuno-mendes",
+       "displayName": "Nuno Mendes",
+       "pictureUrl": "https://assets.sorare.com/p/nuno.png",
+       "squaredPictureUrl": "https://assets.sorare.com/p/nuno-sq.png",
+       "playingStatus": "SUBSTITUTE",
+       "activeInjuries": [
+        {
+         "kind": "Thigh Injury",
+         "expectedEndDate": "2026-11-10"
+        }
+       ],
+       "activeSuspensions": [],
+       "nextClassicFixtureProjectedScore": 41,
+       "activeNationalTeam": {
+        "slug": "portugal",
+        "name": "Portugal",
+        "pictureUrl": "https://f/PT.png"
+       }
+      },
+      {
+       "slug": "vitinha",
+       "displayName": "Vitinha",
+       "pictureUrl": null,
+       "squaredPictureUrl": null,
+       "playingStatus": "STARTER",
+       "activeInjuries": [],
+       "activeSuspensions": [
+        {
+         "reason": "Red card",
+         "endDate": "2026-11-02"
+        }
+       ],
+       "nextClassicFixtureProjectedScore": null,
+       "activeNationalTeam": null
+      }
+     ]
+    }
+   }
+  }
+ }
+}

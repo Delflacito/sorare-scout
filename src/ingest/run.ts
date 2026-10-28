@@ -23,11 +23,12 @@ async function main() {
   try {
     // Chaque jour : suit les promotions / relégations.
     const { clubs } = await importClubs(deps);
-    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 4 });
-    const agg = await recomputeAggregates(repo);
-    // Après l'import des matchs : les nouveaux joueurs existent déjà en base.
+    // Avant les matchs : la sélection de chaque joueur détermine les matchs internationaux à importer.
+    // (Un joueur apparu aujourd'hui aura son statut au prochain import.)
     const statuses = await importPlayerStatuses(deps);
     console.log(`Statuts mis à jour : ${statuses.updated}`);
+    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 4 });
+    const agg = await recomputeAggregates(repo);
     await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);
