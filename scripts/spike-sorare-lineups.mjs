@@ -35,21 +35,12 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Marché : dernières ventes (last, season), carte vendue, prix plancher en ETH et taux de change.
+// Marché : taux de change Sorare et prix plancher Classic.
 const MP = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
-const tries = {
-  'tp-last': 'tokenPrices(rarity: limited, last: 5) { nodes { date amounts { eurCents } } }',
-  'tp-season-int': 'tokenPrices(rarity: limited, last: 5, season: 2026) { nodes { date amounts { eurCents } } }',
-  'tp-season-xyz': 'tokenPrices(rarity: limited, last: 2, season: xyz) { nodes { date } }',
-  'tp-card': 'tokenPrices(rarity: limited, last: 3) { nodes { date card { slug seasonYear } } }',
-  'tp-node-xyzc': 'tokenPrices(rarity: limited, last: 2) { nodes { xyzCard xyzSeason } }',
-  'tp-args-xyz2': 'tokenPrices(rarity: limited, last: 2, xyzCollection: 1) { nodes { date } }',
-  'lp-amounts': 'lowestPriceAnyCard(rarity: limited) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }',
-  'lp-inseason': 'lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear }',
-  'lp-season': 'lowestPriceAnyCard(rarity: limited, season: 2026) { slug seasonYear }',
-};
-for (const [k, q] of Object.entries(tries)) await sample(k, MP(q));
-await probe('Root (taux)', (c) => `{ ${c} }`, ['config { exchangeRate { id } }', 'config { xyzRate }', 'exchangeRate { id }', 'xyzExchange']);
+await probe('ExchangeRate', (c) => `{ config { exchangeRate { ${c} } } }`, ['rates', 'xyzRate', 'xyzEur', 'xyzUsd', 'time', 'eurCents', 'usdCents']);
+await sample('lp-classic', MP('lowestPriceAnyCard(rarity: limited, inSeason: false) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }'));
+await sample('lp-inseason-price', MP('lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }'));
+await sample('tp-amounts', MP('tokenPrices(rarity: limited, last: 3) { nodes { date amounts { eurCents usdCents wei referenceCurrency } card { seasonYear } } }'));
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
