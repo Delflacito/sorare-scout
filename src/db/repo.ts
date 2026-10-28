@@ -6,7 +6,13 @@ export type FixtureStatus = 'played' | 'scheduled' | 'postponed';
 export type RunStatus = 'running' | 'ok' | 'error';
 
 export interface CompetitionInput { slug: string; name: string }
-export interface TeamInput { name: string; sorareSlug: string; competitionId: number }
+export interface TeamInput { name: string; sorareSlug: string; competitionId: number; pictureUrl?: string | null; shortName?: string | null }
+export interface PlayerStatusInput {
+  slug: string; pictureUrl: string | null; playingStatus: string | null;
+  injury: { kind: string | null; expectedEnd: string | null } | null;
+  suspension: { reason: string | null; end: string | null } | null;
+  projection: number | null;
+}
 export interface PlayerInput { name: string; sorareSlug: string; position: GenericPosition; teamId: number }
 export interface FixtureInput {
   date: string; competitionId: number; homeTeamId: number; awayTeamId: number;
@@ -65,8 +71,10 @@ function createBaseRepo(sql: Sql) {
 
     async upsertTeam(t: TeamInput): Promise<number> {
       const [r] = await sql`
-        insert into teams (name, sorare_slug, competition_id) values (${t.name}, ${t.sorareSlug}, ${t.competitionId})
-        on conflict (sorare_slug) do update set name = excluded.name, competition_id = excluded.competition_id
+        insert into teams (name, sorare_slug, competition_id, picture_url, short_name)
+        values (${t.name}, ${t.sorareSlug}, ${t.competitionId}, ${t.pictureUrl ?? null}, ${t.shortName ?? null})
+        on conflict (sorare_slug) do update set name = excluded.name, competition_id = excluded.competition_id,
+          picture_url = coalesce(excluded.picture_url, teams.picture_url), short_name = coalesce(excluded.short_name, teams.short_name)
         returning id`;
       return r.id;
     },
@@ -83,6 +91,20 @@ function createBaseRepo(sql: Sql) {
         on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position, team_id = excluded.team_id
         returning id`;
       return r.id;
+    },
+
+    /** Statut actuel des joueurs déjà connus ; renvoie le nombre de joueurs mis à jour. */
+    async updatePlayerStatuses(rows: PlayerStatusInput[]): Promise<number> {
+      let updated = 0;
+      for (const r of rows) {
+        const res = await sql`update players set picture_url = coalesce(${r.pictureUrl}, picture_url), playing_status = ${r.playingStatus},
+          injury_kind = ${r.injury?.kind ?? null}, injury_end = ${r.injury?.expectedEnd ?? null},
+          suspension_reason = ${r.suspension?.reason ?? null}, suspension_end = ${r.suspension?.end ?? null},
+          sorare_projection = ${r.projection}, status_updated_at = now()
+          where sorare_slug = ${r.slug}`;
+        updated += res.count;
+      }
+      return updated;
     },
 
     async upsertFixture(f: FixtureInput): Promise<number> {
