@@ -94,7 +94,7 @@ export function createQueries(sql: postgres.Sql) {
         left join team_conceded_by_position cp
           on cp.team_id = n.opponent_id and cp.detailed_position = s.usual_position and cp.window_size = 5
         where true
-          ${f.q ? sql`and unaccent(p.name) ilike unaccent(${`%${f.q}%`})` : sql``}
+          ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`})` : sql``}
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.position ? sql`and p.position = ${f.position}` : sql``}

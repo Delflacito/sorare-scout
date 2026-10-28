@@ -14,7 +14,8 @@ Conception : `docs/superpowers/specs/2026-10-28-sorare-analyse-joueurs-design.md
 ## Prérequis
 
 - Node.js 22+
-- Une base Postgres (Supabase conseillé) avec l'extension `unaccent`
+- Une base Postgres (Supabase conseillé) avec l'extension `unaccent`. Sur Supabase, utiliser l'adresse du
+  **Transaction pooler** (bouton « Connect », port 6543) comme `DATABASE_URL`.
 - Une clé API Sorare : https://sorare.com/settings/developer (envoyée dans l'en-tête `APIKEY`)
 - Une clé API-Football : https://dashboard.api-football.com
 
