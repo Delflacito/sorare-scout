@@ -10,6 +10,8 @@ export interface FixturesOptions {
   deadline?: number;
   /** Début de période (ISO) : les matchs antérieurs ne sont ni importés ni conservés. */
   since?: string;
+  /** Matchs complétés en parallèle (Sorare répond lentement, mais autorise 200 requêtes / minute). */
+  concurrency?: number;
 }
 
 async function syncLeague(deps: FixturesDeps, league: League, errors: string[], since?: string): Promise<void> {
@@ -93,14 +95,18 @@ export async function importFixtures(deps: FixturesDeps, leagues: League[] = LEA
   }
   const teamsById = new Map((await deps.repo.allTeams()).map((t) => [t.id, t]));
   // Du plus récent au plus ancien : la forme récente est disponible dès le premier import.
-  for (const fixture of await deps.repo.fixturesNeedingLineups()) {
-    if (opts.deadline !== undefined && Date.now() > opts.deadline) break;
-    try {
-      if (await completeFixture(deps, fixture, teamsById)) fixturesImported++;
-    } catch (e) {
-      await deps.repo.countLineupAttempt(fixture.id);
-      errors.push(`match ${fixture.sorareGameId} : ${(e as Error).message}`);
+  const queue = await deps.repo.fixturesNeedingLineups();
+  const worker = async () => {
+    for (let fixture = queue.shift(); fixture; fixture = queue.shift()) {
+      if (opts.deadline !== undefined && Date.now() > opts.deadline) return;
+      try {
+        if (await completeFixture(deps, fixture, teamsById)) fixturesImported++;
+      } catch (e) {
+        await deps.repo.countLineupAttempt(fixture.id);
+        errors.push(`match ${fixture.sorareGameId} : ${(e as Error).message}`);
+      }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: opts.concurrency ?? 1 }, worker));
   return { fixturesImported, errors };
 }

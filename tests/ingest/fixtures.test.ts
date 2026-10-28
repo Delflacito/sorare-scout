@@ -153,4 +153,23 @@ describeDb('importFixtures', () => {
     expect(games.map((g) => g.sorare_game_id)).toEqual(['Game:1', 'Game:3']);
     expect(f.detailCalls).toEqual(['Game:1']);
   });
+
+  it('complète plusieurs matchs en parallèle', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const f = fakeSorare();
+    const sorare = {
+      ...f.sorare,
+      gameDetail: async (id: string) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 20));
+        inFlight--;
+        return f.sorare.gameDetail(id);
+      },
+    } as unknown as SorareClient;
+    const r = await importFixtures({ sorare, repo }, [league], { concurrency: 4 });
+    expect(r.fixturesImported).toBe(2);
+    expect(maxInFlight).toBe(2);
+  });
 });
