@@ -1,0 +1,99 @@
+import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow } from '@/db/repo';
+import { concededByPosition, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
+import type { DetailedPosition } from '@/domain/types';
+
+export const CONCEDED_WINDOWS = [5, 10];
+const USUAL_POSITION_SAMPLE = 10;
+
+const byDateDesc = (a: { date: string }, b: { date: string }) => Date.parse(b.date) - Date.parse(a.date);
+
+function conceded(fixtures: CompletedFixture[], apps: AppearanceRow[]): Conceded[] {
+  const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
+  const rows: Conceded[] = [];
+  const competitions = new Set(fixtures.map((f) => f.competitionId));
+  for (const competitionId of competitions) {
+    const compFixtures = fixtures.filter((f) => f.competitionId === competitionId).sort(byDateDesc);
+    const teamFixtures: Record<string, string[]> = {};
+    for (const f of compFixtures) {
+      for (const t of [f.homeTeamId, f.awayTeamId]) (teamFixtures[String(t)] ??= []).push(String(f.id));
+    }
+    const obs: ConcededObs[] = [];
+    for (const a of apps) {
+      const f = fixtureById.get(a.fixtureId);
+      if (!f || f.competitionId !== competitionId || !a.detailedPosition) continue;
+      obs.push({
+        opponentTeamId: String(a.teamId === f.homeTeamId ? f.awayTeamId : f.homeTeamId),
+        fixtureId: String(f.id), date: f.date, position: a.detailedPosition, score: a.score, started: a.started,
+      });
+    }
+    for (const w of CONCEDED_WINDOWS) rows.push(...concededByPosition(obs, teamFixtures, w));
+  }
+  return rows;
+}
+
+/**
+ * Matchs d'équipe à prendre en compte pour un joueur : pour chaque club, de sa première participation pour ce club
+ * (ou du début de saison pour le premier club) jusqu'à sa première participation pour le club suivant.
+ */
+function playerTeamGames(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>, fixturesByTeam: Map<number, CompletedFixture[]>): TeamGame[] {
+  const stints: { teamId: number; from: number }[] = [];
+  const sorted = [...apps].sort((a, b) => Date.parse(fixtureById.get(a.fixtureId)!.date) - Date.parse(fixtureById.get(b.fixtureId)!.date));
+  for (const a of sorted) {
+    if (stints.at(-1)?.teamId !== a.teamId) stints.push({ teamId: a.teamId, from: Date.parse(fixtureById.get(a.fixtureId)!.date) });
+  }
+  return stints.flatMap((s, i) => {
+    const from = i === 0 ? -Infinity : s.from;
+    const to = stints[i + 1]?.from ?? Infinity;
+    return (fixturesByTeam.get(s.teamId) ?? [])
+      .filter((f) => Date.parse(f.date) >= from && Date.parse(f.date) < to)
+      .map((f) => ({ fixtureId: String(f.id), date: f.date, teamId: String(s.teamId) }));
+  });
+}
+
+function usualPosition(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>): DetailedPosition | null {
+  const recent = apps
+    .filter((a) => a.started && a.detailedPosition)
+    .sort((a, b) => byDateDesc(fixtureById.get(a.fixtureId)!, fixtureById.get(b.fixtureId)!))
+    .slice(0, USUAL_POSITION_SAMPLE);
+  const counts = new Map<DetailedPosition, number>();
+  for (const a of recent) counts.set(a.detailedPosition!, (counts.get(a.detailedPosition!) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerSummaryRow[] {
+  const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
+  const fixturesByTeam = new Map<number, CompletedFixture[]>();
+  for (const f of fixtures) for (const t of [f.homeTeamId, f.awayTeamId]) fixturesByTeam.set(t, [...(fixturesByTeam.get(t) ?? []), f]);
+  const byPlayer = new Map<number, AppearanceRow[]>();
+  for (const a of apps) byPlayer.set(a.playerId, [...(byPlayer.get(a.playerId) ?? []), a]);
+
+  return [...byPlayer.entries()].map(([playerId, playerApps]) => {
+    const games = playerTeamGames(playerApps, fixtureById, fixturesByTeam);
+    const played: PlayerGame[] = playerApps.map((a) => ({
+      fixtureId: String(a.fixtureId), started: a.started, minutes: a.minutes, score: a.score, decisive: a.decisive, allAround: a.allAround,
+    }));
+    const l5 = lastN(games, played, 5);
+    const pt5 = playingTime(games, played, 5);
+    const pt15 = playingTime(games, played, 15);
+    const b5 = scoreBreakdown(games, played, 5);
+    const b15 = scoreBreakdown(games, played, 15);
+    return {
+      playerId, l5: l5.average, l15: lastN(games, played, 15).average, l40: lastN(games, played, 40).average, stdDev5: l5.stdDev,
+      startRate5: pt5.startRate, avgMinutes5: pt5.avgMinutes, startRate15: pt15.startRate, avgMinutes15: pt15.avgMinutes,
+      decisive5: b5.decisive, allAround5: b5.allAround, decisive15: b15.decisive, allAround15: b15.allAround,
+      usualPosition: usualPosition(playerApps, fixtureById),
+    };
+  });
+}
+
+/** Recalcule team_conceded_by_position et player_summary à partir des matchs complets. */
+export async function recomputeAggregates(repo: Repo): Promise<{ conceded: number; players: number }> {
+  const { fixtures, appearances } = await repo.aggregateInputs();
+  const concededRows = conceded(fixtures, appearances);
+  const summaryRows = summaries(fixtures, appearances);
+  await repo.transaction(async (tx) => {
+    await tx.replaceConceded(concededRows);
+    await tx.replacePlayerSummaries(summaryRows);
+  });
+  return { conceded: concededRows.length, players: summaryRows.length };
+}
