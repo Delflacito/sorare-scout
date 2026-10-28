@@ -56,7 +56,7 @@ const SEASON_STATS = 'appearances substituteIn goals assists minutesPlayed yello
 export function playerProfilesQuery(count: number, seasons: number[]): string {
   const vars = Array.from({ length: count }, (_, i) => `$p${i}: String!`).join(', ');
   const players = Array.from({ length: count }, (_, i) => `p${i}: anyPlayer(slug: $p${i}) { ... on Player {
-    slug birthDate country { code name flagUrl } activeClub { slug name pictureUrl }
+    slug firstName lastName height shirtNumber pictureUrl birthDate country { code name flagUrl } activeClub { slug name pictureUrl }
     ${seasons.map((y) => `s${y}: stats(seasonStartYear: ${y}) { ${SEASON_STATS} }`).join('\n    ')}
   } }`).join('\n  ');
   return `query PlayerProfiles(${vars}) {\n  ${players}\n}`;

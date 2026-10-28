@@ -91,7 +91,8 @@ describe('client Sorare', () => {
     expect(f.requests[0].body.variables).toEqual({ p0: 'kylian-mbappe-lottin', p1: 'inconnu' });
     expect(f.requests[0].body.query).toContain('s2024: stats(seasonStartYear: 2024)');
     expect(profiles).toEqual([{
-      slug: 'kylian-mbappe-lottin', birthDate: '1998-12-20', country: { code: 'fr', name: 'France', flagUrl: 'https://flags/FR.png' },
+      slug: 'kylian-mbappe-lottin', birthDate: '1998-12-20',
+      firstName: 'Kylian', lastName: 'Mbappé', height: 178, shirtNumber: 10, bodyPictureUrl: 'https://p/mbappe-trimmed.png', country: { code: 'fr', name: 'France', flagUrl: 'https://flags/FR.png' },
       activeClub: { slug: 'real-madrid-madrid', name: 'Real Madrid', pictureUrl: 'https://t/rm.png' },
       seasons: [
         { startYear: 2026, appearances: 9, substituteIn: 1, goals: 8, assists: 2, minutes: 790, yellowCards: 0, redCards: 0 },

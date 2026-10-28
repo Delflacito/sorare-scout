@@ -35,6 +35,7 @@ export interface AppearanceInput {
 }
 export interface PlayerProfileInput {
   slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null;
+  firstName?: string | null; lastName?: string | null; height?: number | null; shirtNumber?: number | null; bodyPictureUrl?: string | null;
   activeClub?: { slug: string; name: string; pictureUrl: string | null } | null;
   seasons: { startYear: number; appearances: number; substituteIn: number; goals: number; assists: number; minutes: number; yellowCards: number; redCards: number }[];
 }
@@ -288,7 +289,9 @@ function createBaseRepo(sql: Sql) {
     async saveProfiles(profiles: PlayerProfileInput[]): Promise<void> {
       for (const p of profiles) {
         const [player] = await sql`update players set birth_date = ${p.birthDate}, country_code = ${p.country?.code ?? null},
-          country_name = ${p.country?.name ?? null}, country_flag_url = ${p.country?.flagUrl ?? null}, profile_updated_at = now()
+          country_name = ${p.country?.name ?? null}, country_flag_url = ${p.country?.flagUrl ?? null}, profile_updated_at = now(),
+          first_name = ${p.firstName ?? null}, last_name = ${p.lastName ?? null}, height = ${p.height ?? null},
+          shirt_number = ${p.shirtNumber ?? null}, body_picture_url = coalesce(${p.bodyPictureUrl ?? null}, body_picture_url)
           where sorare_slug = ${p.slug} returning id`;
         if (!player) continue;
         // Club actuel hors des championnats suivis : seulement pour un joueur qui n'est plus dans un effectif suivi.

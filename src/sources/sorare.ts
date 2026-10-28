@@ -58,6 +58,9 @@ export interface SorareSeasonStats {
 /** Identité et historique en championnat, saison par saison. */
 export interface SorarePlayerProfile {
   slug: string; birthDate: string | null;
+  firstName: string | null; lastName: string | null; height: number | null; shirtNumber: number | null;
+  /** Photo détourée (en pied) de la carte Sorare. */
+  bodyPictureUrl: string | null;
   country: { code: string; name: string; flagUrl: string | null } | null;
   /** Club actuel (peut être hors des championnats suivis). */
   activeClub: { slug: string; name: string; pictureUrl: string | null } | null;
@@ -186,11 +189,15 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
     async playerProfiles(slugs: string[], seasons: number[]): Promise<SorarePlayerProfile[]> {
       if (!slugs.length) return [];
       type Club = { slug: string; name: string; pictureUrl: string | null };
-      type Raw = { slug: string; birthDate: string | null; country: { code: string; name: string; flagUrl: string | null } | null; activeClub?: Club | null } & Record<string, unknown>;
+      type Raw = {
+        slug: string; birthDate: string | null; firstName?: string | null; lastName?: string | null; height?: number | null;
+        shirtNumber?: number | null; pictureUrl?: string | null; country: { code: string; name: string; flagUrl: string | null } | null; activeClub?: Club | null } & Record<string, unknown>;
       const d = await query<Record<string, Raw | null>>(playerProfilesQuery(slugs.length, seasons), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
       return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
         slug: p.slug,
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : null,
+        firstName: p.firstName ?? null, lastName: p.lastName ?? null, height: p.height || null, shirtNumber: p.shirtNumber ?? null,
+        bodyPictureUrl: p.pictureUrl ?? null,
         country: p.country ? { code: p.country.code, name: p.country.name, flagUrl: p.country.flagUrl ?? null } : null,
         activeClub: p.activeClub ? { slug: p.activeClub.slug, name: p.activeClub.name, pictureUrl: p.activeClub.pictureUrl ?? null } : null,
         seasons: seasons

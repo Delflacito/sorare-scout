@@ -79,6 +79,9 @@ export interface PlayerDetail {
   sorareProjection: number | null;
   birthDate: string | null;
   country: { code: string; name: string; flagUrl: string | null } | null;
+  firstName: string | null; lastName: string | null; height: number | null; shirtNumber: number | null;
+  /** Photo détourée de la carte Sorare (à défaut, la photo carrée). */
+  bodyPictureUrl: string | null;
 }
 
 /** Statistiques de championnat d'une saison (Sorare). */
@@ -101,6 +104,8 @@ export interface PlayerGameView {
   /** Compétition du match ; isLeague = false pour une coupe ou un match de sélection. */
   competition: string; isLeague: boolean;
   actions: Record<string, number>;
+  /** Équipe du joueur pour ce match (club ou sélection). */
+  team: string; teamShortName: string | null; teamPictureUrl: string | null;
 }
 
 export interface TeamView { id: number; name: string; slug: string; competition: string | null }
@@ -289,6 +294,7 @@ export function createQueries(sql: postgres.Sql) {
           p.picture_url, t.picture_url as team_picture_url, t.short_name as team_short_name, p.playing_status,
           p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
           p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
+          p.first_name, p.last_name, p.height, p.shirt_number, p.body_picture_url,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
@@ -327,6 +333,7 @@ export function createQueries(sql: postgres.Sql) {
         sorareProjection: r.sorare_projection,
         birthDate: r.birth_date,
         country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
+        firstName: r.first_name, lastName: r.last_name, height: r.height, shirtNumber: r.shirt_number, bodyPictureUrl: r.body_picture_url,
       };
     },
 
@@ -374,8 +381,10 @@ export function createQueries(sql: postgres.Sql) {
             and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
         )
         select g.*, o.name as opponent, o.sorare_slug as opponent_slug, o.picture_url as opponent_picture_url,
-          o.short_name as opponent_short_name, c.name as competition, c.is_league from games g
+          o.short_name as opponent_short_name, c.name as competition, c.is_league,
+          tm.name as team, tm.short_name as team_short_name, tm.picture_url as team_picture_url from games g
         join competitions c on c.id = g.competition_id
+        join teams tm on tm.id = g.team_id
         join teams o on o.id = case when g.home_team_id = g.team_id then g.away_team_id else g.home_team_id end
         order by g.date desc limit ${limit}`;
       return rows.map((g) => ({
@@ -388,6 +397,7 @@ export function createQueries(sql: postgres.Sql) {
         status: g.started ? 'started' : g.minutes > 0 ? 'sub' : 'absent',
         position: g.detailed_position, decisive: g.decisive_score ?? 0, allAround: g.all_around_score ?? 0,
         competition: g.competition, isLeague: g.is_league, actions: g.decisive_actions ?? {},
+        team: g.team, teamShortName: g.team_short_name, teamPictureUrl: g.team_picture_url,
       }));
     },
 
