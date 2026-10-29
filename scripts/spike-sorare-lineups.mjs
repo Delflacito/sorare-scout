@@ -35,11 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Offres en cours d'un joueur (prix plancher quand lowestPriceAnyCard renvoie une carte sans offre).
-await probe('tokens', (c) => `{ tokens { ${c} } }`, ['xyzOffers', 'liveSingleSaleOffers { xyz }', 'xyzLive', 'xyzSingle']);
-await probe('Player (offres)', (c) => `{ anyPlayer(slug: "oussama-targhalline") { ... on Player { ${c} } } }`, [
-  'xyzOffers', 'liveSingleSaleOffers', 'xyzLive', 'xyzSale', 'onSale', 'xyzListing', 'cards(rarities: [limited]) { nodes { slug } }', 'xyzCards',
-]);
+// tokens.offers : arguments et champs.
+for (const [k, q] of Object.entries({
+  noargs: '{ tokens { offers { nodes { id } } } }',
+  xyzarg: '{ tokens { offers(xyzArg: 1) { nodes { id } } } }',
+  player: '{ tokens { offers(playerSlug: "oussama-targhalline") { nodes { id } } } }',
+  players: '{ tokens { offers(playerSlugs: ["oussama-targhalline"]) { nodes { id } } } }',
+  sport: '{ tokens { offers(sport: FOOTBALL, first: 2) { nodes { id } } } }',
+  xyzfield: '{ tokens { offers(first: 1) { nodes { xyzPrice } } } }',
+})) await sample(k, q);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
