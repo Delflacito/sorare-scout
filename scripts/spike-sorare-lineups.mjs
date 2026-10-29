@@ -35,25 +35,13 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Requêtes réelles par lot (champ racine players) : profils et marché, 20 joueurs.
-const roster = await gql('{ football { club(slug: "psg-paris") { activePlayers(first: 20) { nodes { slug } } } } }');
-const slugs = (roster.data?.football?.club?.activePlayers?.nodes ?? []).map((n) => n.slug);
-const SEASON_STATS = 'appearances substituteIn goals assists minutesPlayed yellowCards redCards';
-const PRICE = 'seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei } } }';
-async function run(name, q) {
-  const t = Date.now();
-  const res = await fetch('https://api.sorare.com/graphql', { method: 'POST', headers: { 'content-type': 'application/json', APIKEY: KEY },
-    body: JSON.stringify({ query: q, variables: { slugs } }) });
-  const j = await res.json();
-  out.samples[name] = { ms: Date.now() - t, n: j.data?.players?.length, errors: j.errors?.map((e) => e.message).slice(0, 3), first: JSON.stringify(j.data?.players?.[0] ?? null).slice(0, 600) };
-}
-await run('profiles20', `query P($slugs: [String!]!) { players(slugs: $slugs) { ... on Player { slug firstName lastName height shirtNumber pictureUrl birthDate country { code name flagUrl } activeClub { slug name pictureUrl } s2026: stats(seasonStartYear: 2026) { ${SEASON_STATS} } s2025: stats(seasonStartYear: 2025) { ${SEASON_STATS} } } } }`);
-await run('floors20', `query M($slugs: [String!]!) { players(slugs: $slugs) { ... on Player { slug inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PRICE} } anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PRICE} } } } }`);
-{
-  const t = Date.now();
-  const r = await gql(`{ anyPlayer(slug: "${slugs[0]}") { ... on Player { tokenPrices(rarity: limited, last: 30) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } } } } }`);
-  out.samples.sales1 = { ms: Date.now() - t - 350, n: r.data?.anyPlayer?.tokenPrices?.nodes?.length, errors: r.errors?.map((e) => e.message) };
-}
+// Tiers des joueurs (classement Sorare utilisé pour les compétitions / le marché).
+await probe('Player (tier)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`, [
+  'tier', 'playerTier', 'xyzTier', 'cardTier', 'tiers', 'seasonTier', 'currentTier', 'xyzRank', 'ranking', 'xyzLevel', 'xyzGrade', 'grade', 'xyzStar',
+]);
+await probe('Card (tier)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { ${c} } } } }`, [
+  'tier', 'xyzTier', 'playerTier', 'xyzGrade', 'grade', 'xyzLevel', 'level',
+]);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
