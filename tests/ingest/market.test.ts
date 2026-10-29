@@ -14,8 +14,9 @@ function inputs(): MarketInputRow[] {
     const l15 = 30 + (i % 40);
     const price = 2 * Math.exp(0.05 * l15) * (1 + ((i * 7) % 5 - 2) / 100);
     return {
-      playerId: i, floorInSeason: price, l15, l5: l15, startRate: 0.9, birthDate: '2000-01-01', league: 'ligue-1-fr',
-      position: 'Forward', nextProjected: l15,
+      playerId: i, floorInSeason: price, l15, l5: l15, allAround: 30, startRate: 0.9, minutes: 80, birthDate: '2000-01-01',
+      league: 'ligue-1-fr', position: 'Forward', nextProjected: l15, teamId: i % 5, clubPpg: 1.5, prevGoalsAssists: 4,
+      international: false, status: 'STARTER',
       sales: [daysAgo(1), daysAgo(2), daysAgo(3)].map((date) => ({ date, eur: price })),
     };
   });
@@ -34,6 +35,17 @@ describe('computeMarket', () => {
     const typical = out.find((r) => r.playerId === 10)!;
     expect(typical.valueRatio).toBeCloseTo(1, 1);
     expect(typical.potentialGain).toBeCloseTo(0, 5); // score attendu = son niveau
+  });
+
+  it('calibré sur les planchers : les ventes gonflées des joueurs sans offre ne faussent pas la valeur estimée', () => {
+    const rows = inputs();
+    for (const i of [1, 2, 3, 4, 5, 6]) {
+      rows[i] = { ...rows[i], floorInSeason: null, sales: rows[i].sales.map((s) => ({ ...s, eur: s.eur * 3 })) };
+    }
+    const out = computeMarket(rows, NOW);
+    expect(out.find((r) => r.playerId === 10)!.valueRatio).toBeCloseTo(1, 1);
+    const noFloor = out.find((r) => r.playerId === 1)!;
+    expect(noFloor).toMatchObject({ fairPrice: null, valueRatio: null, potentialPrice: null, potentialGain: null });
   });
 
   it('joueur sans prix ignoré ; trop peu de joueurs cotés : pas de valeur estimée', () => {

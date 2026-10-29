@@ -1,14 +1,22 @@
 import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, type MarketRow } from '@/domain/market';
 
-/** Marché synthétique : prix = 2 € × e^(0,05 × L15) × (×1,5 en Eredivisie), avec un léger bruit déterministe. */
+const profile = {
+  allAround: 30, startRate: 0.8, minutes: 70, teamId: null, clubPpg: 1.5, prevGoalsAssists: 5, international: false, status: 'STARTER',
+} as const;
+
+/**
+ * Marché synthétique : prix = 2 € × e^(0,05 × L15) × (×1,5 en Eredivisie) × (×2 pour le club 7), avec un léger bruit
+ * déterministe ; les joueurs du club 7 ont le même profil que les autres.
+ */
 function market(n = 80): MarketRow[] {
   return Array.from({ length: n }, (_, i) => {
     const l15 = 30 + (i % 40);
     const league = i % 2 ? 'eredivisie' : 'ligue-1-fr';
     const noise = 1 + ((i * 7) % 5 - 2) / 100;
+    const teamId = i % 5 === 0 ? 7 : i % 5;
     return {
-      playerId: i, l15, l5: l15, startRate: 0.8, age: 24 + (i % 8), league, position: i % 3 ? 'Midfielder' : 'Forward',
-      price: 2 * Math.exp(0.05 * l15) * (league === 'eredivisie' ? 1.5 : 1) * noise,
+      ...profile, playerId: i, l15, l5: l15, age: 24 + (i % 8), league, position: i % 3 ? 'Midfielder' : 'Forward', teamId,
+      price: 2 * Math.exp(0.05 * l15) * (league === 'eredivisie' ? 1.5 : 1) * (teamId === 7 ? 2 : 1) * noise,
     };
   });
 }
@@ -16,9 +24,18 @@ function market(n = 80): MarketRow[] {
 describe('valeur estimée des cartes', () => {
   it('retrouve la relation prix / performance du marché', () => {
     const m = fitPriceModel(market())!;
-    const row = { l15: 60, l5: 60, startRate: 0.8, age: 27, league: 'ligue-1-fr', position: 'Midfielder' as const };
+    const row = { ...profile, teamId: 1, l15: 60, l5: 60, age: 27, league: 'ligue-1-fr', position: 'Midfielder' as const };
     expect(fairPrice(m, row)).toBeCloseTo(2 * Math.exp(3), -0.5);
     expect(fairPrice(m, { ...row, league: 'eredivisie' }) / fairPrice(m, row)).toBeCloseTo(1.5, 1);
+  });
+
+  it('prime du club : à profil égal, le marché paie plus cher les joueurs du club 7', () => {
+    const m = fitPriceModel(market())!;
+    const row = { ...profile, l15: 60, l5: 60, age: 27, league: 'ligue-1-fr', position: 'Midfielder' as const };
+    const ratio = fairPrice(m, { ...row, teamId: 7 }) / fairPrice(m, { ...row, teamId: 1 });
+    expect(ratio).toBeGreaterThan(1.6); // ×2 réel, rétréci (16 joueurs)
+    expect(ratio).toBeLessThan(2.1);
+    expect(fairPrice(m, { ...row, teamId: 99 })).toBeCloseTo(fairPrice(m, { ...row, teamId: null })); // club inconnu : pas de prime
   });
 
   it('trop peu de joueurs cotés : pas de modèle', () => {
@@ -27,7 +44,7 @@ describe('valeur estimée des cartes', () => {
 
   it('prix potentiel : monte si le score attendu dépasse son niveau, baisse sinon', () => {
     const m = fitPriceModel(market())!;
-    const r: MarketRow = { playerId: 1, price: 40, l15: 55, l5: 55, startRate: 1, age: 25, league: 'ligue-1-fr', position: 'Forward' };
+    const r: MarketRow = { ...profile, playerId: 1, price: 40, l15: 55, l5: 55, age: 25, league: 'ligue-1-fr', position: 'Forward' };
     expect(potentialPrice(m, r, 80)).toBeGreaterThan(40);
     expect(potentialPrice(m, r, 30)).toBeLessThan(40);
     expect(potentialPrice(m, r, 55)).toBeCloseTo(40, 5);

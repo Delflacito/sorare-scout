@@ -48,16 +48,20 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
     return { r, recentPrice, referencePrice: r.floorInSeason ?? recentPrice };
   }).filter((x): x is typeof x & { referencePrice: number } => x.referencePrice !== null && x.referencePrice > 0);
 
-  const toRow = (x: (typeof priced)[number]): MarketRow => ({
-    playerId: x.r.playerId, price: x.referencePrice, l15: x.r.l15, l5: x.r.l5, startRate: x.r.startRate,
-    age: x.r.birthDate ? ageAt(x.r.birthDate, new Date(now)) : null, league: x.r.league, position: x.r.position,
+  const toRow = ({ r, referencePrice }: (typeof priced)[number]): MarketRow => ({
+    playerId: r.playerId, price: referencePrice, l15: r.l15, l5: r.l5, allAround: r.allAround, startRate: r.startRate, minutes: r.minutes,
+    age: r.birthDate ? ageAt(r.birthDate, new Date(now)) : null, league: r.league, position: r.position, teamId: r.teamId,
+    clubPpg: r.clubPpg, prevGoalsAssists: r.prevGoalsAssists, international: r.international, status: r.status,
   });
-  // Ajusté sur les joueurs réellement échangés (au moins 3 ventes en 4 semaines) : leur prix reflète le marché.
-  const model = fitPriceModel(priced.filter((x) => x.r.sales.length >= 3).map(toRow));
+  // Ajusté sur les joueurs réellement échangés (au moins 3 ventes en 4 semaines) ayant une offre en vente : les ventes
+  // mêlent ventes primaires de Sorare (prix fixes, souvent 2 à 3 fois le plancher) et reventes, le plancher est plus fiable.
+  const model = fitPriceModel(priced.filter((x) => x.r.floorInSeason !== null && x.r.sales.length >= 3).map(toRow));
   return priced.map((x) => {
     const row = toRow(x);
-    const fair = model ? fairPrice(model, row) : null;
-    const potential = model && x.r.nextProjected !== null ? potentialPrice(model, row, x.r.nextProjected) : null;
+    // Sans offre, le prix vient des ventes (gonflées par les ventes primaires) : pas comparable au modèle.
+    const comparable = model && x.r.floorInSeason !== null ? model : null;
+    const fair = comparable ? fairPrice(comparable, row) : null;
+    const potential = comparable && x.r.nextProjected !== null ? potentialPrice(comparable, row, x.r.nextProjected) : null;
     return {
       playerId: x.r.playerId, referencePrice: x.referencePrice, recentPrice: x.recentPrice, priceTrend7: priceTrend(x.r.sales, now),
       sales30: x.r.sales.length, fairPrice: fair, valueRatio: fair ? x.referencePrice / fair : null,

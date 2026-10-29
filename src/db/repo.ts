@@ -45,8 +45,9 @@ export interface PlayerMarketInput {
 }
 /** Joueur coté : ce qui entre dans la valeur estimée et le potentiel. */
 export interface MarketInputRow {
-  playerId: number; floorInSeason: number | null; l15: number; l5: number; startRate: number; birthDate: string | null;
-  league: string; position: GenericPosition; nextProjected: number | null;
+  playerId: number; floorInSeason: number | null; l15: number; l5: number; allAround: number; startRate: number; minutes: number;
+  birthDate: string | null; league: string; position: GenericPosition; nextProjected: number | null;
+  teamId: number; clubPpg: number | null; prevGoalsAssists: number; international: boolean; status: string | null;
   /** Ventes de cartes de la saison des 28 derniers jours. */
   sales: { date: string; eur: number }[];
 }
@@ -410,16 +411,26 @@ function createBaseRepo(sql: Sql) {
 
     async marketInputs(): Promise<MarketInputRow[]> {
       const rows = await sql`
-        select p.id, p.floor_in_season, s.l15, s.l5, s.start_rate5, p.birth_date::text as birth_date, c.slug as league, p.position,
-          s.next_projected,
+        with club as (
+          select v.team_id, avg(case v.result when 1 then 3 when 0 then 1 else 0 end)::float8 ppg
+          from fixtures f, lateral (values (f.home_team_id, sign(f.home_goals - f.away_goals)), (f.away_team_id, sign(f.away_goals - f.home_goals))) v(team_id, result)
+          where f.status = 'played' group by 1
+        )
+        select p.id, p.floor_in_season, s.l15, s.l5, s.all_around15, s.start_rate15, s.avg_minutes15, p.birth_date::text as birth_date,
+          c.slug as league, p.position, s.next_projected, p.team_id, club.ppg, coalesce(ps.goals + ps.assists, 0) as prev_ga,
+          p.national_team_id is not null as international, p.playing_status,
           coalesce((select json_agg(json_build_object('date', cs.sold_at, 'eur', cs.price_eur)) from card_sales cs
             where cs.player_id = p.id and cs.in_season and cs.sold_at > now() - interval '28 days'), '[]') as sales
         from players p join player_summary s on s.player_id = p.id
         join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
+        left join club on club.team_id = p.team_id
+        left join player_seasons ps on ps.player_id = p.id and ps.start_year = (select max(start_year) - 1 from player_seasons)
         where p.market_updated_at is not null`;
       return rows.map((r) => ({
-        playerId: r.id, floorInSeason: r.floor_in_season, l15: r.l15, l5: r.l5, startRate: r.start_rate5, birthDate: r.birth_date,
-        league: r.league, position: r.position, nextProjected: r.next_projected,
+        playerId: r.id, floorInSeason: r.floor_in_season, l15: r.l15, l5: r.l5, allAround: r.all_around15, startRate: r.start_rate15,
+        minutes: r.avg_minutes15, birthDate: r.birth_date, league: r.league, position: r.position, nextProjected: r.next_projected,
+        teamId: r.team_id, clubPpg: r.ppg, prevGoalsAssists: r.prev_ga, international: r.international,
+        status: r.playing_status,
         sales: (r.sales as { date: string; eur: number }[]).map((x) => ({ date: new Date(x.date).toISOString(), eur: x.eur })),
       }));
     },
