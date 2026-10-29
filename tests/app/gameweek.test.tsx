@@ -36,18 +36,36 @@ describe('/game-week', () => {
     getGameWeekPlayers.mockReset().mockResolvedValue([player('nuno', 'Defender', 72.4), player('doue', 'Forward', 81)]);
   });
 
-  it('un tableau par poste, score potentiel et match', async () => {
+  it('une liste par poste, score potentiel et match', async () => {
     render(await GameWeek(params()));
     expect(screen.getByText(/1 match/)).toBeInTheDocument();
-    const def = screen.getByRole('table', { name: 'Défenseurs' });
-    const row = within(def).getAllByRole('row')[1];
+    const def = screen.getByRole('list', { name: 'Défenseurs' });
+    const row = within(def).getAllByRole('listitem')[0];
     expect(within(row).getByRole('link', { name: 'nuno' })).toHaveAttribute('href', '/joueurs/nuno');
     expect(within(row).getByText('72.4')).toBeInTheDocument();
     expect(within(row).getByText('Olympique de Marseille')).toBeInTheDocument();
-    expect(within(screen.getByRole('table', { name: 'Attaquants' })).getByText('81.0')).toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: 'Gardiens' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Attaquants' })).getByText('81.0')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Gardiens' })).not.toBeInTheDocument();
     expect(within(row).getByText(/\+12\.4/)).toHaveClass('hot');
     expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, startersOnly: true, limit: 10, sort: 'projected' });
+  });
+
+  it('équipe type : le meilleur de chaque poste, plus un extra de champ', async () => {
+    getGameWeekPlayers.mockResolvedValue([
+      player('gk', 'Goalkeeper', 50), player('d1', 'Defender', 60), player('d2', 'Defender', 70),
+      player('m1', 'Midfielder', 55), player('f1', 'Forward', 80),
+    ]);
+    render(await GameWeek(params()));
+    const team = screen.getByRole('region', { name: 'Équipe type de la journée' });
+    expect(within(team).getAllByRole('link').map((l) => l.textContent)).toEqual(['gk', 'd2', 'm1', 'f1', 'd1']);
+    expect(within(team).getByText('315')).toBeInTheDocument();
+  });
+
+  it('championnats en pastilles, remplaçants en bascule', async () => {
+    render(await GameWeek(params({ competition: 'ligue-1-fr' })));
+    expect(screen.getByRole('link', { name: 'Ligue 1' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Toutes les ligues' })).toHaveAttribute('href', '/game-week');
+    expect(screen.getByRole('link', { name: /Inclure les remplaçants/ })).toHaveAttribute('href', '/game-week?competition=ligue-1-fr&tous=1');
   });
 
   it('onglet « Plus gros boosts » : classement par gain sur le niveau habituel', async () => {

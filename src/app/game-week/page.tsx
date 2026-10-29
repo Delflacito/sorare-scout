@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries';
-import { POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
+import { GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
+import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
@@ -20,57 +21,99 @@ function Boost({ p }: { p: GameWeekPlayer }) {
   const pct = p.base ? Math.round((diff / p.base) * 100) : 0;
   const sign = diff >= 0 ? '+' : '−';
   return (
-    <td className={`num ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`}>
-      {sign}{fmtScore(Math.abs(diff))} <span className="muted small">({sign}{Math.abs(pct)} %)</span>
-    </td>
+    <span className={`gw-boost ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`} title="Écart avec le niveau habituel (L15)">
+      {sign}{fmtScore(Math.abs(diff))} <span className="small">({sign}{Math.abs(pct)} %)</span>
+    </span>
   );
 }
 
-function PlayersTable({ title, players }: { title: string; players: GameWeekPlayer[] }) {
+function MatchLine({ p }: { p: GameWeekPlayer }) {
   return (
-    <section>
-      <h2>{title}</h2>
-      {players.length === 0 ? <p className="empty">Aucun joueur à ce poste pour ces filtres</p> : (
-        <div className="table-wrap">
-          <table aria-label={title}>
-            <thead>
-              <tr><th scope="col">#</th><th scope="col">Joueur</th><th scope="col">Match</th><th scope="col">Carte</th><th scope="col"><abbr title="Score attendu au prochain match, selon l’adversaire">Potentiel</abbr></th><th scope="col"><abbr title="Moyenne des 15 derniers matchs">Habitude (L15)</abbr></th><th scope="col">vs habitude</th><th scope="col"><abbr title="Part des matchs commencés comme titulaire">% titu</abbr></th><th scope="col"><abbr title="Projection officielle de Sorare pour le prochain match">Proj. Sorare</abbr></th></tr>
-            </thead>
-            <tbody>
-              {players.map((p, i) => (
-                <tr key={p.slug}>
-                  <td className="rank">{i + 1}</td>
-                  <td>
-                    <span className="player-cell">
-                      <PlayerAvatar name={p.name} url={p.pictureUrl} size={32} />
-                      <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
-                      <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
-                      <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />
-                    </span>
-                  </td>
-                  <td>
-                    <span className="club-link">
-                      <Venue isHome={p.isHome} />
-                      <ClubLogo name={p.opponent} url={p.opponentPictureUrl} />
-                      {p.opponent}
-                    </span>
-                    <div className="muted small">{fmtDate(p.date)}</div>
-                  </td>
-                  <td>
-                    {cardLabel(p.cardPositions)}
-                    {p.usualPosition && <span className="muted small" title="Poste occupé sur le terrain"> · {POSITION_LABEL_FR[p.usualPosition]}</span>}
-                  </td>
-                  <td className="num strong">{fmtScore(p.projected)}</td>
-                  <td className="num">{fmtScore(p.base)}</td>
-                  <Boost p={p} />
-                  <td className="num">{fmtPct(p.startRate)}</td>
-                  <td className="num">{p.sorareProjection === null ? '—' : Math.round(p.sorareProjection)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <span className="gw-match">
+      <Venue isHome={p.isHome} />
+      <ClubLogo name={p.opponent} url={p.opponentPictureUrl} size={16} />
+      <span className="gw-opp">{p.opponent}</span>
+    </span>
+  );
+}
+
+function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
+  return (
+    <li className="gw-row">
+      <span className="gw-rank" aria-label={`Rang ${rank}`}>{rank}</span>
+      <PlayerAvatar name={p.name} url={p.pictureUrl} size={40} />
+      <div className="gw-who">
+        <div className="gw-name">
+          <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
+          <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
+          <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />
         </div>
-      )}
+        <MatchLine p={p} />
+        <div className="gw-meta">
+          <span>{fmtDate(p.date)}</span>
+          {p.cardPositions.length > 1 && <span title="Postes de la carte">{cardLabel(p.cardPositions)}</span>}
+          {p.usualPosition && <span title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
+          <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(p.base)}</span>
+          <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(p.startRate)}</span>
+          {p.sorareProjection !== null && <span><abbr title="Projection officielle de Sorare">Sorare</abbr> {Math.round(p.sorareProjection)}</span>}
+        </div>
+      </div>
+      <div className="gw-score">
+        <ScorePill score={p.projected} precise title="Score potentiel" />
+        <Boost p={p} />
+      </div>
+    </li>
+  );
+}
+
+function PositionCard({ title, players }: { title: string; players: GameWeekPlayer[] }) {
+  return (
+    <section className="card gw-section" aria-labelledby={`gw-${title}`}>
+      <h2 className="card-title" id={`gw-${title}`}>{title}<span>{players.length} joueur{players.length > 1 ? 's' : ''}</span></h2>
+      {players.length === 0
+        ? <p className="empty">Aucun joueur à ce poste pour ces filtres</p>
+        : <ol className="gw-list" aria-label={title}>{players.map((p, i) => <PlayerRow key={p.slug} p={p} rank={i + 1} />)}</ol>}
+    </section>
+  );
+}
+
+/** Équipe de 5 façon Sorare : le premier de chaque poste, plus le meilleur joueur de champ restant en « extra ». */
+function lineup(all: GameWeekPlayer[], sort: GameWeekSort): { slot: string; p: GameWeekPlayer }[] {
+  const metric = (x: GameWeekPlayer) => (sort === 'boost' ? x.projected - x.base : x.projected);
+  const players = [...all].sort((x, y) => metric(y) - metric(x));
+  const used = new Set<string>();
+  const pick = (pos: GenericPosition) => players.find((x) => x.position === pos && !used.has(x.slug));
+  const team: { slot: string; p: GameWeekPlayer }[] = [];
+  for (const [pos] of SECTIONS) {
+    const p = pick(pos);
+    if (p) { used.add(p.slug); team.push({ slot: GENERIC_LABEL_FR[pos], p }); }
+  }
+  const extra = players.filter((x) => x.position !== 'Goalkeeper' && !used.has(x.slug))[0];
+  if (extra) team.push({ slot: 'Extra', p: extra });
+  return team;
+}
+
+function Lineup({ players, sort }: { players: GameWeekPlayer[]; sort: GameWeekSort }) {
+  const team = lineup(players, sort);
+  if (!team.length) return null;
+  const total = team.reduce((t, x) => t + x.p.projected, 0);
+  return (
+    <section className="gw-lineup" aria-labelledby="gw-lineup-title">
+      <div className="gw-lineup-head">
+        <h2 id="gw-lineup-title">{sort === 'boost' ? 'Le 5 des plus gros boosts' : 'Équipe type de la journée'}</h2>
+        <span className="gw-total">Total potentiel <strong>{Math.round(total)}</strong></span>
+      </div>
+      <ul className="gw-lineup-grid">
+        {team.map(({ slot, p }) => (
+          <li key={p.slug} className="gw-slot">
+            <span className="gw-slot-pos">{slot}</span>
+            <PlayerAvatar name={p.name} url={p.pictureUrl} size={56} />
+            <Link href={`/joueurs/${p.slug}`} className="gw-slot-name">{p.name}</Link>
+            <span className="gw-slot-match"><Venue isHome={p.isHome} /> {p.opponent}</span>
+            <ScorePill score={p.projected} size="lg" />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -80,8 +123,11 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const competition = one(p.competition);
   const startersOnly = one(p.tous) !== '1';
   const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
-  const tabHref = (vue?: string) => {
-    const qs = new URLSearchParams(Object.entries({ competition, tous: startersOnly ? undefined : '1', vue }).filter(([, v]) => v) as [string, string][]);
+  const href = (o: { competition?: string; tous?: boolean; vue?: GameWeekSort }) => {
+    const next = { competition, tous: !startersOnly, vue: sort, ...o };
+    const qs = new URLSearchParams(Object.entries({
+      competition: next.competition, tous: next.tous ? '1' : undefined, vue: next.vue === 'boost' ? 'boost' : undefined,
+    }).filter(([, v]) => v) as [string, string][]);
     return `/game-week${qs.size ? `?${qs}` : ''}`;
   };
   const queries = getQueries();
@@ -89,35 +135,49 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, startersOnly, limit: PER_POSITION, sort });
 
   return (
-    <main>
-      <h1>Ma Game Week</h1>
-      <p className="subtitle">{fixtures.length ? roundLabel(fixtures) : 'Aucun match programmé'}</p>
-      <form className="filters" method="get">
-        <select name="competition" defaultValue={competition ?? ''} aria-label="Compétition">
-          <option value="">Toutes les ligues</option>
-          {competitions.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-        </select>
-        <label className="check">
-          <input type="checkbox" name="tous" value="1" defaultChecked={!startersOnly} /> Inclure les remplaçants
-        </label>
-        {sort === 'boost' && <input type="hidden" name="vue" value="boost" />}
-        <button type="submit">Appliquer</button>
-      </form>
-      <nav className="tabs" aria-label="Classement">
-        <Link href={tabHref()} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
-        <Link href={tabHref('boost')} aria-current={sort === 'boost' ? 'page' : undefined}>Plus gros boosts</Link>
-      </nav>
-      <p className="note">
-        {sort === 'boost'
-          ? 'Joueurs dont le match s’annonce nettement au-dessus de leur niveau habituel (score potentiel − L15), poste par poste. '
-          : 'Meilleurs scores potentiels de la prochaine journée, poste par poste. '}
-        Blessés et suspendus exclus
-        {startersOnly && ', ainsi que les joueurs titulaires moins de 3 fois sur leurs 5 derniers matchs'}.{' '}
-        <Link href={competition ? `/journee?competition=${competition}` : '/journee'}>Voir les adversaires poste par poste →</Link>
-      </p>
-      {fixtures.length > 0 && SECTIONS.map(([pos, title]) => (
-        <PlayersTable key={pos} title={title} players={players.filter((x) => x.position === pos)} />
-      ))}
+    <main className="gw">
+      <div className="gw-head">
+        <div>
+          <h1>Ma Game Week</h1>
+          <p className="subtitle">{fixtures.length ? roundLabel(fixtures) : 'Aucun match programmé'}</p>
+        </div>
+        <Link href={competition ? `/journee?competition=${competition}` : '/journee'} className="gw-head-link">Adversaires poste par poste →</Link>
+      </div>
+
+      <div className="gw-toolbar">
+        <nav className="chip-row" aria-label="Championnat">
+          <Link href={href({ competition: undefined })} aria-current={competition ? undefined : 'page'}>Toutes les ligues</Link>
+          {competitions.map((c) => (
+            <Link key={c.slug} href={href({ competition: c.slug })} aria-current={competition === c.slug ? 'page' : undefined}>{c.name}</Link>
+          ))}
+        </nav>
+        <div className="gw-controls">
+          <nav className="segmented" aria-label="Classement">
+            <Link href={href({ vue: 'projected' })} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
+            <Link href={href({ vue: 'boost' })} aria-current={sort === 'boost' ? 'page' : undefined}>Plus gros boosts</Link>
+          </nav>
+          <Link href={href({ tous: startersOnly })} className="toggle-link" aria-current={startersOnly ? undefined : 'true'}>
+            <span className="toggle-box" aria-hidden="true">{startersOnly ? '' : '✓'}</span>Inclure les remplaçants
+          </Link>
+        </div>
+        <p className="note">
+          {sort === 'boost'
+            ? 'Matchs qui s’annoncent nettement au-dessus du niveau habituel (score potentiel − L15). '
+            : 'Score potentiel : ce que chaque joueur devrait marquer selon son niveau, l’adversaire et le lieu. '}
+          Blessés et suspendus exclus{startersOnly && ', ainsi que les joueurs titulaires moins de 3 fois sur leurs 5 derniers matchs'}.
+        </p>
+      </div>
+
+      {fixtures.length > 0 && (
+        <>
+          <Lineup players={players} sort={sort} />
+          <div className="gw-grid">
+            {SECTIONS.map(([pos, title]) => (
+              <PositionCard key={pos} title={title} players={players.filter((x) => x.position === pos)} />
+            ))}
+          </div>
+        </>
+      )}
     </main>
   );
 }
