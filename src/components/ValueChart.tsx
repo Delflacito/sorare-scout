@@ -40,7 +40,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
   if (series.season.length < 2 && series.classic.length < 2) return null;
   const points = series[cards];
   const season = cards === 'season';
-  const label = season ? 'Valeur estimée' : 'Valeur (prix de vente)';
+  const label = 'Valeur (prix de vente)';
   const toggle = (
     <div className="segmented" role="radiogroup" aria-label="Cartes">
       {([['season', `Saison ${yy}`], ['classic', 'Classic']] as const).map(([v, text]) => (
@@ -119,7 +119,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
       <p className="note">
         Reconstituée d’après les ventes de cartes {season ? `de la saison ${yy}` : 'Classic'} : chaque jour, chaque joueur compte
         pour sa vente moyenne du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 3 derniers
-        jours (le jour même compte le plus){season ? ', ramenée à la valeur estimée d’aujourd’hui' : ' ; pas de valeur estimée pour les Classic : somme des prix de vente'}.
+        jours (le jour même compte le plus). Seules les ventes réelles comptent : la valeur estimée n’intervient pas.
       </p>
     </figure>
   );

@@ -72,33 +72,28 @@ describe('valueHistory', () => {
       sale('a', '2026-10-01', 10), sale('b', '2026-10-01', 30),
       sale('a', '2026-10-03', 20), // b non vendu : garde 30
       sale('b', '2026-10-04', 40), // a non vendu : garde 20
-    ], 60, 1);
+    ], 1);
     expect(h.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
-    // Sommes 40, 40, 50, 60 ; le dernier jour vaut la valeur estimée actuelle (60)
-    expect(h.map((p) => Math.round(p.value))).toEqual([40, 40, 50, 60]);
+    expect(h.map((p) => p.value)).toEqual([40, 40, 50, 60]);
     expect(h.map((p) => p.players)).toEqual([2, 0, 1, 1]);
   });
   it('joueur pas encore vendu : compté à sa première vente connue (son arrivée ne fait pas monter la courbe)', () => {
-    const h = valueHistory([sale('a', '2026-10-01', 10), sale('a', '2026-10-02', 10), sale('b', '2026-10-02', 50)], 60, 1);
-    expect(h.map((p) => Math.round(p.value))).toEqual([60, 60]);
+    const h = valueHistory([sale('a', '2026-10-01', 10), sale('a', '2026-10-02', 10), sale('b', '2026-10-02', 50)], 1);
+    expect(h.map((p) => p.value)).toEqual([60, 60]);
   });
-  it('moyenne pondérée des 3 derniers jours (3, 2, 1) : un jour isolé pèse moins, le dernier point reste la valeur actuelle', () => {
+  it('moyenne pondérée des 3 derniers jours (3, 2, 1) : un jour isolé pèse moins ; uniquement les prix de vente réels', () => {
     const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
-    const prices = [100, 100, 100, 50, 100].map((p, i) => sale('a', days[i], p));
-    expect(valueHistory(prices, 100, 1).map((p) => Math.round(p.value))).toEqual([100, 100, 100, 50, 100]);
-    const h = valueHistory(prices, 100).map((p) => p.value);
-    // Le creux : (3 × 50 + 2 × 100 + 1 × 100) / 6 = 75, remis à l'échelle du dernier point (3 × 100 + 2 × 50 + 100) / 6
-    const last = (3 * 100 + 2 * 50 + 1 * 100) / 6;
-    expect(h[3]).toBeCloseTo(75 * (100 / last));
-    expect(h.at(-1)).toBeCloseTo(100);
-    expect(Math.min(...h)).toBeGreaterThan(80);
+    const h = valueHistory([100, 100, 100, 50, 100].map((p, i) => sale('a', days[i], p))).map((p) => p.value);
+    // Le creux : (3 × 50 + 2 × 100 + 1 × 100) / 6 = 75 ; le lendemain : (3 × 100 + 2 × 50 + 100) / 6 = 83,3
+    expect(h[3]).toBeCloseTo(75);
+    expect(h[4]).toBeCloseTo(500 / 6);
   });
-  it('aucune vente → vide', () => expect(valueHistory([], 80)).toEqual([]));
-  it('saison ramenée à la valeur estimée, Classic laissée au prix de vente', () => {
+  it('aucune vente → vide', () => expect(valueHistory([])).toEqual([]));
+  it('cartes de la saison et Classic séparées', () => {
     const s = valueSeries([
       { slug: 'a', day: '2026-10-01', price: 10, inSeason: true }, { slug: 'a', day: '2026-10-01', price: 4, inSeason: false },
-    ], 50);
-    expect(s.season.map((p) => p.value)).toEqual([50]);
+    ]);
+    expect(s.season.map((p) => p.value)).toEqual([10]);
     expect(s.classic.map((p) => p.value)).toEqual([4]);
   });
 });

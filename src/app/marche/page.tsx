@@ -124,11 +124,11 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   // Championnat choisi : courbe de la valeur estimée de tous ses clubs (pas de courbe pour « toutes les ligues »).
   const leagueView = async () => {
     const [clubs, prices] = await Promise.all([queries.getClubsMarket(competition), competition ? queries.getDailyPrices({ competition }) : []]);
-    return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices, sum(clubs.map((c) => c.totalFair)))} />;
+    return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices)} />;
   };
   const clubView = async (team: string) => {
     const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team })]);
-    return <ClubPlayers players={players} yy={yy} history={valueSeries(prices, sum(players.map((p) => p.fairPrice)))} />;
+    return <ClubPlayers players={players} yy={yy} history={valueSeries(prices)} />;
   };
 
   return (

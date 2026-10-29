@@ -34,7 +34,7 @@ describe('/marche', () => {
     render(await Page(params({ competition: 'eredivisie' })));
     expect(screen.getByText('Valeur estimée totale').parentElement).toHaveTextContent('800 €');
     const chart = screen.getByRole('figure');
-    expect(within(chart).getByRole('img')).toHaveAccessibleName(/tous les clubs du championnat.*800 €/);
+    expect(within(chart).getByRole('img')).toHaveAccessibleName(/tous les clubs du championnat/);
   });
 
   it('récapitulatif : valeur totale par club', async () => {
@@ -59,10 +59,11 @@ describe('/marche', () => {
     expect(total).toHaveTextContent('52,5 €');
     expect(total).toHaveTextContent('10 €');
     expect(screen.getByText(/2 cartes en vente sur 3 joueurs/)).toBeInTheDocument();
-    // Graphique : le dernier jour vaut la valeur estimée actuelle ; prix +25 % entre les deux jours, adouci par la
-    // moyenne pondérée : (3 × 50 + 2 × 40) / 5 = 46 contre 40, soit +15 %
+    // Graphique : somme des ventes réelles (3 × 40 = 120 puis 3 × 50 = 150), adoucie par la moyenne pondérée :
+    // (3 × 150 + 2 × 120) / 5 = 138 contre 120, soit +15 % ; la valeur estimée n'intervient pas
     const chart = screen.getByRole('figure');
-    expect(chart).toHaveTextContent('Valeur estimée depuis le 21 oct.');
+    expect(chart).toHaveTextContent('Valeur (prix de vente) depuis le 21 oct.');
+    expect(within(chart).getByRole('img')).toHaveAccessibleName(/de 120 € le 21 oct\. à 138 €/);
     expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2); // 21 et 22 octobre
     expect(within(chart).getByText('+15 %')).toBeInTheDocument();
     // Un clic pour passer aux cartes Classic : somme des prix de vente (24 puis 18), pondérée : (3 × 18 + 2 × 24) / 5 = 20,4
