@@ -116,9 +116,9 @@ describe('client Sorare', () => {
     expect(m).toEqual({
       slug: 'kylian-mbappe-lottin', floorInSeason: 184.5, floorClassic: 52.4,
       sales: [
-        { date: '2026-10-27T10:00:00Z', eur: 100, seasonYear: 2026, auction: false },
-        { date: '2026-10-28T18:58:42Z', eur: 170.11, seasonYear: 2026, auction: true },
-        { date: '2026-10-28T19:00:00Z', eur: 50, seasonYear: 2023, auction: false },
+        { date: '2026-10-27T10:00:00Z', eur: 100, seasonYear: 2026, auction: false, dealType: null },
+        { date: '2026-10-28T18:58:42Z', eur: 170.11, seasonYear: 2026, auction: true, dealType: 'TokenAuction' },
+        { date: '2026-10-28T19:00:00Z', eur: 50, seasonYear: 2023, auction: false, dealType: null },
       ],
     });
     // offre en livres sterling convertie ; carte la moins chère toutes saisons de la saison en cours : pas de prix Classic

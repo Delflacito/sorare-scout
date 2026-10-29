@@ -72,7 +72,7 @@ describeDb('importMarket', () => {
       calls.push(slugs);
       return slugs.map((slug) => ({
         slug, floorInSeason: 12.5, floorClassic: slug === 'greenwood' ? 4 : null,
-        sales: [{ date: '2026-10-28T10:00:00Z', eur: 11, seasonYear: 2026, auction: true }, { date: '2026-10-27T10:00:00Z', eur: 3, seasonYear: 2023, auction: false }],
+        sales: [{ date: '2026-10-28T10:00:00Z', eur: 11, seasonYear: 2026, auction: true, dealType: 'TokenAuction' }, { date: '2026-10-27T10:00:00Z', eur: 3, seasonYear: 2023, auction: false, dealType: 'TokenOffer' }],
       }));
     },
   }) as unknown as SorareClient;
@@ -85,9 +85,9 @@ describeDb('importMarket', () => {
     await importMarket({ sorare: sorare([]), repo }, { season: 2026 });
     const [g] = await sql`select floor_in_season, floor_classic from players where sorare_slug = 'greenwood'`;
     expect(g).toEqual({ floor_in_season: 12.5, floor_classic: 4 });
-    const sales = await sql`select price_eur, in_season, auction from card_sales s join players p on p.id = s.player_id
+    const sales = await sql`select price_eur, in_season, auction, deal_type from card_sales s join players p on p.id = s.player_id
       where p.sorare_slug = 'greenwood' order by sold_at`;
-    expect(sales).toEqual([{ price_eur: 3, in_season: false, auction: false }, { price_eur: 11, in_season: true, auction: true }]);
+    expect(sales).toEqual([{ price_eur: 3, in_season: false, auction: false, deal_type: 'TokenOffer' }, { price_eur: 11, in_season: true, auction: true, deal_type: 'TokenAuction' }]);
     expect(await recomputeMarket(repo)).toBe(4);
     const [m] = await sql`select reference_price, fair_price from player_market pm join players p on p.id = pm.player_id where p.sorare_slug = 'greenwood'`;
     expect(m).toEqual({ reference_price: 12.5, fair_price: null }); // 4 joueurs cotés : pas assez pour estimer

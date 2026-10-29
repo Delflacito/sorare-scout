@@ -72,7 +72,8 @@ export interface SorarePlayerProfile {
 /** Taux de conversion vers l'euro. */
 export interface ExchangeRates { usdToEur: number; gbpToEur: number; weiToEur: number }
 /** auction : vente aux enchères (sinon vente d'un manager ou vente primaire de Sorare). */
-export interface SorareSale { date: string; eur: number; seasonYear: number | null; auction: boolean }
+/** dealType : type de vente selon Sorare (TokenAuction pour une enchère…), null s'il n'est pas renseigné. */
+export interface SorareSale { date: string; eur: number; seasonYear: number | null; auction: boolean; dealType: string | null }
 /** Marché Limited d'un joueur (prix en euros). */
 export interface SorarePlayerMarket {
   slug: string;
@@ -263,7 +264,7 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
           floorInSeason: p.inSeason?.seasonYear === season ? offer(p.inSeason) : null,
           floorClassic: p.anySeason && p.anySeason.seasonYear !== season ? offer(p.anySeason) : null,
           sales: (s.anyPlayer?.tokenPrices?.nodes ?? [])
-            .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null, auction: n.deal?.__typename === 'TokenAuction' }))
+            .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null, auction: n.deal?.__typename === 'TokenAuction', dealType: n.deal?.__typename ?? null }))
             .filter((x): x is SorareSale => x.eur !== null && x.eur > 0),
         });
       }
