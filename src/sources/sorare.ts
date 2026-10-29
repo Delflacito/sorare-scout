@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, playerProfilesQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, playerMarketsQuery, playerProfilesQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -69,6 +69,30 @@ export interface SorarePlayerProfile {
   activeClub: { slug: string; name: string; pictureUrl: string | null } | null;
   seasons: SorareSeasonStats[];
 }
+/** Taux de conversion vers l'euro. */
+export interface ExchangeRates { usdToEur: number; weiToEur: number }
+export interface SorareSale { date: string; eur: number; seasonYear: number | null }
+/** Marché Limited d'un joueur (prix en euros). */
+export interface SorarePlayerMarket {
+  slug: string;
+  /** Carte de la saison en cours la moins chère en vente. */
+  floorInSeason: number | null;
+  /** Carte d'une saison passée (Classic) la moins chère en vente, si c'est la moins chère toutes saisons confondues. */
+  floorClassic: number | null;
+  sales: SorareSale[];
+}
+interface RawAmounts { eurCents: number | null; usdCents: number | null; wei: string | null }
+interface RawPriced { seasonYear: number | null; liveSingleSaleOffer: { receiverSide: { amounts: RawAmounts | null } | null } | null }
+
+/** Montant en euros, quelle que soit la devise de référence de l'offre ou de la vente. */
+export function toEuros(a: RawAmounts | null | undefined, rates: ExchangeRates): number | null {
+  if (!a) return null;
+  if (a.eurCents != null) return a.eurCents / 100;
+  if (a.usdCents != null) return Math.round(a.usdCents * rates.usdToEur) / 100;
+  if (a.wei != null) return Math.round(Number(a.wei) * rates.weiToEur * 100) / 100;
+  return null;
+}
+
 interface RawSeasonStats {
   appearances: number | null; substituteIn: number | null; goals: number | null; assists: number | null;
   minutesPlayed: number | null; yellowCards: number | null; redCards: number | null;
@@ -210,6 +234,31 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
             startYear: y, appearances: st!.appearances ?? 0, substituteIn: st!.substituteIn ?? 0, goals: st!.goals ?? 0,
             assists: st!.assists ?? 0, minutes: st!.minutesPlayed ?? 0, yellowCards: st!.yellowCards ?? 0, redCards: st!.redCards ?? 0,
           })),
+      }));
+    },
+
+    async exchangeRates(): Promise<ExchangeRates> {
+      const d = await query<{ config: { exchangeRate: { rates: { eth: { eur: number; usd: number }; wei: { eur: number } } } } }>(EXCHANGE_RATES_QUERY, {});
+      const r = d.config.exchangeRate.rates;
+      return { usdToEur: r.eth.eur / r.eth.usd, weiToEur: r.wei.eur };
+    },
+
+    /** Prix planchers et dernières ventes Limited ; `season` : année de début de la saison en cours. */
+    async playerMarkets(slugs: string[], rates: ExchangeRates, season: number, sales = 30): Promise<SorarePlayerMarket[]> {
+      if (!slugs.length) return [];
+      type Raw = {
+        slug: string; inSeason: RawPriced | null; anySeason: RawPriced | null;
+        tokenPrices: { nodes: { date: string; amounts: RawAmounts | null; card: { seasonYear: number | null } | null }[] } | null;
+      };
+      const d = await query<Record<string, Raw | null>>(playerMarketsQuery(slugs.length, sales), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
+      const offer = (c: RawPriced | null) => toEuros(c?.liveSingleSaleOffer?.receiverSide?.amounts, rates);
+      return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
+        slug: p.slug,
+        floorInSeason: p.inSeason?.seasonYear === season ? offer(p.inSeason) : null,
+        floorClassic: p.anySeason && p.anySeason.seasonYear !== season ? offer(p.anySeason) : null,
+        sales: (p.tokenPrices?.nodes ?? [])
+          .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null }))
+          .filter((x): x is SorareSale => x.eur !== null && x.eur > 0),
       }));
     },
 

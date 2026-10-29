@@ -39,3 +39,13 @@ export function teamCode(name: string, shortName?: string | null): string {
   if (words.length <= 1) return (words[0] ?? name).slice(0, 3).toUpperCase();
   return words.map((w) => w[0]).join('').slice(0, 3).toUpperCase();
 }
+
+/** Prix en euros : centimes sous 10 €, une décimale jusqu'à 100 €, arrondi à l'euro au-delà. */
+export const fmtEur = (n: number) =>
+  `${n.toLocaleString('fr-FR', { minimumFractionDigits: n < 10 ? 2 : 0, maximumFractionDigits: n < 10 ? 2 : n < 100 ? 1 : 0 })} €`;
+
+/** Variation en % signée : « +12 % », « −8 % ». */
+export const fmtChange = (r: number) => {
+  const pct = Math.round(r * 100);
+  return pct > 0 ? `+${pct} %` : pct < 0 ? `−${-pct} %` : '0 %';
+};

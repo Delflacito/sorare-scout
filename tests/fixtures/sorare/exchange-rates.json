@@ -1,0 +1,18 @@
+{
+ "data": {
+  "config": {
+   "exchangeRate": {
+    "rates": {
+     "eth": {
+      "eur": 2000,
+      "usd": 2500
+     },
+     "wei": {
+      "eur": 2e-15,
+      "usd": 2.5e-15
+     }
+    }
+   }
+  }
+ }
+}

@@ -7,6 +7,7 @@ import { importClubs } from './clubs';
 import { importFixtures } from './fixtures';
 import { importPlayerStatuses } from './playerStatuses';
 import { importProfiles } from './profiles';
+import { importMarket, recomputeMarket } from './market';
 import { recomputeAggregates } from './aggregates';
 import { seasonStart } from './leagues';
 
@@ -31,9 +32,13 @@ async function main() {
     // Identité et historique par saison (rapide, avant les matchs) : 8 minutes au plus, le reste est repris le lendemain.
     const profiles = await importProfiles(deps, { deadline: Date.now() + 8 * 60_000, concurrency: 3 });
     console.log(`Profils mis à jour : ${profiles.updated}`);
-    const result = await importFixtures(deps, undefined, { deadline: deadline + 8 * 60_000, since: seasonStart(), concurrency: 8 });
+    const result = await importFixtures(deps, undefined, { deadline, since: seasonStart(), concurrency: 8 });
     const agg = await recomputeAggregates(repo);
-    await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors]);
+    // Marché après les agrégats : la valeur estimée et le potentiel s'appuient sur les résumés et le prochain match.
+    const market = await importMarket(deps, { deadline: Date.now() + 10 * 60_000, concurrency: 3 });
+    const priced = await recomputeMarket(repo);
+    console.log(`Marché : ${market.updated} joueurs, ${priced} cotés`);
+    await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors, ...market.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);
   } catch (e) {

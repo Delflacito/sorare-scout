@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 import { render, screen, within, fireEvent } from '@testing-library/react';
-import type { CompetitionTotalsView, PlayerDetail, PlayerGameView, PlayerSeasonView, UpcomingView } from '@/db/queries';
+import type { CompetitionTotalsView, PlayerDetail, PlayerGameView, PlayerSeasonView, SaleView, UpcomingView } from '@/db/queries';
 
 const getPlayer = vi.fn<(slug: string) => Promise<PlayerDetail | null>>();
 const getPlayerGames = vi.fn<(slug: string, n: number) => Promise<PlayerGameView[]>>();
 const getUpcoming = vi.fn<(slug: string, n: number) => Promise<UpcomingView | null>>();
 const getCompetitionTotals = vi.fn<(slug: string) => Promise<CompetitionTotalsView[]>>();
 const getPlayerSeasons = vi.fn<(slug: string) => Promise<PlayerSeasonView[]>>();
+const getPlayerSales = vi.fn<(slug: string) => Promise<SaleView[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
-  getQueries: () => ({ getPlayer, getPlayerGames, getUpcoming, getCompetitionTotals, getPlayerSeasons }),
+  getQueries: () => ({ getPlayer, getPlayerGames, getUpcoming, getCompetitionTotals, getPlayerSeasons, getPlayerSales }),
 }));
 const notFound = vi.fn(() => { throw new Error('NEXT_NOT_FOUND'); });
 vi.mock('next/navigation', () => ({ notFound: () => notFound() }));
@@ -28,6 +29,8 @@ const player: PlayerDetail = {
   injury: { kind: 'Thigh Injury', end: '2026-11-10' }, suspension: null, sorareProjection: 41,
   birthDate: '2002-06-19', country: { code: 'pt', name: 'Portugal', flagUrl: 'https://f/PT.png' },
   firstName: 'Nuno', lastName: 'Mendes', height: 176, shirtNumber: 25, bodyPictureUrl: null, cardPositions: ['Defender', 'Midfielder'],
+  market: { floorInSeason: 24.5, floorClassic: 6.2, referencePrice: 24.5, recentPrice: 26, priceTrend7: 0.12, sales30: 9,
+    fairPrice: 40, valueRatio: 0.6125, potentialPrice: 27.4, potentialGain: 0.118 },
 };
 const game = (fixtureId: number, day: number, score: number, status: PlayerGameView['status'], opponent = 'Olympique Lyonnais'): PlayerGameView => ({
   fixtureId, date: `2026-10-${String(day).padStart(2, '0')}T19:00:00.000Z`, opponent, opponentSlug: 'ol', isHome: fixtureId % 2 === 0,
@@ -164,6 +167,32 @@ describe('/joueurs/[slug]', () => {
     expect(within(rows[1]).getByText('Champions League')).toBeInTheDocument();
     expect(within(rows[0]).queryByText('Ligue 1')).not.toBeInTheDocument();
     expect(within(rows[0]).getByLabelText('2 buts')).toBeInTheDocument();
+  });
+
+  it('aperçu : prix Limited, valeur estimée et potentiel', async () => {
+    render(await Page(params('nuno-mendes')));
+    const card = screen.getByRole('region', { name: 'Marché Limited' });
+    expect(within(card).getByText('24,5 €')).toBeInTheDocument();
+    expect(within(card).getByText('6,20 €')).toBeInTheDocument();
+    expect(within(card).getByText('Sous-évalué −39 %')).toBeInTheDocument();
+    expect(within(card).getByText('+12 %')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'Voir les ventes →' })).toHaveAttribute('href', '/joueurs/nuno-mendes?onglet=marche');
+    expect(getPlayerSales).not.toHaveBeenCalled();
+  });
+
+  it('marché : graphique des dernières ventes, filtre saison / Classic', async () => {
+    getPlayerSales.mockReset().mockResolvedValue([
+      { date: '2026-10-20T10:00:00.000Z', eur: 20, inSeason: true },
+      { date: '2026-10-22T10:00:00.000Z', eur: 6, inSeason: false },
+      { date: '2026-10-25T10:00:00.000Z', eur: 26, inSeason: true },
+    ]);
+    render(await Page(params('nuno-mendes', 'marche')));
+    expect(screen.getAllByTestId('sale-point')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('radio', { name: 'Toutes' }));
+    expect(screen.getAllByTestId('sale-point')).toHaveLength(3);
+    fireEvent.mouseEnter(screen.getAllByTestId('sale-point')[1]);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('6,00 €');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Classic');
   });
 
   it('joueur inconnu → notFound', async () => {

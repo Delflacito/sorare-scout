@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "ingest": "tsx src/ingest/run.ts"
+    "ingest": "tsx src/ingest/run.ts",
+    "market": "tsx src/ingest/marketRun.ts"
   },
   "dependencies": {
     "next": "^16.4.3",

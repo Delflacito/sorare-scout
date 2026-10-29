@@ -15,6 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Link href="/game-week">Ma Game Week</Link>{' · '}
             <Link href="/journee">Journée</Link>{' · '}
             <Link href="/joueurs">Joueurs</Link>{' · '}
+            <Link href="/trading">Trading</Link>{' · '}
             <Link href="/admin/imports">Imports</Link>
           </nav>
         </header>
