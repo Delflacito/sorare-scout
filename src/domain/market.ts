@@ -145,50 +145,46 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
   return recent !== null && before ? recent / before - 1 : null;
 }
 
+/** Prix moyen des ventes d'un joueur un jour donné. */
 export interface DailyPrice { slug: string; day: string; price: number }
-/** Jours glissants sur lesquels le prix de chaque joueur est lissé. */
-export const SMOOTH_DAYS = 3;
 /** Jours de la moyenne pondérée de la courbe : le jour même pèse WEIGHTED_DAYS, la veille un de moins, etc. */
 export const WEIGHTED_DAYS = 7;
+/** players : joueurs vendus ce jour-là. */
 export interface ValuePoint { day: string; value: number; players: number }
 
 /**
- * Évolution de la valeur d'un effectif, chaînée jour par jour comme un indice : d'un jour au suivant, variation des prix
- * médians des joueurs vendus les deux jours ; le dernier jour vaut `current` (valeur estimée actuelle).
- * Jours écartés : moins de 3 joueurs vendus, ou moins de la moitié du jour le plus fourni (seuil plafonné à 20 joueurs, assez
- * pour un championnat entier) : une vente isolée fausserait la courbe.
+ * Évolution de la valeur d'un effectif, un point par jour sans trou. Chaque jour, chaque joueur compte pour sa vente
+ * moyenne du jour s'il a été vendu, sinon pour sa dernière vente des jours précédents (avant sa première vente connue :
+ * le prix de celle-ci, pour que l'entrée d'un joueur ne fasse pas monter la courbe). Somme lissée par une moyenne
+ * pondérée des jours précédents, puis remise à l'échelle : le dernier jour vaut `current` (valeur estimée actuelle).
  */
 export function valueHistory(prices: DailyPrice[], current: number, weightedDays = WEIGHTED_DAYS): ValuePoint[] {
-  // Prix de chaque joueur un jour donné : médiane de ses prix médians des SMOOTH_DAYS derniers jours (lisse le bruit quotidien).
+  if (!prices.length) return [];
   const dayMs = 86_400_000;
-  const byPlayer = new Map<string, { t: number; price: number }[]>();
-  for (const p of prices) byPlayer.set(p.slug, [...(byPlayer.get(p.slug) ?? []), { t: Date.parse(p.day), price: p.price }]);
-  const byDay = new Map<string, Map<string, number>>();
-  for (const p of prices) {
-    const t = Date.parse(p.day);
-    const recent = byPlayer.get(p.slug)!.filter((x) => x.t <= t && x.t > t - SMOOTH_DAYS * dayMs).map((x) => x.price);
-    byDay.set(p.day, (byDay.get(p.day) ?? new Map()).set(p.slug, median(recent)!));
-  }
-  const most = Math.max(0, ...[...byDay.values()].map((m) => m.size));
-  const days = [...byDay.keys()].filter((d) => byDay.get(d)!.size >= Math.max(3, Math.min(most / 2, 20))).sort();
-  if (!days.length) return [];
-  const values = new Array<number>(days.length);
-  values[days.length - 1] = current;
-  for (let i = days.length - 1; i > 0; i--) {
-    const now = byDay.get(days[i])!;
-    const before = byDay.get(days[i - 1])!;
-    const common = [...now.keys()].filter((s) => before.has(s));
-    const sumNow = common.reduce((t, s) => t + now.get(s)!, 0);
-    const sumBefore = common.reduce((t, s) => t + before.get(s)!, 0);
-    values[i - 1] = sumNow && sumBefore ? values[i] * (sumBefore / sumNow) : values[i];
-  }
-  // Moyenne pondérée des jours précédents (poids décroissants) pour qu'un seul jour ne fasse pas plonger la courbe,
-  // puis remise à l'échelle : le dernier point reste la valeur estimée actuelle.
-  const weighted = values.map((_, i) => {
-    const window = values.slice(Math.max(0, i - weightedDays + 1), i + 1).reverse();
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const byPlayer = new Map<string, Map<string, number>>();
+  for (const p of prices) byPlayer.set(p.slug, (byPlayer.get(p.slug) ?? new Map()).set(p.day, p.price));
+  const first = Math.min(...prices.map((p) => Date.parse(p.day)));
+  const last = Math.max(...prices.map((p) => Date.parse(p.day)));
+  const days = Array.from({ length: Math.round((last - first) / dayMs) + 1 }, (_, i) => iso(first + i * dayMs));
+  // Prix courant de chaque joueur, mis à jour jour après jour ; au départ, sa première vente connue.
+  const known = new Map([...byPlayer].map(([slug, sales]) => [slug, sales.get([...sales.keys()].sort()[0])!]));
+  const totals = days.map((day) => {
+    let total = 0;
+    let sold = 0;
+    for (const [slug, sales] of byPlayer) {
+      const price = sales.get(day);
+      if (price !== undefined) { known.set(slug, price); sold++; }
+      total += known.get(slug)!;
+    }
+    return { total, sold };
+  });
+  // Moyenne pondérée des jours précédents (poids décroissants) : un seul jour ne fait pas plonger la courbe.
+  const weighted = totals.map((_, i) => {
+    const window = totals.slice(Math.max(0, i - weightedDays + 1), i + 1).reverse();
     const weights = window.map((__, j) => weightedDays - j);
-    return window.reduce((t, v, j) => t + v * weights[j], 0) / weights.reduce((a, b) => a + b, 0);
+    return window.reduce((t, v, j) => t + v.total * weights[j], 0) / weights.reduce((a, b) => a + b, 0);
   });
   const scale = weighted.at(-1) ? current / weighted.at(-1)! : 1;
-  return days.map((day, i) => ({ day, value: weighted[i] * scale, players: byDay.get(day)!.size }));
+  return days.map((day, i) => ({ day, value: weighted[i] * scale, players: totals[i].sold }));
 }

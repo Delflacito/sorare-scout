@@ -66,52 +66,32 @@ describe('tendance du prix', () => {
 });
 
 describe('valueHistory', () => {
-  const day = (d: string, prices: Record<string, number>) => Object.entries(prices).map(([slug, price]) => ({ slug, day: d, price }));
-  it('chaîne les variations des joueurs vendus aux deux dates et finit sur la valeur estimée actuelle', () => {
-    // Dates espacées de plus de 3 jours : pas de lissage entre elles.
+  const sale = (slug: string, day: string, price: number) => ({ slug, day, price });
+  it('un point par jour sans trou : vente moyenne du jour, sinon dernière vente des jours précédents', () => {
     const h = valueHistory([
-      ...day('2026-10-01', { a: 10, b: 30, c: 5 }),
-      ...day('2026-10-05', { a: 12, b: 36, c: 6 }), // +20 %
-      ...day('2026-10-09', { a: 12, d: 99, e: 7 }), // seul a en commun : stable
-    ], 120, 1);
-    expect(h.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
-    expect(h.map((p) => Math.round(p.value))).toEqual([100, 120, 120]);
-    expect(h.map((p) => p.players)).toEqual([3, 3, 3]);
+      sale('a', '2026-10-01', 10), sale('b', '2026-10-01', 30),
+      sale('a', '2026-10-03', 20), // b non vendu : garde 30
+      sale('b', '2026-10-04', 40), // a non vendu : garde 20
+    ], 60, 1);
+    expect(h.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    // Sommes 40, 40, 50, 60 ; le dernier jour vaut la valeur estimée actuelle (60)
+    expect(h.map((p) => Math.round(p.value))).toEqual([40, 40, 50, 60]);
+    expect(h.map((p) => p.players)).toEqual([2, 0, 1, 1]);
   });
-  it('prix lissé sur 3 jours glissants : une journée aberrante ne fait pas plonger la courbe', () => {
-    const h = valueHistory([
-      ...day('2026-10-22', { a: 10, b: 10, c: 10 }),
-      ...day('2026-10-23', { a: 10, b: 10, c: 10 }),
-      ...day('2026-10-24', { a: 2, b: 10, c: 10 }), // a : médiane (10, 10, 2) = 10
-    ], 30, 1);
-    expect(h.map((p) => Math.round(p.value))).toEqual([30, 30, 30]);
+  it('joueur pas encore vendu : compté à sa première vente connue (son arrivée ne fait pas monter la courbe)', () => {
+    const h = valueHistory([sale('a', '2026-10-01', 10), sale('a', '2026-10-02', 10), sale('b', '2026-10-02', 50)], 60, 1);
+    expect(h.map((p) => Math.round(p.value))).toEqual([60, 60]);
   });
   it('moyenne pondérée des jours précédents (7, 6, 5…) : un jour isolé pèse moins, le dernier point reste la valeur actuelle', () => {
-    const d = (n: number) => `2026-10-${String(n).padStart(2, '0')}`;
-    // Valeurs brutes 100, 100, 100, 50 (chute d'un jour), puis retour à 100
-    const raw = [10, 10, 10, 5, 10];
-    const prices = raw.flatMap((p, i) => day(d(1 + i * 4), { a: p, b: p, c: p }));
-    const flat = valueHistory(prices, 100, 1).map((p) => Math.round(p.value));
-    expect(flat).toEqual([100, 100, 100, 50, 100]);
+    const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
+    const prices = [100, 100, 100, 50, 100].map((p, i) => sale('a', days[i], p));
+    expect(valueHistory(prices, 100, 1).map((p) => Math.round(p.value))).toEqual([100, 100, 100, 50, 100]);
     const h = valueHistory(prices, 100).map((p) => p.value);
-    // Le creux : (7 × 50 + 6 × 100 + 5 × 100 + 4 × 100) / 22 = 84,1, remis à l'échelle du dernier point
+    // Le creux : (7 × 50 + 6 × 100 + 5 × 100 + 4 × 100) / 22, remis à l'échelle du dernier point
     const last = (7 * 100 + 6 * 50 + 5 * 100 + 4 * 100 + 3 * 100) / 25;
     expect(h[3]).toBeCloseTo(((7 * 50 + 6 * 100 + 5 * 100 + 4 * 100) / 22) * (100 / last));
     expect(h.at(-1)).toBeCloseTo(100);
     expect(Math.min(...h)).toBeGreaterThan(80);
   });
-  it('jours trop pauvres écartés (moins de 3 joueurs ou moins de la moitié du jour le plus fourni)', () => {
-    const h = valueHistory([
-      ...day('2026-10-16', { a: 2 }),
-      ...day('2026-10-21', { a: 10, b: 10, c: 10 }),
-      ...day('2026-10-22', { a: 10, b: 10, c: 10, d: 1, e: 1, f: 1, g: 1 }),
-      ...day('2026-10-23', { a: 11, b: 11, c: 11, d: 1.1 }),
-    ], 50);
-    expect(h.map((p) => p.day)).toEqual(['2026-10-22', '2026-10-23']);
-    expect(valueHistory([], 80)).toEqual([]);
-    // Championnat : jour le plus fourni à 100 joueurs, seuil plafonné à 20 (et non 50)
-    const many = (d: string, n: number) => day(d, Object.fromEntries(Array.from({ length: n }, (_, i) => [`p${i}`, 10])));
-    expect(valueHistory([...many('2026-10-01', 25), ...many('2026-10-05', 100), ...many('2026-10-09', 15)], 1).map((p) => p.day))
-      .toEqual(['2026-10-01', '2026-10-05']);
-  });
+  it('aucune vente → vide', () => expect(valueHistory([], 80)).toEqual([]));
 });

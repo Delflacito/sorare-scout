@@ -682,11 +682,11 @@ export function createQueries(sql: postgres.Sql) {
       }));
     },
 
-    /** Prix médian des cartes de la saison de chaque joueur d'un club ou d'un championnat, jour par jour (heure de Paris). */
+    /** Prix moyen des ventes de cartes de la saison de chaque joueur d'un club ou d'un championnat, jour par jour (heure de Paris). */
     async getDailyPrices(f: { team?: string; competition?: string }): Promise<DailyPrice[]> {
       const rows = await sql`
         select p.sorare_slug, to_char(cs.sold_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day,
-          percentile_cont(0.5) within group (order by cs.price_eur) as price
+          avg(cs.price_eur) as price
         from card_sales cs
         join players p on p.id = cs.player_id
         join teams t on t.id = p.team_id

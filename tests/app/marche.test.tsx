@@ -9,7 +9,7 @@ vi.mock('@/db/queries', async (importOriginal) => ({
   getQueries: () => ({
     getClubsMarket, getMarketPlayers,
     getDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
-      { slug, day: '2026-10-15', price: 40 }, { slug, day: '2026-10-22', price: 50 },
+      { slug, day: '2026-10-21', price: 40 }, { slug, day: '2026-10-22', price: 50 },
     ]),
     listCompetitions: async () => [{ slug: 'eredivisie', name: 'Eredivisie' }],
     listTeams: async () => [{ slug: 'psv', name: 'PSV', competitionSlug: 'eredivisie' }],
@@ -62,7 +62,7 @@ describe('/marche', () => {
     // moyenne pondérée : (7 × 50 + 6 × 40) / 13 = 45,4 contre 40, soit +13 %
     const chart = screen.getByRole('figure');
     expect(chart).toHaveTextContent('Évolution de la valeur estimée');
-    expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2);
+    expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2); // 21 et 22 octobre
     expect(within(chart).getByText('+13 %')).toBeInTheDocument();
   });
 });

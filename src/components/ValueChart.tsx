@@ -65,7 +65,7 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
               <text x={LEFT - 6} y={y(v) + 4} textAnchor="end" className="tick">{fmtEur(v)}</text>
             </g>
           ))}
-          {points.map((p, i) => (i % every === 0 || i === points.length - 1) && (
+          {points.map((p, i) => ((i % every === 0 && points.length - 1 - i >= every) || i === points.length - 1) && (
             <text key={p.day} x={x(i)} y={H - 8} textAnchor={i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'} className="tick">{fmtDay(p.day)}</text>
           ))}
           {h && <line x1={x(hover!)} x2={x(hover!)} y1={TOP} y2={H - BOTTOM} className="axis" />}
@@ -83,7 +83,7 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
         {h && (
           <div role="tooltip" className="chart-tooltip" style={{ left: Math.max(90, Math.min(x(hover!), width - 90)), top: y(h.value) - 10 }}>
             <strong>{fmtEur(h.value)}</strong>
-            <span>{fmtDay(h.day)} · {h.players} joueur{h.players > 1 ? 's' : ''} vendu{h.players > 1 ? 's' : ''}</span>
+            <span>{fmtDay(h.day)} · {h.players} joueur{h.players > 1 ? 's' : ''} vendu{h.players > 1 ? 's' : ''} ce jour</span>
           </div>
         )}
       </div>
@@ -95,9 +95,9 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
         </table>
       </details>
       <p className="note">
-        Reconstituée d’après les ventes de cartes de la saison : chaque jour, variation des prix médians des joueurs
-        vendus aussi le jour précédent, ramenée à la valeur estimée d’aujourd’hui. Chaque point est une moyenne pondérée
-        des 7 derniers jours (le jour même compte le plus). Jours avec trop peu de ventes écartés.
+        Reconstituée d’après les ventes de cartes de la saison : chaque jour, chaque joueur compte pour sa vente moyenne
+        du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 7 derniers jours (le jour même
+        compte le plus), ramenée à la valeur estimée d’aujourd’hui.
       </p>
     </figure>
   );
