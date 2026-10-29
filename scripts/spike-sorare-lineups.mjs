@@ -35,21 +35,13 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Prix plancher manquant (Ferri, Read) et ventes aux enchères.
-const PR = 'slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei } } }';
-for (const slug of ['ignacio-ferri-julia', 'givairo-read']) {
-  await sample(`floor-${slug}`, `{ anyPlayer(slug: "${slug}") { ... on Player {
-    inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PR} }
-    anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PR} }
-    tokenPrices(rarity: limited, last: 3) { nodes { date amounts { eurCents } card { seasonYear } } }
-  } } }`);
-}
-await probe('TokenPrice (type de vente)', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { tokenPrices(rarity: limited, last: 2) { nodes { ${c} } } } } }`, [
-  'deal { __typename }', 'xyzDeal', 'xyzAuction', 'auction', 'xyzType', 'xyzKind', 'xyzSource', 'primary', 'xyzPrimary',
+// Devise du prix plancher manquant (Ferri, Read) et types de vente.
+await probe('Amounts', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { liveSingleSaleOffer { receiverSide { amounts { ${c} } } } } } } }`, [
+  'referenceCurrency', 'gbpCents', 'xyzCents', 'eurCents usdCents gbpCents wei referenceCurrency',
 ]);
-await probe('AnyCard (offres)', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { ${c} } } } }`, [
-  'xyzAuction', 'liveAuction', 'xyzOffer', 'latestEnglishAuction { id }', 'xyzPrimary',
-]);
+await sample('read-offer', `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) {
+  slug liveSingleSaleOffer { __typename receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } }`);
+await sample('deal-types', `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { tokenPrices(rarity: limited, last: 50) { nodes { date amounts { eurCents } deal { __typename } } } } } }`);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
