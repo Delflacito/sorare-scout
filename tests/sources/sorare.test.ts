@@ -114,7 +114,7 @@ describe('client Sorare', () => {
       { playerSlug: 'a', seasonYear: 2026, purchaseEur: 6.88 },
       { playerSlug: 'b', seasonYear: 2025, purchaseEur: null }, // reçue sans achat
     ]);
-    expect(f.requests.map((r) => r.body.variables)).toEqual([{ slug: 'delflacito', after: null }, { slug: 'delflacito', after: 'p2' }]);
+    expect(f.requests.map((r) => r.body.variables)).toEqual([{ slug: 'delflacito', after: null, first: 50 }, { slug: 'delflacito', after: 'p2', first: 50 }]);
     expect(await client.userCards('inconnu', rates)).toBeNull();
   });
 

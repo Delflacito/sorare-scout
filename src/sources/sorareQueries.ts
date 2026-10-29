@@ -97,9 +97,12 @@ export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!
   } }
 }`;
 
-/** Cartes Limited d'un utilisateur (galerie publique), 50 par page ; dernier propriétaire = l'utilisateur, avec son prix d'achat. */
-export const USER_CARDS_QUERY = `query UserCards($slug: String!, $after: String) {
-  user(slug: $slug) { cards(rarities: [limited], first: 50, after: $after) {
+/**
+ * Cartes Limited d'un utilisateur (galerie publique), par pages ; dernier propriétaire = l'utilisateur, avec son prix d'achat.
+ * Complexité ≈ 54 par carte : sans clé API, Sorare plafonne à 500 (8 cartes par page), avec clé à 30 000.
+ */
+export const USER_CARDS_QUERY = `query UserCards($slug: String!, $after: String, $first: Int!) {
+  user(slug: $slug) { cards(rarities: [limited], first: $first, after: $after) {
     pageInfo { hasNextPage endCursor }
     nodes { seasonYear anyPlayer { slug } ownershipHistory { amounts { eurCents usdCents gbpCents wei } } }
   } }

@@ -293,7 +293,7 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
         nodes: { seasonYear: number | null; anyPlayer: { slug: string } | null; ownershipHistory: { amounts: RawAmounts | null }[] }[] } } | null };
       const cards: SorareUserCard[] = [];
       for (let after: string | null = null; ;) {
-        const d: Page = await query<Page>(USER_CARDS_QUERY, { slug: userSlug, after });
+        const d: Page = await query<Page>(USER_CARDS_QUERY, { slug: userSlug, after, first: apiKey ? 50 : 8 });
         if (!d.user) return null;
         for (const n of d.user.cards.nodes) {
           if (n.anyPlayer) cards.push({ playerSlug: n.anyPlayer.slug, seasonYear: n.seasonYear, purchaseEur: toEuros(n.ownershipHistory.at(-1)?.amounts, rates) });
