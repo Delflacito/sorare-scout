@@ -14,8 +14,9 @@ function inputs(): MarketInputRow[] {
     const l15 = 30 + (i % 40);
     const price = 2 * Math.exp(0.05 * l15) * (1 + ((i * 7) % 5 - 2) / 100);
     return {
-      playerId: i, floorInSeason: price, l15, l5: l15, startRate: 0.9, birthDate: '2000-01-01', league: 'ligue-1-fr',
-      position: 'Forward', nextProjected: l15,
+      playerId: i, floorInSeason: price, l15, l5: l15, allAround: 30, startRate: 0.9, minutes: 80, birthDate: '2000-01-01',
+      league: 'ligue-1-fr', position: 'Forward', nextProjected: l15, teamId: i % 5, clubPpg: 1.5, prevGoalsAssists: 4,
+      international: false, status: 'STARTER',
       sales: [daysAgo(1), daysAgo(2), daysAgo(3)].map((date) => ({ date, eur: price })),
     };
   });

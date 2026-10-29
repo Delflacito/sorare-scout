@@ -165,8 +165,9 @@ export default async function TradingPage({ searchParams }: { searchParams: Sear
           </>
         ) : (
           <>
-            Écart entre le prix (carte de la saison la moins chère en vente) et la valeur estimée d’après les performances (L15, forme,
-            temps de jeu, âge, championnat, poste), calculée sur tout le marché. Forme ↗ : L5 au-dessus du L15 ; Prix 7 j : évolution
+            Écart entre le prix (carte de la saison la moins chère en vente) et la valeur estimée d’après le profil du joueur (L15, forme,
+            All-Around, temps de jeu, statut Sorare, buts et passes de la saison passée, sélection, âge, poste, championnat, force et
+            cote de son club), calculée sur tout le marché. Forme ↗ : L5 au-dessus du L15 ; Prix 7 j : évolution
             des ventes sur une semaine. Une carte sous-évaluée en forme et dont le prix commence à monter est la piste la plus solide.
           </>
         )}

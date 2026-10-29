@@ -7,18 +7,40 @@ export interface MarketRow {
   price: number;
   l15: number;
   l5: number;
+  /** Moyenne All-Around sur 15 matchs du club (0 si absent). */
+  allAround: number;
   startRate: number;
+  /** Minutes moyennes sur 15 matchs du club. */
+  minutes: number;
   age: number | null;
   league: string;
   position: GenericPosition;
+  teamId: number | null;
+  /** Points par match du club cette saison. */
+  clubPpg: number | null;
+  /** Buts + passes décisives la saison passée. */
+  prevGoalsAssists: number;
+  international: boolean;
+  /** Statut Sorare : STARTER, REGULAR, SUBSTITUTE, NOT_PLAYING… */
+  status: string | null;
 }
 
-export interface PriceModel { coef: number[]; leagues: string[]; positions: GenericPosition[]; meanAge: number }
+type Profile = Omit<MarketRow, 'playerId' | 'price'>;
+
+export interface PriceModel {
+  coef: number[]; leagues: string[]; positions: GenericPosition[]; meanAge: number;
+  /** Prime (log) propre à chaque club : ce que le marché paie en plus ou en moins pour ce club à profil égal. */
+  clubs: Record<number, number>;
+}
 
 /** En dessous, pas assez de joueurs cotés pour estimer une valeur. */
 export const MIN_FIT_ROWS = 30;
 /** Rétrécissement des coefficients (régression ridge) : évite les valeurs extrêmes avec peu de joueurs par ligue. */
 const RIDGE = 1;
+/** Prime d'un club = somme des écarts de ses joueurs / (nombre + CLUB_SHRINK) : peu de joueurs, prime ramenée vers 0. */
+const CLUB_SHRINK = 3;
+/** Points par match d'un club sans match joué (moyenne des championnats). */
+const AVG_PPG = 1.4;
 
 export const median = (xs: number[]) => {
   if (!xs.length) return null;
@@ -28,13 +50,16 @@ export const median = (xs: number[]) => {
 };
 
 /**
- * Variables du modèle : niveau (L15), forme (L5 − L15), titularisations, âge (et son carré : les jeunes se paient plus cher,
- * les plus âgés moins), championnat et poste. Les scores sont divisés par 10 pour des coefficients lisibles.
+ * Variables du modèle, choisies d'après les prix planchers d'octobre 2026 (77 % des écarts de prix expliqués hors
+ * échantillon, contre 39 % avec L15 / forme / âge / ligue / poste seuls) : niveau (L15), forme (L5 − L15), All-Around,
+ * temps de jeu, âge, force du club, buts + passes de la saison passée, sélection, statut Sorare, championnat et poste.
  */
-function features(r: Omit<MarketRow, 'playerId' | 'price'>, m: Omit<PriceModel, 'coef'>): number[] {
+function features(r: Profile, m: Omit<PriceModel, 'coef' | 'clubs'>): number[] {
   const age = ((r.age ?? m.meanAge) - m.meanAge) / 5;
   return [
-    1, r.l15 / 10, (r.l5 - r.l15) / 10, r.startRate, age, age * age,
+    1, r.l15 / 10, (r.l5 - r.l15) / 10, r.startRate, r.allAround / 10, r.minutes / 90, age, age * age,
+    r.clubPpg ?? AVG_PPG, r.prevGoalsAssists / 10, r.international ? 1 : 0,
+    r.status === 'STARTER' ? 1 : 0, r.status === 'SUBSTITUTE' || r.status === 'NOT_PLAYING' ? 1 : 0,
     ...m.leagues.slice(1).map((l) => (r.league === l ? 1 : 0)),
     ...m.positions.slice(1).map((p) => (r.position === p ? 1 : 0)),
   ];
@@ -58,7 +83,12 @@ function solve(a: number[][], b: number[]): number[] {
   return m.map((row, i) => (Math.abs(row[i]) < 1e-12 ? 0 : row[n] / row[i]));
 }
 
-/** Régression du logarithme du prix sur les performances, sur tout le marché ; null s'il y a trop peu de joueurs cotés. */
+const dot = (x: number[], coef: number[]) => x.reduce((t, v, i) => t + v * coef[i], 0);
+
+/**
+ * Régression du logarithme du prix sur le profil, sur tout le marché, puis prime de chaque club (écart moyen rétréci
+ * de ses joueurs) ; null s'il y a trop peu de joueurs cotés.
+ */
 export function fitPriceModel(rows: MarketRow[]): PriceModel | null {
   const usable = rows.filter((r) => r.price > 0);
   if (usable.length < MIN_FIT_ROWS) return null;
@@ -74,22 +104,33 @@ export function fitPriceModel(rows: MarketRow[]): PriceModel | null {
   const xtx = Array.from({ length: k }, (_, i) => Array.from({ length: k }, (_, j) =>
     x.reduce((t, row) => t + row[i] * row[j], 0) + (i === j && i > 0 ? RIDGE : 0)));
   const xty = Array.from({ length: k }, (_, i) => x.reduce((t, row, n) => t + row[i] * y[n], 0));
-  return { ...base, coef: solve(xtx, xty) };
+  const coef = solve(xtx, xty);
+  const byClub = new Map<number, { sum: number; n: number }>();
+  usable.forEach((r, i) => {
+    if (r.teamId === null) return;
+    const c = byClub.get(r.teamId) ?? { sum: 0, n: 0 };
+    byClub.set(r.teamId, { sum: c.sum + y[i] - dot(x[i], coef), n: c.n + 1 });
+  });
+  const clubs = Object.fromEntries([...byClub].map(([id, c]) => [id, c.sum / (c.n + CLUB_SHRINK)]));
+  return { ...base, coef, clubs };
 }
 
-const linear = (m: PriceModel, r: Omit<MarketRow, 'playerId' | 'price'>) => features(r, m).reduce((t, v, i) => t + v * m.coef[i], 0);
+const linear = (m: PriceModel, r: Profile) => dot(features(r, m), m.coef);
 
-/** Prix « juste » d'après les performances : ce que le marché paie en moyenne pour ce profil. */
-export function fairPrice(m: PriceModel, r: Omit<MarketRow, 'playerId' | 'price'>): number {
-  return Math.exp(linear(m, r));
+/** Prix « juste » d'après le profil : ce que le marché paie en moyenne pour ce profil dans ce club. */
+export function fairPrice(m: PriceModel, r: Profile): number {
+  return Math.exp(linear(m, r) + (r.teamId === null ? 0 : m.clubs[r.teamId] ?? 0));
 }
 
 /**
- * Prix potentiel si le joueur marque `projected` à son prochain match : son L5 et son L15 intègrent ce score,
- * et le prix évolue comme le marché valorise ces moyennes (même modèle).
+ * Prix potentiel si le joueur marque `projected` à son prochain match : son L5, son L15 et son All-Around intègrent ce
+ * score (l'écart au L15 est supposé passer par l'All-Around), et le prix évolue comme le marché valorise ces moyennes.
+ * Ordre de grandeur : +10 points au-dessus du L15 ≈ +5 %, proche de la réaction observée des prix après un match.
  */
 export function potentialPrice(m: PriceModel, r: MarketRow, projected: number): number {
-  const after = { ...r, l5: (4 * r.l5 + projected) / 5, l15: (14 * r.l15 + projected) / 15 };
+  const after = {
+    ...r, l5: (4 * r.l5 + projected) / 5, l15: (14 * r.l15 + projected) / 15, allAround: r.allAround + (projected - r.l15) / 15,
+  };
   return r.price * Math.exp(linear(m, after) - linear(m, r));
 }
 
