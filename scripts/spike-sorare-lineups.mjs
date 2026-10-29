@@ -35,15 +35,13 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Prix plancher manquant (Targhalline) : carte la moins chère de la saison et ses offres.
-await sample('targhalline', `{ anyPlayer(slug: "oussama-targhalline") { ... on Player {
-  inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear inSeasonEligible
-    liveSingleSaleOffer { __typename receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } }
-    latestEnglishAuction { id } }
-  anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { slug seasonYear
-    liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } }
-} } }`);
-await probe('Player (prix)', (c) => `{ anyPlayer(slug: "oussama-targhalline") { ... on Player { ${c} } } }`, ['cardPrice', 'xyzCardPrice']);
+// Champ cardPrice : type, arguments, valeur (Targhalline, Mbappé).
+const P2 = (slug, c) => `{ anyPlayer(slug: "${slug}") { ... on Player { ${c} } } }`;
+await sample('cp-scalar', P2('oussama-targhalline', 'cardPrice(rarity: limited)'));
+await sample('cp-xyz', P2('oussama-targhalline', 'cardPrice(rarity: limited) { xyz }'));
+await sample('cp-args', P2('oussama-targhalline', 'cardPrice(rarity: limited, xyzArg: 1)'));
+await sample('cp-mbappe', P2('kylian-mbappe-lottin', 'cardPrice(rarity: limited)'));
+await sample('cp-read', P2('givairo-read', 'cardPrice(rarity: limited)'));
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
