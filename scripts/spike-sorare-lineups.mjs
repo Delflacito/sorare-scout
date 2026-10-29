@@ -35,13 +35,20 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Tier affiché par Sorare (« Star » avec 4 points) : niveau interface, autres noms.
-const words = ['tier', 'xyzTier', 'stars', 'playerTier', 'tierLabel', 'averageScoreTier', 'scoreTier', 'sorareTier', 'currentTier', 'positionTier',
-  'tierInfo', 'tierLevel', 'starTier', 'level', 'category', 'segment', 'xyzCategory', 'xyzSegment', 'xyzLevel', 'xyzRank', 'xyzStar'];
-await probe('AnyPlayerInterface', (c) => `{ anyPlayer(slug: "liam-millar") { ${c} } }`, words);
-await probe('Player (noms 2)', (c) => `{ anyPlayer(slug: "liam-millar") { ... on Player { ${c} } } }`, [
-  'tierLabel', 'averageScoreTier', 'scoreTier', 'sorareTier', 'positionTier', 'tierLevel', 'tierBySeason', 'currentSeasonTier',
-  'xyzScore', 'xyzAverage', 'averageScore', 'xyzLeaderboard', 'xyzEligib', 'xyzSo5', 'so5Tier', 'xyzCap', 'xyzPrestige',
+// Prix plancher manquant (Ferri, Read) et ventes aux enchères.
+const PR = 'slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei } } }';
+for (const slug of ['ignacio-ferri-julia', 'givairo-read']) {
+  await sample(`floor-${slug}`, `{ anyPlayer(slug: "${slug}") { ... on Player {
+    inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PR} }
+    anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PR} }
+    tokenPrices(rarity: limited, last: 3) { nodes { date amounts { eurCents } card { seasonYear } } }
+  } } }`);
+}
+await probe('TokenPrice (type de vente)', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { tokenPrices(rarity: limited, last: 2) { nodes { ${c} } } } } }`, [
+  'deal { __typename }', 'xyzDeal', 'xyzAuction', 'auction', 'xyzType', 'xyzKind', 'xyzSource', 'primary', 'xyzPrimary',
+]);
+await probe('AnyCard (offres)', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { ${c} } } } }`, [
+  'xyzAuction', 'liveAuction', 'xyzOffer', 'latestEnglishAuction { id }', 'xyzPrimary',
 ]);
 
 mkdirSync('spike-output', { recursive: true });
