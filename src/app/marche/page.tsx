@@ -61,7 +61,7 @@ function ClubPlayers({ players, yy }: { players: MarketPlayerView[]; yy: string 
         <table aria-label="Prix des cartes du club">
           <thead>
             <tr>
-              <th>Joueur</th><th>Carte</th><th>L15</th><th>Plancher {yy}</th><th>Plancher C</th><th>5 dern. ventes</th>
+              <th>Joueur</th><th>Carte</th><th>L15</th><th>Plancher {yy}</th><th>Plancher C</th><th>Dernière enchère</th><th>5 dern. ventes</th>
               <th>Valeur estimée</th><th>Écart</th><th>Potentiel GW</th>
             </tr>
           </thead>
@@ -83,6 +83,7 @@ function ClubPlayers({ players, yy }: { players: MarketPlayerView[]; yy: string 
                   <td className="num">{p.l15 === null ? '—' : fmtScore(p.l15)}</td>
                   <td className="num strong">{p.floorInSeason === null ? '—' : fmtEur(p.floorInSeason)}</td>
                   <td className="num">{p.floorClassic === null ? '—' : fmtEur(p.floorClassic)}</td>
+                  <td className="num">{p.lastAuction === null ? '—' : fmtEur(p.lastAuction.eur)}</td>
                   <td className="num">{p.recentPrice === null ? '—' : fmtEur(p.recentPrice)}</td>
                   <td className="num">{p.fairPrice === null ? '—' : fmtEur(p.fairPrice)}</td>
                   <td className={`num ${label?.tone ?? ''}`}>{p.valueRatio === null ? '—' : fmtChange(1 - p.valueRatio)}</td>
@@ -98,7 +99,7 @@ function ClubPlayers({ players, yy }: { players: MarketPlayerView[]; yy: string 
               <td>Total</td><td /><td />
               <td className="num">{fmtEur(sum(players.map((p) => p.floorInSeason)))}</td>
               <td className="num">{fmtEur(sum(players.map((p) => p.floorClassic)))}</td>
-              <td /><td className="num">{fmtEur(sum(players.map((p) => p.fairPrice)))}</td><td /><td />
+              <td /><td /><td className="num">{fmtEur(sum(players.map((p) => p.fairPrice)))}</td><td /><td />
             </tr>
           </tfoot>
         </table>

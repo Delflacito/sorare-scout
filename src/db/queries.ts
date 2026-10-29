@@ -94,6 +94,8 @@ export interface PlayerMarketView {
   floorInSeason: number | null; floorClassic: number | null; referencePrice: number | null; recentPrice: number | null;
   priceTrend7: number | null; sales30: number; fairPrice: number | null; valueRatio: number | null;
   potentialPrice: number | null; potentialGain: number | null;
+  /** Dernière vente aux enchères d'une carte de la saison. */
+  lastAuction: { eur: number; date: string } | null;
 }
 export interface SaleView { date: string; eur: number; inSeason: boolean }
 export type TradingView = 'sous' | 'sur' | 'gw';
@@ -117,6 +119,7 @@ export interface MarketPlayerView {
   competition: string | null; competitionSlug: string | null; cardPositions: GenericPosition[]; usualPosition: DetailedPosition | null;
   l15: number | null; floorInSeason: number | null; floorClassic: number | null; recentPrice: number | null; price: number | null;
   fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null; priceTrend7: number | null;
+  lastAuction: { eur: number; date: string } | null;
 }
 
 /** Statistiques de championnat d'une saison (Sorare). */
@@ -178,6 +181,8 @@ export interface MatchView {
   id: number; date: string; status: 'played' | 'scheduled' | 'postponed'; competition: string;
   home: MatchSideView; away: MatchSideView; players: MatchPlayerView[];
 }
+
+const toAuction = (a: { eur: number; date: string } | null) => (a ? { eur: a.eur, date: new Date(a.date).toISOString() } : null);
 
 const toConceded = (r: postgres.Row): ConcededView => ({
   position: r.detailed_position, average: r.average, leagueAverage: r.league_average, index: r.index,
@@ -335,6 +340,8 @@ export function createQueries(sql: postgres.Sql) {
           coalesce(p.card_positions, array[p.position]) as card_positions,
           p.floor_in_season, p.floor_classic, pm.reference_price, pm.recent_price, pm.price_trend7, pm.sales30, pm.fair_price,
           pm.value_ratio, pm.potential_price, pm.potential_gain, p.market_updated_at,
+          (select json_build_object('eur', cs.price_eur, 'date', cs.sold_at) from card_sales cs
+            where cs.player_id = p.id and cs.auction and cs.in_season order by cs.sold_at desc limit 1) as last_auction,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
@@ -379,7 +386,7 @@ export function createQueries(sql: postgres.Sql) {
         market: r.market_updated_at ? {
           floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, referencePrice: r.reference_price, recentPrice: r.recent_price,
           priceTrend7: r.price_trend7, sales30: r.sales30 ?? 0, fairPrice: r.fair_price, valueRatio: r.value_ratio,
-          potentialPrice: r.potential_price, potentialGain: r.potential_gain,
+          potentialPrice: r.potential_price, potentialGain: r.potential_gain, lastAuction: toAuction(r.last_auction),
         } : null,
       };
     },
@@ -640,7 +647,9 @@ export function createQueries(sql: postgres.Sql) {
         select p.sorare_slug, p.name, p.picture_url, t.name as team, t.sorare_slug as team_slug, t.picture_url as team_picture,
           c.name as competition, c.slug as competition_slug, coalesce(p.card_positions, array[p.position]) as card_positions,
           s.usual_position, s.l15, p.floor_in_season, p.floor_classic, pm.recent_price, pm.reference_price, pm.fair_price, pm.value_ratio,
-          pm.potential_price, pm.potential_gain, pm.price_trend7
+          pm.potential_price, pm.potential_gain, pm.price_trend7,
+          (select json_build_object('eur', cs.price_eur, 'date', cs.sold_at) from card_sales cs
+            where cs.player_id = p.id and cs.auction and cs.in_season order by cs.sold_at desc limit 1) as last_auction
         from players p
         left join player_summary s on s.player_id = p.id
         left join player_market pm on pm.player_id = p.id
@@ -658,7 +667,7 @@ export function createQueries(sql: postgres.Sql) {
         competition: r.competition, competitionSlug: r.competition_slug, cardPositions: r.card_positions, usualPosition: r.usual_position,
         l15: r.l15, floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, recentPrice: r.recent_price,
         price: r.reference_price ?? r.floor_in_season, fairPrice: r.fair_price, valueRatio: r.value_ratio,
-        potentialPrice: r.potential_price, potentialGain: r.potential_gain, priceTrend7: r.price_trend7,
+        potentialPrice: r.potential_price, potentialGain: r.potential_gain, priceTrend7: r.price_trend7, lastAuction: toAuction(r.last_auction),
       }));
     },
 

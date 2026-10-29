@@ -65,7 +65,7 @@ export function playerProfilesQuery(seasons: number[]): string {
 }`;
 }
 
-const PRICE = 'seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei } } }';
+const PRICE = 'seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei } } }';
 
 /** Taux de change Sorare (ETH → EUR / USD) pour convertir les prix affichés en dollars ou en ETH. */
 export const EXCHANGE_RATES_QUERY = `query ExchangeRates { config { exchangeRate { rates } } }`;
@@ -82,6 +82,6 @@ export const PLAYER_FLOORS_QUERY = `query PlayerFloors($slugs: [String!]!) {
 /** Dernières ventes Limited d'un joueur (Sorare n'accepte pas ce champ dans une liste de joueurs). */
 export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!) {
   anyPlayer(slug: $slug) { ... on Player {
-    tokenPrices(rarity: limited, last: $last) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } }
+    tokenPrices(rarity: limited, last: $last) { nodes { date amounts { eurCents usdCents gbpCents wei } card { seasonYear } deal { __typename } } }
   } }
 }`;

@@ -30,7 +30,19 @@
    },
    {
     "slug": "no-cards",
-    "inSeason": null,
+    "inSeason": {
+     "seasonYear": 2026,
+     "liveSingleSaleOffer": {
+      "receiverSide": {
+       "amounts": {
+        "eurCents": null,
+        "usdCents": null,
+        "gbpCents": 1870,
+        "wei": null
+       }
+      }
+     }
+    },
     "anySeason": {
      "seasonYear": 2026,
      "liveSingleSaleOffer": null

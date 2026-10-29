@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { PlayerMarketView } from '@/db/queries';
 import { fmtChange, fmtEur } from '@/lib/format';
 
+const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' });
+
 /** Lecture de l'écart prix / valeur estimée : sous 0,8 la carte est bon marché pour ses performances, au-dessus de 1,25 chère. */
 export function valueLabel(ratio: number | null): { text: string; tone: 'hot' | 'cold' | 'neutral' } | null {
   if (ratio === null) return null;
@@ -29,6 +31,13 @@ export function MarketCard({ market, season, href }: { market: PlayerMarketView 
                 {market.priceTrend7 !== null && (
                   <small className={market.priceTrend7 > 0 ? 'hot' : market.priceTrend7 < 0 ? 'cold' : ''} title="Évolution sur 7 jours"> {fmtChange(market.priceTrend7)} 7 j</small>
                 )}
+              </dd>
+            </div>
+            <div>
+              <dt>Dernière enchère {yy}</dt>
+              <dd>
+                {market.lastAuction === null ? '—' : fmtEur(market.lastAuction.eur)}
+                {market.lastAuction && <small className="muted"> {fmtDay(market.lastAuction.date)}</small>}
               </dd>
             </div>
           </dl>

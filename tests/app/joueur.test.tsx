@@ -30,7 +30,7 @@ const player: PlayerDetail = {
   birthDate: '2002-06-19', country: { code: 'pt', name: 'Portugal', flagUrl: 'https://f/PT.png' },
   firstName: 'Nuno', lastName: 'Mendes', height: 176, shirtNumber: 25, bodyPictureUrl: null, cardPositions: ['Defender', 'Midfielder'],
   market: { floorInSeason: 24.5, floorClassic: 6.2, referencePrice: 24.5, recentPrice: 26, priceTrend7: 0.12, sales30: 9,
-    fairPrice: 40, valueRatio: 0.6125, potentialPrice: 27.4, potentialGain: 0.118 },
+    fairPrice: 40, valueRatio: 0.6125, potentialPrice: 27.4, potentialGain: 0.118, lastAuction: { eur: 22, date: '2026-10-27T18:00:00.000Z' } },
 };
 const game = (fixtureId: number, day: number, score: number, status: PlayerGameView['status'], opponent = 'Olympique Lyonnais'): PlayerGameView => ({
   fixtureId, date: `2026-10-${String(day).padStart(2, '0')}T19:00:00.000Z`, opponent, opponentSlug: 'ol', isHome: fixtureId % 2 === 0,
@@ -174,6 +174,7 @@ describe('/joueurs/[slug]', () => {
     const card = screen.getByRole('region', { name: 'Marché Limited' });
     expect(within(card).getByText('24,5 €')).toBeInTheDocument();
     expect(within(card).getByText('6,20 €')).toBeInTheDocument();
+    expect(within(card).getByText('22 €')).toBeInTheDocument(); // dernière enchère
     expect(within(card).getByText('Sous-évalué −39 %')).toBeInTheDocument();
     expect(within(card).getByText('+12 %')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: 'Voir les ventes →' })).toHaveAttribute('href', '/joueurs/nuno-mendes?onglet=marche');
