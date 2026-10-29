@@ -145,20 +145,23 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
   return recent !== null && before ? recent / before - 1 : null;
 }
 
-/** Prix moyen des ventes d'un joueur un jour donné. */
-export interface DailyPrice { slug: string; day: string; price: number }
+/** Prix moyen des ventes d'un joueur un jour donné (cartes de la saison ou Classic). */
+export interface DailyPrice { slug: string; day: string; price: number; inSeason: boolean }
 /** Jours de la moyenne pondérée de la courbe : le jour même pèse WEIGHTED_DAYS, la veille un de moins, etc. */
 export const WEIGHTED_DAYS = 3;
 /** players : joueurs vendus ce jour-là. */
 export interface ValuePoint { day: string; value: number; players: number }
+/** Courbes des cartes de la saison (valeur estimée) et Classic (prix de vente). */
+export interface ValueSeries { season: ValuePoint[]; classic: ValuePoint[] }
 
 /**
  * Évolution de la valeur d'un effectif, un point par jour sans trou. Chaque jour, chaque joueur compte pour sa vente
  * moyenne du jour s'il a été vendu, sinon pour sa dernière vente des jours précédents (avant sa première vente connue :
  * le prix de celle-ci, pour que l'entrée d'un joueur ne fasse pas monter la courbe). Somme lissée par une moyenne
- * pondérée des jours précédents, puis remise à l'échelle : le dernier jour vaut `current` (valeur estimée actuelle).
+ * pondérée des jours précédents, puis remise à l'échelle : le dernier jour vaut `current` (valeur estimée actuelle) ;
+ * sans `current` (cartes Classic, sans valeur estimée), la courbe reste la somme des prix de vente.
  */
-export function valueHistory(prices: DailyPrice[], current: number, weightedDays = WEIGHTED_DAYS): ValuePoint[] {
+export function valueHistory(prices: { slug: string; day: string; price: number }[], current: number | null, weightedDays = WEIGHTED_DAYS): ValuePoint[] {
   if (!prices.length) return [];
   const dayMs = 86_400_000;
   const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -185,6 +188,12 @@ export function valueHistory(prices: DailyPrice[], current: number, weightedDays
     const weights = window.map((__, j) => weightedDays - j);
     return window.reduce((t, v, j) => t + v.total * weights[j], 0) / weights.reduce((a, b) => a + b, 0);
   });
-  const scale = weighted.at(-1) ? current / weighted.at(-1)! : 1;
+  const scale = current && weighted.at(-1) ? current / weighted.at(-1)! : 1;
   return days.map((day, i) => ({ day, value: weighted[i] * scale, players: totals[i].sold }));
 }
+
+/** Les deux courbes d'un effectif : cartes de la saison ramenées à la valeur estimée `fair`, Classic au prix de vente. */
+export const valueSeries = (prices: DailyPrice[], fair: number): ValueSeries => ({
+  season: valueHistory(prices.filter((p) => p.inSeason), fair),
+  classic: valueHistory(prices.filter((p) => !p.inSeason), null),
+});

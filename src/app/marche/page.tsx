@@ -4,7 +4,7 @@ import { POSITION_LABEL_FR, cardLabel } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { valueLabel } from '@/components/MarketCard';
 import { ValueChart } from '@/components/ValueChart';
-import { valueHistory, type ValuePoint } from '@/domain/market';
+import { valueSeries, type ValueSeries } from '@/domain/market';
 import { fmtChange, fmtEur, fmtScore } from '@/lib/format';
 import { one, type SearchParams } from '@/lib/params';
 import { seasonStart } from '@/ingest/leagues';
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 const sum = (xs: (number | null)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
 
-function ClubsTable({ clubs, competition, history }: { clubs: ClubMarketView[]; competition?: string; history: ValuePoint[] }) {
+function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView[]; competition?: string; yy: string; history: ValueSeries }) {
   const total = sum(clubs.map((c) => c.totalFloor));
   return (
     <>
@@ -23,7 +23,7 @@ function ClubsTable({ clubs, competition, history }: { clubs: ClubMarketView[]; 
         <div className="card"><div className="card-kicker">Valeur totale (planchers)</div><strong>{fmtEur(total)}</strong></div>
         <div className="card"><div className="card-kicker">Valeur estimée totale</div><strong>{fmtEur(sum(clubs.map((c) => c.totalFair)))}</strong></div>
       </div>
-      <ValueChart points={history} subject="tous les clubs du championnat" />
+      <ValueChart series={history} yy={yy} subject="tous les clubs du championnat" />
       <div className="table-wrap">
         <table aria-label="Valeur des cartes par club">
           <thead>
@@ -51,7 +51,7 @@ function ClubsTable({ clubs, competition, history }: { clubs: ClubMarketView[]; 
   );
 }
 
-function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy: string; history: ValuePoint[] }) {
+function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy: string; history: ValueSeries }) {
   const priced = players.filter((p) => p.floorInSeason !== null);
   return (
     <>
@@ -61,7 +61,7 @@ function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy
         <div className="card"><div className="card-kicker">Total planchers Classic</div><strong>{fmtEur(sum(players.map((p) => p.floorClassic)))}</strong></div>
         <div className="card"><div className="card-kicker">Total valeur estimée</div><strong>{fmtEur(sum(players.map((p) => p.fairPrice)))}</strong></div>
       </div>
-      <ValueChart points={history} />
+      <ValueChart series={history} yy={yy} />
       <div className="table-wrap">
         <table aria-label="Prix des cartes du club">
           <thead>
@@ -124,11 +124,11 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   // Championnat choisi : courbe de la valeur estimée de tous ses clubs (pas de courbe pour « toutes les ligues »).
   const leagueView = async () => {
     const [clubs, prices] = await Promise.all([queries.getClubsMarket(competition), competition ? queries.getDailyPrices({ competition }) : []]);
-    return <ClubsTable clubs={clubs} competition={competition} history={valueHistory(prices, sum(clubs.map((c) => c.totalFair)))} />;
+    return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices, sum(clubs.map((c) => c.totalFair)))} />;
   };
   const clubView = async (team: string) => {
     const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team })]);
-    return <ClubPlayers players={players} yy={yy} history={valueHistory(prices, sum(players.map((p) => p.fairPrice)))} />;
+    return <ClubPlayers players={players} yy={yy} history={valueSeries(prices, sum(players.map((p) => p.fairPrice)))} />;
   };
 
   return (

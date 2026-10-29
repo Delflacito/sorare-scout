@@ -509,3 +509,5 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .chart-data summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 32px; display: inline-flex; align-items: center; }
 .chart-data table { margin-top: 6px; }
 .chart-card .note { margin: 6px 0 8px; }
+.chart-card p.chart-avg { margin: 0 0 6px; }
+.chart-avg strong { white-space: nowrap; }

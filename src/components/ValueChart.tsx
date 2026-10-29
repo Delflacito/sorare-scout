@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { ValuePoint } from '@/domain/market';
+import type { ValueSeries } from '@/domain/market';
 import { fmtEur } from '@/lib/format';
 
 const H = 220;
@@ -22,8 +22,11 @@ function ticks(min: number, max: number): number[] {
   return Array.from({ length: Math.ceil((max - from) / step) + 1 }, (_, i) => from + i * step);
 }
 
-/** Valeur estimée de l'effectif d'un club (ou de tous les clubs d'un championnat), jour par jour. */
-export function ValueChart({ points, subject = 'l’effectif' }: { points: ValuePoint[]; subject?: string }) {
+type Cards = 'season' | 'classic';
+
+/** Valeur de l'effectif d'un club (ou de tous les clubs d'un championnat), jour par jour : cartes de la saison ou Classic. */
+export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: ValueSeries; yy: string; subject?: string }) {
+  const [cards, setCards] = useState<Cards>(series.season.length >= 2 || series.classic.length < 2 ? 'season' : 'classic');
   const [hover, setHover] = useState<number | null>(null);
   const [width, setWidth] = useState(640);
   const ref = useRef<HTMLDivElement>(null);
@@ -34,7 +37,25 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  if (points.length < 2) return null;
+  if (series.season.length < 2 && series.classic.length < 2) return null;
+  const points = series[cards];
+  const season = cards === 'season';
+  const label = season ? 'Valeur estimée' : 'Valeur (prix de vente)';
+  const toggle = (
+    <div className="segmented" role="radiogroup" aria-label="Cartes">
+      {([['season', `Saison ${yy}`], ['classic', 'Classic']] as const).map(([v, text]) => (
+        <button key={v} type="button" role="radio" aria-checked={cards === v} onClick={() => { setHover(null); setCards(v); }}>{text}</button>
+      ))}
+    </div>
+  );
+  if (points.length < 2) {
+    return (
+      <figure className="card chart-card">
+        <figcaption className="chart-head"><span className="card-title">Évolution de la valeur</span>{toggle}</figcaption>
+        <p className="empty">Pas assez de ventes de cartes {season ? `de la saison ${yy}` : 'Classic'} pour tracer une courbe</p>
+      </figure>
+    );
+  }
   const values = points.map((p) => p.value);
   const yTicks = ticks(Math.min(...values), Math.max(...values));
   const [yMin, yMax] = [yTicks[0], yTicks.at(-1)!];
@@ -50,15 +71,16 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
   return (
     <figure className="card chart-card">
       <figcaption className="chart-head">
-        <span className="card-title">Évolution de la valeur estimée</span>
-        <span className="chart-avg">
-          Depuis le {fmtDay(first.day)} : <strong className={change > 0 ? 'hot' : change < 0 ? 'cold' : ''}>
-            {change >= 0 ? '+' : '−'}{Math.abs(Math.round(change * 100))} %</strong>
-        </span>
+        <span className="card-title">Évolution de la valeur</span>
+        {toggle}
       </figcaption>
+      <p className="chart-avg">
+        {label} depuis le {fmtDay(first.day)} : <strong className={change > 0 ? 'hot' : change < 0 ? 'cold' : ''}>
+          {change >= 0 ? '+' : '−'}{Math.abs(Math.round(change * 100))} %</strong>
+      </p>
       <div ref={ref} className="chart-box" style={{ width: '100%' }} onMouseLeave={() => setHover(null)}>
         <svg width={width} height={H} role="img"
-          aria-label={`Valeur estimée de ${subject}, de ${fmtEur(first.value)} le ${fmtDay(first.day)} à ${fmtEur(last.value)} aujourd’hui`}>
+          aria-label={`${label} de ${subject} (${season ? `saison ${yy}` : 'Classic'}), de ${fmtEur(first.value)} le ${fmtDay(first.day)} à ${fmtEur(last.value)} aujourd’hui`}>
           {yTicks.map((v) => (
             <g key={v}>
               <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="grid" />
@@ -73,7 +95,7 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
           {points.map((p, i) => (
             <circle key={p.day} cx={x(i)} cy={y(p.value)} r={hover === i ? 5 : i === points.length - 1 ? 4.5 : 3.5} className="value-dot" />
           ))}
-          {/* Zones de survol : toute la hauteur, une par semaine (plus large que le point). */}
+          {/* Zones de survol : toute la hauteur, une par jour (plus large que le point). */}
           {points.map((p, i) => (
             <rect key={p.day} data-testid="value-hit" x={x(i) - (width - LEFT - RIGHT) / (points.length - 1) / 2} y={TOP} height={H - TOP - BOTTOM}
               width={(width - LEFT - RIGHT) / (points.length - 1)} fill="transparent" tabIndex={0} aria-label={`${fmtDay(p.day)} : ${fmtEur(p.value)}`}
@@ -90,14 +112,14 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
       <details className="chart-data">
         <summary>Voir les données</summary>
         <table>
-          <thead><tr><th scope="col">Jour</th><th scope="col">Valeur estimée</th><th scope="col">Joueurs vendus</th></tr></thead>
+          <thead><tr><th scope="col">Jour</th><th scope="col">{label}</th><th scope="col">Joueurs vendus</th></tr></thead>
           <tbody>{points.map((p) => <tr key={p.day}><td>{fmtDay(p.day)}</td><td className="num">{fmtEur(p.value)}</td><td className="num">{p.players}</td></tr>)}</tbody>
         </table>
       </details>
       <p className="note">
-        Reconstituée d’après les ventes de cartes de la saison : chaque jour, chaque joueur compte pour sa vente moyenne
-        du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 3 derniers jours (le jour même
-        compte le plus), ramenée à la valeur estimée d’aujourd’hui.
+        Reconstituée d’après les ventes de cartes {season ? `de la saison ${yy}` : 'Classic'} : chaque jour, chaque joueur compte
+        pour sa vente moyenne du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 3 derniers
+        jours (le jour même compte le plus){season ? ', ramenée à la valeur estimée d’aujourd’hui' : ' ; pas de valeur estimée pour les Classic : somme des prix de vente'}.
       </p>
     </figure>
   );

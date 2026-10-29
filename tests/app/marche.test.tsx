@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ClubMarketView, MarketPlayerView } from '@/db/queries';
 
 const getClubsMarket = vi.fn<(c?: string) => Promise<ClubMarketView[]>>();
@@ -9,7 +9,8 @@ vi.mock('@/db/queries', async (importOriginal) => ({
   getQueries: () => ({
     getClubsMarket, getMarketPlayers,
     getDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
-      { slug, day: '2026-10-21', price: 40 }, { slug, day: '2026-10-22', price: 50 },
+      { slug, day: '2026-10-21', price: 40, inSeason: true }, { slug, day: '2026-10-22', price: 50, inSeason: true },
+      { slug, day: '2026-10-21', price: 8, inSeason: false }, { slug, day: '2026-10-22', price: 6, inSeason: false },
     ]),
     listCompetitions: async () => [{ slug: 'eredivisie', name: 'Eredivisie' }],
     listTeams: async () => [{ slug: 'psv', name: 'PSV', competitionSlug: 'eredivisie' }],
@@ -61,8 +62,13 @@ describe('/marche', () => {
     // Graphique : le dernier jour vaut la valeur estimée actuelle ; prix +25 % entre les deux jours, adouci par la
     // moyenne pondérée : (3 × 50 + 2 × 40) / 5 = 46 contre 40, soit +15 %
     const chart = screen.getByRole('figure');
-    expect(chart).toHaveTextContent('Évolution de la valeur estimée');
+    expect(chart).toHaveTextContent('Valeur estimée depuis le 21 oct.');
     expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2); // 21 et 22 octobre
     expect(within(chart).getByText('+15 %')).toBeInTheDocument();
+    // Un clic pour passer aux cartes Classic : somme des prix de vente (24 puis 18), pondérée : (3 × 18 + 2 × 24) / 5 = 20,4
+    expect(within(chart).getByRole('radio', { name: 'Saison 26' })).toBeChecked();
+    fireEvent.click(within(chart).getByRole('radio', { name: 'Classic' }));
+    expect(within(chart).getByRole('radio', { name: 'Classic' })).toBeChecked();
+    expect(within(chart).getByRole('img')).toHaveAccessibleName(/Classic.*de 24 € le 21 oct\. à 20,4 €/);
   });
 });

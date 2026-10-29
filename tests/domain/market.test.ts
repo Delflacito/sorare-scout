@@ -1,4 +1,4 @@
-import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, valueHistory, type MarketRow } from '@/domain/market';
+import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, valueHistory, valueSeries, type MarketRow } from '@/domain/market';
 
 const profile = {
   allAround: 30, startRate: 0.8, minutes: 70, teamId: null, clubPpg: 1.5, prevGoalsAssists: 5, international: false, status: 'STARTER',
@@ -94,4 +94,11 @@ describe('valueHistory', () => {
     expect(Math.min(...h)).toBeGreaterThan(80);
   });
   it('aucune vente → vide', () => expect(valueHistory([], 80)).toEqual([]));
+  it('saison ramenée à la valeur estimée, Classic laissée au prix de vente', () => {
+    const s = valueSeries([
+      { slug: 'a', day: '2026-10-01', price: 10, inSeason: true }, { slug: 'a', day: '2026-10-01', price: 4, inSeason: false },
+    ], 50);
+    expect(s.season.map((p) => p.value)).toEqual([50]);
+    expect(s.classic.map((p) => p.value)).toEqual([4]);
+  });
 });

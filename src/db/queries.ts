@@ -682,20 +682,20 @@ export function createQueries(sql: postgres.Sql) {
       }));
     },
 
-    /** Prix moyen des ventes de cartes de la saison de chaque joueur d'un club ou d'un championnat, jour par jour (heure de Paris). */
+    /** Prix moyen des ventes de chaque joueur d'un club ou d'un championnat, jour par jour (heure de Paris), saison et Classic à part. */
     async getDailyPrices(f: { team?: string; competition?: string }): Promise<DailyPrice[]> {
       const rows = await sql`
-        select p.sorare_slug, to_char(cs.sold_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day,
+        select p.sorare_slug, to_char(cs.sold_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day, cs.in_season,
           avg(cs.price_eur) as price
         from card_sales cs
         join players p on p.id = cs.player_id
         join teams t on t.id = p.team_id
         join competitions c on c.id = t.competition_id
-        where cs.in_season and exists (select 1 from player_summary s where s.player_id = p.id)
+        where exists (select 1 from player_summary s where s.player_id = p.id)
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
-        group by 1, 2`;
-      return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price }));
+        group by 1, 2, 3`;
+      return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price, inSeason: r.in_season }));
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
