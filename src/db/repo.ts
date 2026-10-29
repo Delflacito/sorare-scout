@@ -164,20 +164,53 @@ function createBaseRepo(sql: Sql) {
       return r.id;
     },
 
+    /** Version groupée de upsertPlayer (une requête) ; renvoie l'identifiant de chaque slug. */
+    async upsertPlayers(players: PlayerInput[]): Promise<Map<string, number>> {
+      if (!players.length) return new Map();
+      const unique = [...new Map(players.map((p) => [p.sorareSlug, p])).values()];
+      const rows = await sql`
+        insert into players ${sql(unique.map((p) => ({ name: p.name, sorare_slug: p.sorareSlug, position: p.position, team_id: p.teamId })))}
+        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
+          team_id = coalesce(players.team_id, excluded.team_id)
+        returning id, sorare_slug`;
+      return new Map(rows.map((r) => [r.sorare_slug as string, r.id as number]));
+    },
+
+    /** Version groupée de upsertAppearance (une requête). */
+    async upsertAppearances(rows: AppearanceInput[]): Promise<void> {
+      if (!rows.length) return;
+      await sql`
+        insert into appearances ${sql(rows.map((a) => ({
+          fixture_id: a.fixtureId, player_id: a.playerId, team_id: a.teamId, grid: a.grid, detailed_position: a.detailedPosition,
+          started: a.started, minutes: a.minutes, sorare_score: a.score, decisive_score: a.decisive, all_around_score: a.allAround,
+          decisive_actions: sql.json(a.actions ?? {}),
+        })))}
+        on conflict (fixture_id, player_id) do update set team_id = excluded.team_id, grid = excluded.grid,
+          detailed_position = excluded.detailed_position, started = excluded.started, minutes = excluded.minutes,
+          sorare_score = excluded.sorare_score, decisive_score = excluded.decisive_score,
+          all_around_score = excluded.all_around_score, decisive_actions = excluded.decisive_actions`;
+    },
+
     /** Statut actuel des joueurs déjà connus ; renvoie le nombre de joueurs mis à jour. */
     async updatePlayerStatuses(rows: PlayerStatusInput[]): Promise<number> {
-      let updated = 0;
-      for (const r of rows) {
-        const res = await sql`update players set picture_url = coalesce(${r.pictureUrl}, picture_url), playing_status = ${r.playingStatus},
-          injury_kind = ${r.injury?.kind ?? null}, injury_end = ${r.injury?.expectedEnd ?? null},
-          suspension_reason = ${r.suspension?.reason ?? null}, suspension_end = ${r.suspension?.end ?? null},
-          sorare_projection = ${r.projection}, national_team_id = ${r.nationalTeamId ?? null}, status_updated_at = now(),
-          team_id = coalesce(${r.teamId ?? null}, team_id), position = coalesce(${r.position ?? null}, position),
-          card_positions = coalesce(${r.cardPositions?.length ? r.cardPositions : null}::text[], card_positions)
-          where sorare_slug = ${r.slug}`;
-        updated += res.count;
-      }
-      return updated;
+      if (!rows.length) return 0;
+      // Une seule requête par lot (un aller-retour par joueur prenait plusieurs minutes depuis GitHub).
+      const res = await sql`
+        update players p set picture_url = coalesce(v.picture_url, p.picture_url), playing_status = v.playing_status,
+          injury_kind = v.injury_kind, injury_end = v.injury_end, suspension_reason = v.suspension_reason, suspension_end = v.suspension_end,
+          sorare_projection = v.projection, national_team_id = v.national_team_id, status_updated_at = now(),
+          team_id = coalesce(v.team_id, p.team_id), position = coalesce(v.position, p.position),
+          card_positions = coalesce(v.card_positions, p.card_positions)
+        from jsonb_to_recordset(${sql.json(rows.map((r) => ({
+          slug: r.slug, picture_url: r.pictureUrl, playing_status: r.playingStatus,
+          injury_kind: r.injury?.kind ?? null, injury_end: r.injury?.expectedEnd ?? null,
+          suspension_reason: r.suspension?.reason ?? null, suspension_end: r.suspension?.end ?? null,
+          projection: r.projection, national_team_id: r.nationalTeamId ?? null, team_id: r.teamId ?? null,
+          position: r.position ?? null, card_positions: r.cardPositions?.length ? r.cardPositions : null,
+        })))}) as v(slug text, picture_url text, playing_status text, injury_kind text, injury_end date, suspension_reason text,
+          suspension_end date, projection double precision, national_team_id integer, team_id integer, position text, card_positions text[])
+        where p.sorare_slug = v.slug`;
+      return res.count;
     },
 
     async upsertFixture(f: FixtureInput): Promise<number> {
@@ -309,28 +342,40 @@ function createBaseRepo(sql: Sql) {
 
     /** Identité et historique par saison (l'historique d'un joueur est remplacé en entier). */
     async saveProfiles(profiles: PlayerProfileInput[]): Promise<void> {
-      for (const p of profiles) {
-        const [player] = await sql`update players set birth_date = ${p.birthDate}, country_code = ${p.country?.code ?? null},
-          country_name = ${p.country?.name ?? null}, country_flag_url = ${p.country?.flagUrl ?? null}, profile_updated_at = now(),
-          first_name = ${p.firstName ?? null}, last_name = ${p.lastName ?? null}, height = ${p.height ?? null},
-          shirt_number = ${p.shirtNumber ?? null}, body_picture_url = coalesce(${p.bodyPictureUrl ?? null}, body_picture_url)
-          where sorare_slug = ${p.slug} returning id`;
-        if (!player) continue;
-        // Club actuel hors des championnats suivis : seulement pour un joueur qui n'est plus dans un effectif suivi.
-        if (p.activeClub) {
-          const [club] = await sql`
-            insert into teams (name, sorare_slug, picture_url, kind) values (${p.activeClub.name}, ${p.activeClub.slug}, ${p.activeClub.pictureUrl}, 'club')
-            on conflict (sorare_slug) do update set picture_url = coalesce(teams.picture_url, excluded.picture_url)
-            returning id`;
-          await sql`update players set team_id = ${club.id} where id = ${player.id} and (team_id is null
-            or team_id not in (select id from teams where competition_id is not null and kind = 'club'))`;
-        }
-        await sql`delete from player_seasons where player_id = ${player.id}`;
-        if (p.seasons.length) await sql`insert into player_seasons ${sql(p.seasons.map((x) => ({
-          player_id: player.id, start_year: x.startYear, appearances: x.appearances, substitute_in: x.substituteIn, goals: x.goals,
-          assists: x.assists, minutes: x.minutes, yellow_cards: x.yellowCards, red_cards: x.redCards,
-        })))}`;
+      if (!profiles.length) return;
+      const ids = await sql`
+        update players p set birth_date = v.birth_date, country_code = v.country_code, country_name = v.country_name,
+          country_flag_url = v.country_flag_url, profile_updated_at = now(), first_name = v.first_name, last_name = v.last_name,
+          height = v.height, shirt_number = v.shirt_number, body_picture_url = coalesce(v.body_picture_url, p.body_picture_url)
+        from jsonb_to_recordset(${sql.json(profiles.map((p) => ({
+          slug: p.slug, birth_date: p.birthDate, country_code: p.country?.code ?? null, country_name: p.country?.name ?? null,
+          country_flag_url: p.country?.flagUrl ?? null, first_name: p.firstName ?? null, last_name: p.lastName ?? null,
+          height: p.height ?? null, shirt_number: p.shirtNumber ?? null, body_picture_url: p.bodyPictureUrl ?? null,
+        })))}) as v(slug text, birth_date date, country_code text, country_name text, country_flag_url text, first_name text,
+          last_name text, height integer, shirt_number integer, body_picture_url text)
+        where p.sorare_slug = v.slug
+        returning p.id, p.sorare_slug`;
+      const idOf = new Map(ids.map((r) => [r.sorare_slug as string, r.id as number]));
+      // Club actuel hors des championnats suivis : seulement pour un joueur qui n'est plus dans un effectif suivi.
+      const clubs = [...new Map(profiles.filter((p) => p.activeClub).map((p) => [p.activeClub!.slug, p.activeClub!])).values()];
+      if (clubs.length) {
+        await sql`insert into teams ${sql(clubs.map((c) => ({ name: c.name, sorare_slug: c.slug, picture_url: c.pictureUrl, kind: 'club' })))}
+          on conflict (sorare_slug) do update set picture_url = coalesce(teams.picture_url, excluded.picture_url)`;
+        await sql`
+          update players p set team_id = t.id
+          from jsonb_to_recordset(${sql.json(profiles.filter((x) => x.activeClub).map((x) => ({ slug: x.slug, club: x.activeClub!.slug })))})
+            as v(slug text, club text)
+          join teams t on t.sorare_slug = v.club
+          where p.sorare_slug = v.slug and (p.team_id is null
+            or p.team_id not in (select id from teams where competition_id is not null and kind = 'club'))`;
       }
+      const playerIds = [...idOf.values()];
+      if (playerIds.length) await sql`delete from player_seasons where player_id = any(${playerIds})`;
+      const seasons = profiles.flatMap((p) => (idOf.has(p.slug) ? p.seasons.map((x) => ({
+        player_id: idOf.get(p.slug)!, start_year: x.startYear, appearances: x.appearances, substitute_in: x.substituteIn, goals: x.goals,
+        assists: x.assists, minutes: x.minutes, yellow_cards: x.yellowCards, red_cards: x.redCards,
+      })) : []));
+      for (const chunk of chunks(seasons)) await sql`insert into player_seasons ${sql(chunk)}`;
     },
 
     /** Marque des joueurs comme traités même si Sorare ne les connaît pas (évite de les redemander chaque jour). */
@@ -348,14 +393,18 @@ function createBaseRepo(sql: Sql) {
 
     /** Prix planchers et ventes (saison `season` = cartes de la saison en cours) ; ventes de plus de 60 jours supprimées. */
     async saveMarkets(markets: PlayerMarketInput[], season: number): Promise<void> {
-      for (const m of markets) {
-        const [p] = await sql`update players set floor_in_season = ${m.floorInSeason}, floor_classic = ${m.floorClassic},
-          market_updated_at = now() where sorare_slug = ${m.slug} returning id`;
-        if (!p) continue;
-        if (m.sales.length) await sql`insert into card_sales ${sql(m.sales.map((x) => ({
-          player_id: p.id, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season,
-        })))} on conflict do nothing`;
-      }
+      if (!markets.length) return;
+      const ids = await sql`
+        update players p set floor_in_season = v.floor_in_season, floor_classic = v.floor_classic, market_updated_at = now()
+        from jsonb_to_recordset(${sql.json(markets.map((m) => ({ slug: m.slug, floor_in_season: m.floorInSeason, floor_classic: m.floorClassic })))})
+          as v(slug text, floor_in_season double precision, floor_classic double precision)
+        where p.sorare_slug = v.slug
+        returning p.id, p.sorare_slug`;
+      const idOf = new Map(ids.map((r) => [r.sorare_slug as string, r.id as number]));
+      const sales = markets.flatMap((m) => (idOf.has(m.slug) ? m.sales.map((x) => ({
+        player_id: idOf.get(m.slug)!, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season,
+      })) : []));
+      for (const chunk of chunks(sales)) await sql`insert into card_sales ${sql(chunk)} on conflict do nothing`;
       await sql`delete from card_sales where sold_at < now() - interval '60 days'`;
     },
 

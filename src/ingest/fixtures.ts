@@ -117,23 +117,24 @@ async function completeFixture(deps: FixturesDeps, fixture: FixtureToComplete, t
   }));
 
   await deps.repo.transaction(async (tx) => {
+    const onSheet = detail.scores
+      .map((s) => ({ s, side: sides.find((x) => x.members.has(s.playerSlug)) }))
+      .filter((x): x is { s: (typeof detail.scores)[number]; side: (typeof sides)[number] } => !!x.side); // sur la feuille de match
     // Joueurs d'une équipe non suivie (adversaire européen, sélection) : seulement ceux déjà connus, sans changer leur club.
-    const known = await tx.playerIdsBySlugs(detail.scores.map((s) => s.playerSlug));
-    for (const s of detail.scores) {
-      const side = sides.find((x) => x.members.has(s.playerSlug));
-      if (!side) continue; // pas sur la feuille de match
-      const playerId = side.team.tracked
-        ? await tx.upsertPlayer({ name: s.displayName, sorareSlug: s.playerSlug, position: s.position, teamId: side.team.id })
-        : known.get(s.playerSlug);
-      if (playerId === undefined) continue;
-      await tx.upsertAppearance({
+    const known = await tx.playerIdsBySlugs(onSheet.filter((x) => !x.side.team.tracked).map((x) => x.s.playerSlug));
+    const tracked = await tx.upsertPlayers(onSheet.filter((x) => x.side.team.tracked).map(({ s, side }) => ({
+      name: s.displayName, sorareSlug: s.playerSlug, position: s.position, teamId: side.team.id,
+    })));
+    await tx.upsertAppearances(onSheet.flatMap(({ s, side }) => {
+      const playerId = (side.team.tracked ? tracked : known).get(s.playerSlug);
+      return playerId === undefined ? [] : [{
         fixtureId: fixture.id, playerId, teamId: side.team.id,
         grid: side.grid.get(s.playerSlug) ?? null,
         detailedPosition: side.positions.get(s.playerSlug) ?? null,
         started: side.grid.has(s.playerSlug),
         minutes: s.minutes, score: s.score, decisive: s.decisive, allAround: s.allAround, actions: s.actions,
-      });
-    }
+      }];
+    }));
     await tx.markLineupsImported(fixture.id, formationOf(detail.home.starting), formationOf(detail.away.starting));
   });
   return true;
