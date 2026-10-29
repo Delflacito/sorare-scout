@@ -35,12 +35,18 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Marché : taux de change Sorare et prix plancher Classic.
-const MP = (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`;
-await probe('ExchangeRate', (c) => `{ config { exchangeRate { ${c} } } }`, ['rates', 'xyzRate', 'xyzEur', 'xyzUsd', 'time', 'eurCents', 'usdCents']);
-await sample('lp-classic', MP('lowestPriceAnyCard(rarity: limited, inSeason: false) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }'));
-await sample('lp-inseason-price', MP('lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei referenceCurrency } } } }'));
-await sample('tp-amounts', MP('tokenPrices(rarity: limited, last: 3) { nodes { date amounts { eurCents usdCents wei referenceCurrency } card { seasonYear } } }'));
+// Plusieurs joueurs par requête : les alias de anyPlayer sont refusés (« Duplicated root field »).
+const SL = '["kylian-mbappe-lottin", "vitinha"]';
+for (const [k, q] of Object.entries({
+  anyPlayers: `{ anyPlayers(slugs: ${SL}) { ... on Player { slug birthDate } } }`,
+  anyPlayersNodes: `{ anyPlayers(slugs: ${SL}) { nodes { ... on Player { slug birthDate } } } }`,
+  players: `{ players(slugs: ${SL}) { slug birthDate } }`,
+  footballPlayers: `{ football { players(slugs: ${SL}) { slug birthDate } } }`,
+  footballAnyPlayers: `{ football { anyPlayers(slugs: ${SL}) { ... on Player { slug birthDate } } } }`,
+  footballPlayer: `{ football { a: player(slug: "kylian-mbappe-lottin") { slug } b: player(slug: "vitinha") { slug } } }`,
+  rootXyz: '{ xyzPlayers }',
+  footballXyz: '{ football { xyzPlayers } }',
+})) await sample(k, q);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
