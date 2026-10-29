@@ -106,6 +106,19 @@ export interface TradingRow {
   nextOpponent: string | null; nextOpponentPictureUrl: string | null; nextIsHome: boolean | null; nextDate: string | null;
 }
 
+/** Récapitulatif du marché d'un club : valeur totale des cartes de la saison et joueur le plus cher. */
+export interface ClubMarketView {
+  slug: string; name: string; pictureUrl: string | null; competition: string; competitionSlug: string;
+  players: number; priced: number; totalFloor: number; topPlayer: string | null; topPrice: number | null;
+}
+/** Joueur coté (marché, effectif) : prix de référence = carte de la saison la moins chère en vente. */
+export interface MarketPlayerView {
+  slug: string; name: string; pictureUrl: string | null; team: string | null; teamSlug: string | null; teamPictureUrl: string | null;
+  competition: string | null; competitionSlug: string | null; cardPositions: GenericPosition[]; usualPosition: DetailedPosition | null;
+  l15: number | null; floorInSeason: number | null; floorClassic: number | null; recentPrice: number | null; price: number | null;
+  fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null; priceTrend7: number | null;
+}
+
 /** Statistiques de championnat d'une saison (Sorare). */
 export interface PlayerSeasonView {
   startYear: number; appearances: number; substituteIn: number; goals: number; assists: number;
@@ -595,9 +608,58 @@ export function createQueries(sql: postgres.Sql) {
     },
 
     /** Clubs actuellement rattachés à une compétition suivie. */
-    async listTeams(): Promise<{ slug: string; name: string }[]> {
-      const rows = await sql`select sorare_slug, name from teams where competition_id is not null order by name`;
-      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name }));
+    async listTeams(): Promise<{ slug: string; name: string; competitionSlug: string }[]> {
+      const rows = await sql`select t.sorare_slug, t.name, c.slug as competition_slug from teams t join competitions c on c.id = t.competition_id
+        order by t.name`;
+      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, competitionSlug: r.competition_slug }));
+    },
+
+    /** Valeur des cartes de chaque club suivi (somme des prix planchers de la saison), le plus cher d'abord. */
+    async getClubsMarket(competition?: string): Promise<ClubMarketView[]> {
+      const rows = await sql`
+        select t.sorare_slug, t.name, t.picture_url, c.name as competition, c.slug as competition_slug,
+          count(p.id)::int as players, count(p.floor_in_season)::int as priced, coalesce(sum(p.floor_in_season), 0) as total_floor,
+          (array_agg(p.name order by p.floor_in_season desc nulls last))[1] as top_player, max(p.floor_in_season) as top_price
+        from teams t join competitions c on c.id = t.competition_id
+        left join players p on p.team_id = t.id and exists (select 1 from player_summary s where s.player_id = p.id)
+        where true ${competition ? sql`and c.slug = ${competition}` : sql``}
+        group by t.id, c.id order by total_floor desc, t.name`;
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, competition: r.competition, competitionSlug: r.competition_slug,
+        players: r.players, priced: r.priced, totalFloor: r.total_floor, topPlayer: r.priced ? r.top_player : null, topPrice: r.top_price,
+      }));
+    },
+
+    /**
+     * Joueurs cotés : ceux d'un club (`team`), une recherche par nom (`q`, éventuellement limitée à un championnat)
+     * ou une liste de slugs (effectif). Les plus chers d'abord.
+     */
+    async getMarketPlayers(f: { team?: string; q?: string; competition?: string; slugs?: string[]; limit?: number }): Promise<MarketPlayerView[]> {
+      if (f.slugs && !f.slugs.length) return [];
+      const rows = await sql`
+        select p.sorare_slug, p.name, p.picture_url, t.name as team, t.sorare_slug as team_slug, t.picture_url as team_picture,
+          c.name as competition, c.slug as competition_slug, coalesce(p.card_positions, array[p.position]) as card_positions,
+          s.usual_position, s.l15, p.floor_in_season, p.floor_classic, pm.recent_price, pm.reference_price, pm.fair_price, pm.value_ratio,
+          pm.potential_price, pm.potential_gain, pm.price_trend7
+        from players p
+        left join player_summary s on s.player_id = p.id
+        left join player_market pm on pm.player_id = p.id
+        left join teams t on t.id = p.team_id
+        left join competitions c on c.id = t.competition_id
+        where true
+          ${f.team ? sql`and t.sorare_slug = ${f.team} and s.player_id is not null` : sql``}
+          ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`}) and t.competition_id is not null` : sql``}
+          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.slugs ? sql`and p.sorare_slug = any(${f.slugs})` : sql``}
+        order by coalesce(pm.reference_price, p.floor_in_season) desc nulls last, p.name
+        ${f.limit ? sql`limit ${f.limit}` : sql``}`;
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, team: r.team, teamSlug: r.team_slug, teamPictureUrl: r.team_picture,
+        competition: r.competition, competitionSlug: r.competition_slug, cardPositions: r.card_positions, usualPosition: r.usual_position,
+        l15: r.l15, floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, recentPrice: r.recent_price,
+        price: r.reference_price ?? r.floor_in_season, fairPrice: r.fair_price, valueRatio: r.value_ratio,
+        potentialPrice: r.potential_price, potentialGain: r.potential_gain, priceTrend7: r.price_trend7,
+      }));
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
