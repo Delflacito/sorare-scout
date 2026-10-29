@@ -35,13 +35,14 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Tier affiché par Sorare (« Star » avec 4 points) : côté carte ?
-const words = ['tier', 'stars', 'star', 'starRating', 'category', 'class', 'segment', 'level', 'rank', 'rating', 'badge', 'label', 'power',
-  'xyzStars', 'xyzCategory', 'xyzClass', 'xyzTier', 'xyzBadge', 'xyzLabel', 'xyzPower', 'xyzBonus', 'bonus'];
-const CARD = (c) => `{ anyPlayer(slug: "liam-millar") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { ${c} } } } }`;
-await probe('AnyCard (tier)', CARD, words);
-await probe('Card (tier)', (c) => CARD(`... on Card { ${c} }`), words);
-await sample('card-typename', CARD('__typename slug grade'));
+// Tier affiché par Sorare (« Star » avec 4 points) : niveau interface, autres noms.
+const words = ['tier', 'xyzTier', 'stars', 'playerTier', 'tierLabel', 'averageScoreTier', 'scoreTier', 'sorareTier', 'currentTier', 'positionTier',
+  'tierInfo', 'tierLevel', 'starTier', 'level', 'category', 'segment', 'xyzCategory', 'xyzSegment', 'xyzLevel', 'xyzRank', 'xyzStar'];
+await probe('AnyPlayerInterface', (c) => `{ anyPlayer(slug: "liam-millar") { ${c} } }`, words);
+await probe('Player (noms 2)', (c) => `{ anyPlayer(slug: "liam-millar") { ... on Player { ${c} } } }`, [
+  'tierLabel', 'averageScoreTier', 'scoreTier', 'sorareTier', 'positionTier', 'tierLevel', 'tierBySeason', 'currentSeasonTier',
+  'xyzScore', 'xyzAverage', 'averageScore', 'xyzLeaderboard', 'xyzEligib', 'xyzSo5', 'so5Tier', 'xyzCap', 'xyzPrestige',
+]);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
