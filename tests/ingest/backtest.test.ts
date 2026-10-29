@@ -39,10 +39,11 @@ describe('backtestRound', () => {
   it('projette avec les seules données antérieures à la journée', () => {
     const rows = backtestRound(fixtures, apps, { cutoff: '2026-10-24T20:00:00.000Z', fixtureIds: [4] });
     const p10 = rows.find((r) => r.playerId === 10)!;
-    // base du joueur 10 avant la journée : (60 + 80) / 2 = 70 (le 99 de la journée n'est pas utilisé)
-    expect(p10).toMatchObject({ fixtureId: 4, actual: 99, base: 70, isHome: true });
+    // Score moyen avant la journée : (60 + 40 + 70 + 80 + 50 + 30) / 6 = 55 (le 99 de la journée n'est pas utilisé).
+    // Joueur 10, 2 matchs joués : complété à 5 avec ce score moyen → (60 + 80 + 3 × 55) / 5 = 61
+    expect(p10).toMatchObject({ fixtureId: 4, actual: 99, base: 61, isHome: true });
     expect(p10.projected).not.toBeNull();
-    expect(rows.find((r) => r.playerId === 30)).toMatchObject({ actual: 10, base: 50 });
+    expect(rows.find((r) => r.playerId === 30)).toMatchObject({ actual: 10, base: 53 });
   });
 });
 

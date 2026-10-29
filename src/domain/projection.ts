@@ -2,6 +2,8 @@
 export const SHRINK_K = 5;
 /** Matchs joués retenus pour le niveau de base du joueur (L15). */
 export const BASE_GAMES = 15;
+/** En dessous de ce nombre de matchs joués, les matchs manquants comptent pour le score moyen de tous les joueurs. */
+export const MIN_BASE_GAMES = 5;
 /** Dans l'effet adversaire : concédé au poste vs qualité générale. */
 export const POSITION_WEIGHT = 0.4;
 export const TEAM_WEIGHT = 0.6;
@@ -25,9 +27,14 @@ export function shrinkTowards(value: number | null, reference: number, observati
   return (observations * value + k * reference) / (observations + k);
 }
 
-/** Niveau de base : L15 sur les matchs joués (scores du plus récent au plus ancien, absences exclues). */
-export function baseScore(scoresPlayed: number[]): number | null {
-  return scoresPlayed.length ? mean(scoresPlayed.slice(0, BASE_GAMES)) : null;
+/**
+ * Niveau de base : L15 sur les matchs joués (scores du plus récent au plus ancien, absences exclues).
+ * Avec moins de MIN_BASE_GAMES matchs, on complète avec le score moyen (reference) : un seul gros match ne fait pas un 100.
+ */
+export function baseScore(scoresPlayed: number[], reference: number): number | null {
+  if (!scoresPlayed.length) return null;
+  const recent = scoresPlayed.slice(0, BASE_GAMES);
+  return mean([...recent, ...Array(Math.max(0, MIN_BASE_GAMES - recent.length)).fill(reference)]);
 }
 
 /**

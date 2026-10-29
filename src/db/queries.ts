@@ -191,7 +191,8 @@ const toConceded = (r: postgres.Row): ConcededView => ({
 
 export function createQueries(sql: postgres.Sql) {
   const SORT_SQL: Record<Sort, postgres.PendingQuery<postgres.Row[]>> = {
-    projected: sql`s.next_projected`, l5: sql`s.l5`, l15: sql`s.l15`, l40: sql`s.l40`, startRate: sql`s.start_rate5`, nextIndex: sql`cp.index`,
+    // Joueur que Sorare annonce absent : en fin de classement par score potentiel.
+    projected: sql`case when p.playing_status = 'NOT_PLAYING' then null else s.next_projected end`, l5: sql`s.l5`, l15: sql`s.l15`, l40: sql`s.l40`, startRate: sql`s.start_rate5`, nextIndex: sql`cp.index`,
   };
 
   /** Prochain match programmé de chaque équipe. */

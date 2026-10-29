@@ -82,7 +82,7 @@ function usualPosition(apps: AppearanceRow[], fixtureById: Map<number, Completed
 }
 
 /** Niveau de base (L15 joués) et moyennes à domicile / à l'extérieur sur ces mêmes matchs. */
-function baseAndVenue(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>) {
+function baseAndVenue(apps: AppearanceRow[], fixtureById: Map<number, CompletedFixture>, reference: number) {
   const played = apps
     .filter((a) => a.minutes > 0)
     .sort((a, b) => byDateDesc(fixtureById.get(a.fixtureId)!, fixtureById.get(b.fixtureId)!))
@@ -92,7 +92,7 @@ function baseAndVenue(apps: AppearanceRow[], fixtureById: Map<number, CompletedF
   const home = played.filter(isHome);
   const away = played.filter((a) => !isHome(a));
   return {
-    base: baseScore(played.map((a) => a.score)),
+    base: baseScore(played.map((a) => a.score), reference),
     homeAvg: avg(home), homeGames: home.length, awayAvg: avg(away), awayGames: away.length,
   };
 }
@@ -103,6 +103,9 @@ function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerS
   for (const f of fixtures) for (const t of [f.homeTeamId, f.awayTeamId]) fixturesByTeam.set(t, [...(fixturesByTeam.get(t) ?? []), f]);
   const byPlayer = new Map<number, AppearanceRow[]>();
   for (const a of apps) byPlayer.set(a.playerId, [...(byPlayer.get(a.playerId) ?? []), a]);
+  // Score moyen d'un joueur qui a joué, tous matchs confondus : référence des joueurs qui ont peu joué.
+  const played = apps.filter((a) => a.minutes > 0);
+  const reference = played.length ? played.reduce((t, a) => t + a.score, 0) / played.length : 0;
 
   return [...byPlayer.entries()].map(([playerId, playerApps]) => {
     const games = playerTeamGames(playerApps, fixtureById, fixturesByTeam);
@@ -119,7 +122,7 @@ function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerS
       startRate5: pt5.startRate, avgMinutes5: pt5.avgMinutes, startRate15: pt15.startRate, avgMinutes15: pt15.avgMinutes,
       decisive5: b5.decisive, allAround5: b5.allAround, decisive15: b15.decisive, allAround15: b15.allAround,
       usualPosition: usualPosition(playerApps, fixtureById),
-      ...baseAndVenue(playerApps, fixtureById),
+      ...baseAndVenue(playerApps, fixtureById, reference),
     };
   });
 }

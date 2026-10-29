@@ -19,10 +19,13 @@ describe('shrinkTowards', () => {
 
 describe('baseScore (L15 sur les matchs joués)', () => {
   it('moyenne des 15 derniers matchs joués', () => {
-    expect(baseScore([...Array(15).fill(60), 0, 0])).toBe(60);
+    expect(baseScore([...Array(15).fill(60), 0, 0], 47)).toBe(60);
   });
-  it('moins de 10 matchs : moyenne disponible', () => expect(baseScore([80, 60])).toBe(70));
-  it('aucun match joué → null', () => expect(baseScore([])).toBeNull());
+  it('5 matchs ou plus : moyenne disponible', () => expect(baseScore([80, 60, 80, 60, 70], 47)).toBe(70));
+  it('moins de 5 matchs : complété par le score moyen (un seul match à 98,7 ne fait pas 100)', () => {
+    expect(baseScore([98.7], 47.3)).toBeCloseTo((98.7 + 4 * 47.3) / 5);
+  });
+  it('aucun match joué → null', () => expect(baseScore([], 47)).toBeNull());
 });
 
 describe('playerVenueFactor', () => {
