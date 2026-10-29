@@ -1,51 +1,53 @@
 {
  "data": {
-  "p0": {
-   "slug": "kylian-mbappe-lottin",
-   "birthDate": "1998-12-20T00:00:00+00:00",
-   "country": {
-    "code": "fr",
-    "name": "France",
-    "flagUrl": "https://flags/FR.png"
+  "players": [
+   {
+    "slug": "kylian-mbappe-lottin",
+    "birthDate": "1998-12-20T00:00:00+00:00",
+    "country": {
+     "code": "fr",
+     "name": "France",
+     "flagUrl": "https://flags/FR.png"
+    },
+    "s2026": {
+     "appearances": 9,
+     "substituteIn": 1,
+     "goals": 8,
+     "assists": 2,
+     "minutesPlayed": 790,
+     "yellowCards": 0,
+     "redCards": 0
+    },
+    "s2025": {
+     "appearances": 31,
+     "substituteIn": 2,
+     "goals": 25,
+     "assists": 5,
+     "minutesPlayed": 2606,
+     "yellowCards": 2,
+     "redCards": 0
+    },
+    "s2024": {
+     "appearances": 0,
+     "substituteIn": 0,
+     "goals": 0,
+     "assists": 0,
+     "minutesPlayed": 0,
+     "yellowCards": 0,
+     "redCards": 0
+    },
+    "activeClub": {
+     "slug": "real-madrid-madrid",
+     "name": "Real Madrid",
+     "pictureUrl": "https://t/rm.png"
+    },
+    "firstName": "Kylian",
+    "lastName": "Mbappé",
+    "height": 178,
+    "shirtNumber": 10,
+    "pictureUrl": "https://p/mbappe-trimmed.png"
    },
-   "s2026": {
-    "appearances": 9,
-    "substituteIn": 1,
-    "goals": 8,
-    "assists": 2,
-    "minutesPlayed": 790,
-    "yellowCards": 0,
-    "redCards": 0
-   },
-   "s2025": {
-    "appearances": 31,
-    "substituteIn": 2,
-    "goals": 25,
-    "assists": 5,
-    "minutesPlayed": 2606,
-    "yellowCards": 2,
-    "redCards": 0
-   },
-   "s2024": {
-    "appearances": 0,
-    "substituteIn": 0,
-    "goals": 0,
-    "assists": 0,
-    "minutesPlayed": 0,
-    "yellowCards": 0,
-    "redCards": 0
-   },
-   "activeClub": {
-    "slug": "real-madrid-madrid",
-    "name": "Real Madrid",
-    "pictureUrl": "https://t/rm.png"
-   },
-   "firstName": "Kylian",
-   "lastName": "Mbapp\u00e9",
-   "height": 178,
-   "shirtNumber": 10,
-   "pictureUrl": "https://p/mbappe-trimmed.png"
-  },
-  "p1": null
+   null
+  ]
  }
 }

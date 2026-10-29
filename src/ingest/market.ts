@@ -10,7 +10,7 @@ export interface MarketOptions { deadline?: number; batchSize?: number; concurre
 /** Prix planchers et dernières ventes Limited de chaque joueur des clubs suivis. */
 export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): Promise<{ updated: number; errors: string[] }> {
   const season = opts.season ?? new Date(seasonStart()).getUTCFullYear();
-  const size = opts.batchSize ?? 5;
+  const size = opts.batchSize ?? 20;
   const slugs = await deps.repo.playersForMarket();
   const batches = Array.from({ length: Math.ceil(slugs.length / size) }, (_, i) => slugs.slice(i * size, (i + 1) * size));
   const errors: string[] = [];

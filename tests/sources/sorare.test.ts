@@ -3,13 +3,14 @@ import { createSorareClient } from '@/sources/sorare';
 
 const fixture = (name: string) => JSON.parse(readFileSync(`tests/fixtures/sorare/${name}.json`, 'utf8'));
 
-function fakeFetch(byQuery: [RegExp, unknown][]) {
+function fakeFetch(byQuery: [RegExp, unknown | ((variables: Record<string, unknown>) => unknown)][]) {
   const requests: { headers: Headers; body: { query: string; variables: Record<string, unknown> } }[] = [];
   const impl = async (_url: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body));
     requests.push({ headers: new Headers(init?.headers), body });
     const hit = byQuery.find(([re]) => re.test(body.query));
-    return new Response(JSON.stringify(hit ? hit[1] : { errors: [{ message: 'unexpected' }] }), { status: 200 });
+    const data = hit ? (typeof hit[1] === 'function' ? hit[1](body.variables) : hit[1]) : { errors: [{ message: 'unexpected' }] };
+    return new Response(JSON.stringify(data), { status: 200 });
   };
   return { impl: impl as typeof fetch, requests };
 }
@@ -88,7 +89,8 @@ describe('client Sorare', () => {
   it('profils : naissance, nationalité, saisons jouées (une requête pour plusieurs joueurs)', async () => {
     const f = fakeFetch([[/PlayerProfiles/, fixture('player-profiles')]]);
     const profiles = await createSorareClient('k', f.impl).playerProfiles(['kylian-mbappe-lottin', 'inconnu'], [2026, 2025, 2024]);
-    expect(f.requests[0].body.variables).toEqual({ p0: 'kylian-mbappe-lottin', p1: 'inconnu' });
+    expect(f.requests[0].body.variables).toEqual({ slugs: ['kylian-mbappe-lottin', 'inconnu'] });
+    expect(f.requests[0].body.query).toContain('players(slugs: $slugs)');
     expect(f.requests[0].body.query).toContain('s2024: stats(seasonStartYear: 2024)');
     expect(profiles).toEqual([{
       slug: 'kylian-mbappe-lottin', birthDate: '1998-12-20',
@@ -102,12 +104,15 @@ describe('client Sorare', () => {
   });
 
   it('marché : taux de change, prix planchers et ventes convertis en euros', async () => {
-    const f = fakeFetch([[/ExchangeRates/, fixture('exchange-rates')], [/PlayerMarkets/, fixture('player-markets')]]);
+    const sales = fixture('player-sales');
+    const f = fakeFetch([[/ExchangeRates/, fixture('exchange-rates')], [/PlayerFloors/, fixture('player-floors')],
+      [/PlayerSales/, (v: Record<string, unknown>) => sales[v.slug as string]]]);
     const client = createSorareClient('k', f.impl);
     const rates = await client.exchangeRates();
     expect(rates).toEqual({ usdToEur: 0.8, weiToEur: 2e-15 });
     const [m, empty] = await client.playerMarkets(['kylian-mbappe-lottin', 'no-cards', 'inconnu'], rates, 2026, 30);
-    expect(f.requests[1].body.query).toContain('tokenPrices(rarity: limited, last: 30)');
+    expect(f.requests[1].body.variables).toEqual({ slugs: ['kylian-mbappe-lottin', 'no-cards', 'inconnu'] });
+    expect(f.requests[2].body.variables).toEqual({ slug: 'kylian-mbappe-lottin', last: 30 });
     expect(m).toEqual({
       slug: 'kylian-mbappe-lottin', floorInSeason: 184.5, floorClassic: 52.4,
       sales: [

@@ -1,0 +1,42 @@
+{
+ "data": {
+  "players": [
+   {
+    "slug": "kylian-mbappe-lottin",
+    "inSeason": {
+     "seasonYear": 2026,
+     "liveSingleSaleOffer": {
+      "receiverSide": {
+       "amounts": {
+        "eurCents": 18450,
+        "usdCents": null,
+        "wei": null
+       }
+      }
+     }
+    },
+    "anySeason": {
+     "seasonYear": 2021,
+     "liveSingleSaleOffer": {
+      "receiverSide": {
+       "amounts": {
+        "eurCents": null,
+        "usdCents": 6550,
+        "wei": null
+       }
+      }
+     }
+    }
+   },
+   {
+    "slug": "no-cards",
+    "inSeason": null,
+    "anySeason": {
+     "seasonYear": 2026,
+     "liveSingleSaleOffer": null
+    }
+   },
+   null
+  ]
+ }
+}
