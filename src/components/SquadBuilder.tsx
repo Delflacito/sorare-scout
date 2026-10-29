@@ -155,7 +155,7 @@ export function SquadBuilder({ competitions, teams }: {
         <div className="table-wrap">
           <table aria-label="Cartes de l’effectif">
             <thead>
-              <tr><th>Joueur</th><th>Statut</th><th>Prix d’achat</th><th>Prix actuel</th><th>+/− value</th><th>Potentiel GW</th><th /></tr>
+              <tr><th>Joueur</th><th>Statut</th><th>Prix d’achat</th><th>Prix actuel</th><th>Dernière enchère</th><th>+/− value</th><th>Potentiel GW</th><th /></tr>
             </thead>
             <tbody>
               {leagueEntries.map((e) => {
@@ -183,6 +183,7 @@ export function SquadBuilder({ competitions, teams }: {
                         onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value) })} />
                     </td>
                     <td className="num">{p?.price == null ? '—' : fmtEur(p.price)}</td>
+                    <td className="num">{p?.lastAuction ? fmtEur(p.lastAuction.eur) : '—'}</td>
                     <td className={`num ${diff === null ? '' : diff > 0 ? 'hot' : diff < 0 ? 'cold' : ''}`}>
                       {diff === null ? '—' : `${diff >= 0 ? '+' : '−'}${fmtEur(Math.abs(diff))}`}
                     </td>

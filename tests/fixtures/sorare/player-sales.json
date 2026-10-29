@@ -24,6 +24,9 @@
        },
        "card": {
         "seasonYear": 2026
+       },
+       "deal": {
+        "__typename": "TokenAuction"
        }
       },
       {

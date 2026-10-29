@@ -19,6 +19,7 @@ const mp = (slug: string, floor: number | null, classic: number | null): MarketP
   slug, name: slug, pictureUrl: null, team: 'PSV', teamSlug: 'psv', teamPictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie',
   cardPositions: ['Midfielder'], usualPosition: 'CM', l15: 50, floorInSeason: floor, floorClassic: classic, recentPrice: floor, price: floor,
   fairPrice: floor && floor * 1.5, valueRatio: floor ? 1 / 1.5 : null, potentialPrice: null, potentialGain: null, priceTrend7: null,
+  lastAuction: floor ? { eur: floor - 1, date: '2026-10-28T10:00:00.000Z' } : null,
 });
 
 describe('/marche', () => {

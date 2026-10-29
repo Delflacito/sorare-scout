@@ -41,7 +41,7 @@ export interface PlayerProfileInput {
 }
 export interface PlayerMarketInput {
   slug: string; floorInSeason: number | null; floorClassic: number | null;
-  sales: { date: string; eur: number; seasonYear: number | null }[];
+  sales: { date: string; eur: number; seasonYear: number | null; auction?: boolean }[];
 }
 /** Joueur coté : ce qui entre dans la valeur estimée et le potentiel. */
 export interface MarketInputRow {
@@ -402,9 +402,9 @@ function createBaseRepo(sql: Sql) {
         returning p.id, p.sorare_slug`;
       const idOf = new Map(ids.map((r) => [r.sorare_slug as string, r.id as number]));
       const sales = markets.flatMap((m) => (idOf.has(m.slug) ? m.sales.map((x) => ({
-        player_id: idOf.get(m.slug)!, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season,
+        player_id: idOf.get(m.slug)!, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season, auction: x.auction ?? false,
       })) : []));
-      for (const chunk of chunks(sales)) await sql`insert into card_sales ${sql(chunk)} on conflict do nothing`;
+      for (const chunk of chunks(sales)) await sql`insert into card_sales ${sql(chunk)} on conflict (player_id, sold_at, price_eur) do update set auction = excluded.auction`;
       await sql`delete from card_sales where sold_at < now() - interval '60 days'`;
     },
 
