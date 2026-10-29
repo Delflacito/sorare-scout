@@ -13,6 +13,21 @@ export const dynamic = 'force-dynamic';
 
 const sum = (xs: (number | null)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
 
+/** Valeur actuelle (dernières ventes réelles des cartes de la saison) face à la valeur estimée par le modèle. */
+function ActualVsFair({ history, fair }: { history: ValueSeries; fair: number }) {
+  const actual = history.season.at(-1)?.raw ?? null;
+  return (
+    <>
+      <div className="card"><div className="card-kicker">Valeur actuelle (ventes)</div><strong>{actual === null ? '—' : fmtEur(actual)}</strong>
+        <div className="muted small">dernière vente de chaque joueur</div></div>
+      <div className="card"><div className="card-kicker">Valeur estimée</div><strong>{fmtEur(fair)}</strong>
+        {actual ? (
+          <div className={`small ${fair > actual ? 'hot' : fair < actual ? 'cold' : 'muted'}`}>{fmtChange(fair / actual - 1)} par rapport à la valeur actuelle</div>
+        ) : null}</div>
+    </>
+  );
+}
+
 function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView[]; competition?: string; yy: string; history: ValueSeries }) {
   const total = sum(clubs.map((c) => c.totalFloor));
   return (
@@ -21,7 +36,7 @@ function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView
         <div className="card"><div className="card-kicker">Clubs</div><strong>{clubs.length}</strong></div>
         <div className="card"><div className="card-kicker">Cartes cotées</div><strong>{sum(clubs.map((c) => c.priced))}</strong></div>
         <div className="card"><div className="card-kicker">Valeur totale (planchers)</div><strong>{fmtEur(total)}</strong></div>
-        <div className="card"><div className="card-kicker">Valeur estimée totale</div><strong>{fmtEur(sum(clubs.map((c) => c.totalFair)))}</strong></div>
+        <ActualVsFair history={history} fair={sum(clubs.map((c) => c.totalFair))} />
       </div>
       <ValueChart series={history} yy={yy} subject="tous les clubs du championnat" />
       <div className="table-wrap">
@@ -59,7 +74,7 @@ function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy
         <div className="card"><div className="card-kicker">Total planchers {yy}</div><strong>{fmtEur(sum(players.map((p) => p.floorInSeason)))}</strong>
           <div className="muted small">{priced.length} carte{priced.length > 1 ? 's' : ''} en vente sur {players.length} joueur{players.length > 1 ? 's' : ''}</div></div>
         <div className="card"><div className="card-kicker">Total planchers Classic</div><strong>{fmtEur(sum(players.map((p) => p.floorClassic)))}</strong></div>
-        <div className="card"><div className="card-kicker">Total valeur estimée</div><strong>{fmtEur(sum(players.map((p) => p.fairPrice)))}</strong></div>
+        <ActualVsFair history={history} fair={sum(players.map((p) => p.fairPrice))} />
       </div>
       <ValueChart series={history} yy={yy} />
       <div className="table-wrap">

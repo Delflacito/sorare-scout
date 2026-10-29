@@ -40,7 +40,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
   if (series.season.length < 2 && series.classic.length < 2) return null;
   const points = series[cards];
   const season = cards === 'season';
-  const label = 'Valeur (prix de vente)';
+  const label = 'Valeur actuelle';
   const toggle = (
     <div className="segmented" role="radiogroup" aria-label="Cartes">
       {([['season', `Saison ${yy}`], ['classic', 'Classic']] as const).map(([v, text]) => (
@@ -51,7 +51,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
   if (points.length < 2) {
     return (
       <figure className="card chart-card">
-        <figcaption className="chart-head"><span className="card-title">Évolution de la valeur</span>{toggle}</figcaption>
+        <figcaption className="chart-head"><span className="card-title">Évolution de la valeur actuelle</span>{toggle}</figcaption>
         <p className="empty">Pas assez de ventes de cartes {season ? `de la saison ${yy}` : 'Classic'} pour tracer une courbe</p>
       </figure>
     );
@@ -71,7 +71,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
   return (
     <figure className="card chart-card">
       <figcaption className="chart-head">
-        <span className="card-title">Évolution de la valeur</span>
+        <span className="card-title">Évolution de la valeur actuelle</span>
         {toggle}
       </figcaption>
       <p className="chart-avg">

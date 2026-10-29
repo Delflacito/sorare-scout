@@ -32,7 +32,9 @@ describe('/marche', () => {
       { slug: 'psv', name: 'PSV', pictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie', players: 25, priced: 18, totalFloor: 640, topPlayer: 'Xavi', topPrice: 120, totalFair: 800 },
     ]);
     render(await Page(params({ competition: 'eredivisie' })));
-    expect(screen.getByText('Valeur estimée totale').parentElement).toHaveTextContent('800 €');
+    // Valeur actuelle : dernières ventes de la saison (3 joueurs à 50 €) face à la valeur estimée (800 €)
+    expect(screen.getByText('Valeur actuelle (ventes)').parentElement).toHaveTextContent('150 €');
+    expect(screen.getAllByText('Valeur estimée').find((e) => e.classList.contains('card-kicker'))!.parentElement).toHaveTextContent('800 €+433 % par rapport à la valeur actuelle');
     const chart = screen.getByRole('figure');
     expect(within(chart).getByRole('img')).toHaveAccessibleName(/tous les clubs du championnat/);
   });
@@ -62,7 +64,10 @@ describe('/marche', () => {
     // Graphique : somme des ventes réelles (3 × 40 = 120 puis 3 × 50 = 150), adoucie par la moyenne pondérée :
     // (3 × 150 + 2 × 120) / 5 = 138 contre 120, soit +15 % ; la valeur estimée n'intervient pas
     const chart = screen.getByRole('figure');
-    expect(chart).toHaveTextContent('Valeur (prix de vente) depuis le 21 oct.');
+    expect(chart).toHaveTextContent('Évolution de la valeur actuelle');
+    expect(chart).toHaveTextContent('Valeur actuelle depuis le 21 oct.');
+    // Valeur estimée du club (60 + 18,75 = 78,75 €) : −47 % par rapport à la valeur actuelle (150 €), arrondi de −47,5 %
+    expect(screen.getAllByText('Valeur estimée').find((e) => e.classList.contains('card-kicker'))!.parentElement).toHaveTextContent('−47 % par rapport à la valeur actuelle');
     expect(within(chart).getByRole('img')).toHaveAccessibleName(/de 120 € le 21 oct\. à 138 €/);
     expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2); // 21 et 22 octobre
     expect(within(chart).getByText('+15 %')).toBeInTheDocument();

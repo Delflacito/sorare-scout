@@ -149,8 +149,8 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
 export interface DailyPrice { slug: string; day: string; price: number; inSeason: boolean }
 /** Jours de la moyenne pondérée de la courbe : le jour même pèse WEIGHTED_DAYS, la veille un de moins, etc. */
 export const WEIGHTED_DAYS = 3;
-/** players : joueurs vendus ce jour-là. */
-export interface ValuePoint { day: string; value: number; players: number }
+/** value : somme lissée ; raw : somme du jour sans lissage ; players : joueurs vendus ce jour-là. */
+export interface ValuePoint { day: string; value: number; raw: number; players: number }
 /** Courbes des cartes de la saison et Classic (prix de vente réels). */
 export interface ValueSeries { season: ValuePoint[]; classic: ValuePoint[] }
 
@@ -187,7 +187,7 @@ export function valueHistory(prices: { slug: string; day: string; price: number 
     const weights = window.map((__, j) => weightedDays - j);
     return window.reduce((t, v, j) => t + v.total * weights[j], 0) / weights.reduce((a, b) => a + b, 0);
   });
-  return days.map((day, i) => ({ day, value: weighted[i], players: totals[i].sold }));
+  return days.map((day, i) => ({ day, value: weighted[i], raw: totals[i].total, players: totals[i].sold }));
 }
 
 /** Les deux courbes d'un effectif : cartes de la saison et cartes Classic. */
