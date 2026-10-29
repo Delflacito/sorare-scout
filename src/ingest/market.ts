@@ -5,7 +5,8 @@ import { ageAt } from '@/lib/format';
 import { seasonStart } from './leagues';
 
 export interface MarketDeps { sorare: SorareClient; repo: Repo }
-export interface MarketOptions { deadline?: number; batchSize?: number; concurrency?: number; season?: number }
+/** sales : nombre de dernières ventes demandées par joueur (50 par défaut ; davantage pour reconstituer l'historique). */
+export interface MarketOptions { deadline?: number; batchSize?: number; concurrency?: number; season?: number; sales?: number }
 
 /** Prix planchers et dernières ventes Limited de chaque joueur des clubs suivis. */
 export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): Promise<{ updated: number; errors: string[] }> {
@@ -25,7 +26,7 @@ export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): 
     for (let batch = batches.shift(); batch; batch = batches.shift()) {
       if (opts.deadline !== undefined && Date.now() > opts.deadline) return;
       try {
-        const markets = await deps.sorare.playerMarkets(batch, rates, season);
+        const markets = await deps.sorare.playerMarkets(batch, rates, season, opts.sales);
         await deps.repo.saveMarkets(markets, season);
         updated += markets.length;
       } catch (e) {

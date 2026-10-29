@@ -406,7 +406,8 @@ function createBaseRepo(sql: Sql) {
         player_id: idOf.get(m.slug)!, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season, auction: x.auction ?? false,
       })) : []));
       for (const chunk of chunks(sales)) await sql`insert into card_sales ${sql(chunk)} on conflict (player_id, sold_at, price_eur) do update set auction = excluded.auction`;
-      await sql`delete from card_sales where sold_at < now() - interval '60 days'`;
+      // 120 jours : de quoi tracer l'évolution de la valeur des clubs depuis le début de saison.
+      await sql`delete from card_sales where sold_at < now() - interval '120 days'`;
     },
 
     async marketInputs(): Promise<MarketInputRow[]> {

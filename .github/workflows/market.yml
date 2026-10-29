@@ -5,10 +5,14 @@ on:
   schedule:
     - cron: '23 16 * * *'
   workflow_dispatch:
+    inputs:
+      ventes:
+        description: Ventes demandées par joueur (50 par défaut ; davantage pour rattraper l'historique)
+        default: '50'
 jobs:
   market:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,3 +24,4 @@ jobs:
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MARKET_SALES: ${{ inputs.ventes }}
