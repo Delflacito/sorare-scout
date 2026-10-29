@@ -8,7 +8,7 @@ vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
   getQueries: () => ({
     getClubsMarket, getMarketPlayers,
-    getClubDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
+    getDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
       { slug, day: '2026-10-15', price: 40 }, { slug, day: '2026-10-22', price: 50 },
     ]),
     listCompetitions: async () => [{ slug: 'eredivisie', name: 'Eredivisie' }],
@@ -26,15 +26,26 @@ const mp = (slug: string, floor: number | null, classic: number | null): MarketP
 });
 
 describe('/marche', () => {
+  it('championnat choisi : valeur estimée totale et sa courbe ; aucune courbe pour toutes les ligues', async () => {
+    getClubsMarket.mockResolvedValue([
+      { slug: 'psv', name: 'PSV', pictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie', players: 25, priced: 18, totalFloor: 640, topPlayer: 'Xavi', topPrice: 120, totalFair: 800 },
+    ]);
+    render(await Page(params({ competition: 'eredivisie' })));
+    expect(screen.getByText('Valeur estimée totale').parentElement).toHaveTextContent('800 €');
+    const chart = screen.getByRole('figure');
+    expect(within(chart).getByRole('img')).toHaveAccessibleName(/tous les clubs du championnat.*800 €/);
+  });
+
   it('récapitulatif : valeur totale par club', async () => {
     getClubsMarket.mockResolvedValue([
-      { slug: 'psv', name: 'PSV', pictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie', players: 25, priced: 18, totalFloor: 640, topPlayer: 'Xavi', topPrice: 120 },
+      { slug: 'psv', name: 'PSV', pictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie', players: 25, priced: 18, totalFloor: 640, topPlayer: 'Xavi', topPrice: 120, totalFair: 800 },
     ]);
     render(await Page(params()));
     const row = within(screen.getByRole('table', { name: 'Valeur des cartes par club' })).getAllByRole('row')[1];
     expect(within(row).getByRole('link', { name: 'PSV' })).toHaveAttribute('href', '/marche?club=psv');
     expect(within(row).getByText('640 €')).toBeInTheDocument();
     expect(within(row).getByText('18 / 25')).toBeInTheDocument();
+    expect(screen.queryByRole('figure')).not.toBeInTheDocument();
   });
 
   it('club : prix de toutes les cartes et totaux', async () => {

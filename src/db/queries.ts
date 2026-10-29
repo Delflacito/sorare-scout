@@ -116,6 +116,8 @@ export interface TradingRow {
 export interface ClubMarketView {
   slug: string; name: string; pictureUrl: string | null; competition: string; competitionSlug: string;
   players: number; priced: number; totalFloor: number; topPlayer: string | null; topPrice: number | null;
+  /** Somme des valeurs estimées des joueurs du club. */
+  totalFair: number;
 }
 /** Joueur coté (marché, effectif) : prix de référence = carte de la saison la moins chère en vente. */
 export interface MarketPlayerView {
@@ -632,14 +634,17 @@ export function createQueries(sql: postgres.Sql) {
       const rows = await sql`
         select t.sorare_slug, t.name, t.picture_url, c.name as competition, c.slug as competition_slug,
           count(p.id)::int as players, count(p.floor_in_season)::int as priced, coalesce(sum(p.floor_in_season), 0) as total_floor,
-          (array_agg(p.name order by p.floor_in_season desc nulls last))[1] as top_player, max(p.floor_in_season) as top_price
+          (array_agg(p.name order by p.floor_in_season desc nulls last))[1] as top_player, max(p.floor_in_season) as top_price,
+          coalesce(sum(pm.fair_price), 0) as total_fair
         from teams t join competitions c on c.id = t.competition_id
         left join players p on p.team_id = t.id and exists (select 1 from player_summary s where s.player_id = p.id)
+        left join player_market pm on pm.player_id = p.id
         where true ${competition ? sql`and c.slug = ${competition}` : sql``}
         group by t.id, c.id order by total_floor desc, t.name`;
       return rows.map((r) => ({
         slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, competition: r.competition, competitionSlug: r.competition_slug,
         players: r.players, priced: r.priced, totalFloor: r.total_floor, topPlayer: r.priced ? r.top_player : null, topPrice: r.top_price,
+        totalFair: r.total_fair,
       }));
     },
 
@@ -677,15 +682,18 @@ export function createQueries(sql: postgres.Sql) {
       }));
     },
 
-    /** Prix médian des cartes de la saison de chaque joueur d'un club, jour par jour (heure de Paris). */
-    async getClubDailyPrices(team: string): Promise<DailyPrice[]> {
+    /** Prix médian des cartes de la saison de chaque joueur d'un club ou d'un championnat, jour par jour (heure de Paris). */
+    async getDailyPrices(f: { team?: string; competition?: string }): Promise<DailyPrice[]> {
       const rows = await sql`
         select p.sorare_slug, to_char(cs.sold_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day,
           percentile_cont(0.5) within group (order by cs.price_eur) as price
         from card_sales cs
         join players p on p.id = cs.player_id
         join teams t on t.id = p.team_id
-        where t.sorare_slug = ${team} and cs.in_season and exists (select 1 from player_summary s where s.player_id = p.id)
+        join competitions c on c.id = t.competition_id
+        where cs.in_season and exists (select 1 from player_summary s where s.player_id = p.id)
+          ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
+          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
         group by 1, 2`;
       return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price }));
     },

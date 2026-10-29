@@ -95,5 +95,9 @@ describe('valueHistory', () => {
     ], 50);
     expect(h.map((p) => p.day)).toEqual(['2026-10-22', '2026-10-23']);
     expect(valueHistory([], 80)).toEqual([]);
+    // Championnat : jour le plus fourni à 100 joueurs, seuil plafonné à 20 (et non 50)
+    const many = (d: string, n: number) => day(d, Object.fromEntries(Array.from({ length: n }, (_, i) => [`p${i}`, 10])));
+    expect(valueHistory([...many('2026-10-01', 25), ...many('2026-10-05', 100), ...many('2026-10-09', 15)], 1).map((p) => p.day))
+      .toEqual(['2026-10-01', '2026-10-05']);
   });
 });

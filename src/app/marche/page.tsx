@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 const sum = (xs: (number | null)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
 
-function ClubsTable({ clubs, competition }: { clubs: ClubMarketView[]; competition?: string }) {
+function ClubsTable({ clubs, competition, history }: { clubs: ClubMarketView[]; competition?: string; history: ValuePoint[] }) {
   const total = sum(clubs.map((c) => c.totalFloor));
   return (
     <>
@@ -21,7 +21,9 @@ function ClubsTable({ clubs, competition }: { clubs: ClubMarketView[]; competiti
         <div className="card"><div className="card-kicker">Clubs</div><strong>{clubs.length}</strong></div>
         <div className="card"><div className="card-kicker">Cartes cotées</div><strong>{sum(clubs.map((c) => c.priced))}</strong></div>
         <div className="card"><div className="card-kicker">Valeur totale (planchers)</div><strong>{fmtEur(total)}</strong></div>
+        <div className="card"><div className="card-kicker">Valeur estimée totale</div><strong>{fmtEur(sum(clubs.map((c) => c.totalFair)))}</strong></div>
       </div>
+      <ValueChart points={history} subject="tous les clubs du championnat" />
       <div className="table-wrap">
         <table aria-label="Valeur des cartes par club">
           <thead>
@@ -119,8 +121,13 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   const [competitions, teams] = await Promise.all([queries.listCompetitions(), queries.listTeams()]);
   const clubTeam = club ? teams.find((t) => t.slug === club) : undefined;
   const yy = String(new Date(seasonStart()).getUTCFullYear() % 100).padStart(2, '0');
+  // Championnat choisi : courbe de la valeur estimée de tous ses clubs (pas de courbe pour « toutes les ligues »).
+  const leagueView = async () => {
+    const [clubs, prices] = await Promise.all([queries.getClubsMarket(competition), competition ? queries.getDailyPrices({ competition }) : []]);
+    return <ClubsTable clubs={clubs} competition={competition} history={valueHistory(prices, sum(clubs.map((c) => c.totalFair)))} />;
+  };
   const clubView = async (team: string) => {
-    const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getClubDailyPrices(team)]);
+    const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team })]);
     return <ClubPlayers players={players} yy={yy} history={valueHistory(prices, sum(players.map((p) => p.fairPrice)))} />;
   };
 
@@ -142,7 +149,7 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
       {clubTeam && <p><Link href={competition ? `/marche?competition=${competition}` : '/marche'}>← Tous les clubs</Link></p>}
       {clubTeam
         ? await clubView(clubTeam.slug)
-        : <ClubsTable clubs={await queries.getClubsMarket(competition)} competition={competition} />}
+        : await leagueView()}
     </main>
   );
 }

@@ -153,7 +153,8 @@ export interface ValuePoint { day: string; value: number; players: number }
 /**
  * Évolution de la valeur d'un effectif, chaînée jour par jour comme un indice : d'un jour au suivant, variation des prix
  * médians des joueurs vendus les deux jours ; le dernier jour vaut `current` (valeur estimée actuelle).
- * Jours écartés : moins de 3 joueurs vendus ou moins de la moitié du jour le plus fourni (une vente isolée fausserait la courbe).
+ * Jours écartés : moins de 3 joueurs vendus, ou moins de la moitié du jour le plus fourni (seuil plafonné à 20 joueurs, assez
+ * pour un championnat entier) : une vente isolée fausserait la courbe.
  */
 export function valueHistory(prices: DailyPrice[], current: number): ValuePoint[] {
   // Prix de chaque joueur un jour donné : médiane de ses prix médians des SMOOTH_DAYS derniers jours (lisse le bruit quotidien).
@@ -167,7 +168,7 @@ export function valueHistory(prices: DailyPrice[], current: number): ValuePoint[
     byDay.set(p.day, (byDay.get(p.day) ?? new Map()).set(p.slug, median(recent)!));
   }
   const most = Math.max(0, ...[...byDay.values()].map((m) => m.size));
-  const days = [...byDay.keys()].filter((d) => byDay.get(d)!.size >= Math.max(3, most / 2)).sort();
+  const days = [...byDay.keys()].filter((d) => byDay.get(d)!.size >= Math.max(3, Math.min(most / 2, 20))).sort();
   if (!days.length) return [];
   const values = new Array<number>(days.length);
   values[days.length - 1] = current;

@@ -22,8 +22,8 @@ function ticks(min: number, max: number): number[] {
   return Array.from({ length: Math.ceil((max - from) / step) + 1 }, (_, i) => from + i * step);
 }
 
-/** Valeur estimée de l'effectif d'un club, jour par jour. */
-export function ValueChart({ points }: { points: ValuePoint[] }) {
+/** Valeur estimée de l'effectif d'un club (ou de tous les clubs d'un championnat), jour par jour. */
+export function ValueChart({ points, subject = 'l’effectif' }: { points: ValuePoint[]; subject?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const [width, setWidth] = useState(640);
   const ref = useRef<HTMLDivElement>(null);
@@ -58,7 +58,7 @@ export function ValueChart({ points }: { points: ValuePoint[] }) {
       </figcaption>
       <div ref={ref} className="chart-box" style={{ width: '100%' }} onMouseLeave={() => setHover(null)}>
         <svg width={width} height={H} role="img"
-          aria-label={`Valeur estimée de l’effectif, de ${fmtEur(first.value)} le ${fmtDay(first.day)} à ${fmtEur(last.value)} aujourd’hui`}>
+          aria-label={`Valeur estimée de ${subject}, de ${fmtEur(first.value)} le ${fmtDay(first.day)} à ${fmtEur(last.value)} aujourd’hui`}>
           {yTicks.map((v) => (
             <g key={v}>
               <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className="grid" />
