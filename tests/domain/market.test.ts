@@ -73,7 +73,7 @@ describe('valueHistory', () => {
       ...day('2026-10-01', { a: 10, b: 30, c: 5 }),
       ...day('2026-10-05', { a: 12, b: 36, c: 6 }), // +20 %
       ...day('2026-10-09', { a: 12, d: 99, e: 7 }), // seul a en commun : stable
-    ], 120);
+    ], 120, 1);
     expect(h.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
     expect(h.map((p) => Math.round(p.value))).toEqual([100, 120, 120]);
     expect(h.map((p) => p.players)).toEqual([3, 3, 3]);
@@ -83,8 +83,22 @@ describe('valueHistory', () => {
       ...day('2026-10-22', { a: 10, b: 10, c: 10 }),
       ...day('2026-10-23', { a: 10, b: 10, c: 10 }),
       ...day('2026-10-24', { a: 2, b: 10, c: 10 }), // a : médiane (10, 10, 2) = 10
-    ], 30);
+    ], 30, 1);
     expect(h.map((p) => Math.round(p.value))).toEqual([30, 30, 30]);
+  });
+  it('moyenne pondérée des jours précédents (7, 6, 5…) : un jour isolé pèse moins, le dernier point reste la valeur actuelle', () => {
+    const d = (n: number) => `2026-10-${String(n).padStart(2, '0')}`;
+    // Valeurs brutes 100, 100, 100, 50 (chute d'un jour), puis retour à 100
+    const raw = [10, 10, 10, 5, 10];
+    const prices = raw.flatMap((p, i) => day(d(1 + i * 4), { a: p, b: p, c: p }));
+    const flat = valueHistory(prices, 100, 1).map((p) => Math.round(p.value));
+    expect(flat).toEqual([100, 100, 100, 50, 100]);
+    const h = valueHistory(prices, 100).map((p) => p.value);
+    // Le creux : (7 × 50 + 6 × 100 + 5 × 100 + 4 × 100) / 22 = 84,1, remis à l'échelle du dernier point
+    const last = (7 * 100 + 6 * 50 + 5 * 100 + 4 * 100 + 3 * 100) / 25;
+    expect(h[3]).toBeCloseTo(((7 * 50 + 6 * 100 + 5 * 100 + 4 * 100) / 22) * (100 / last));
+    expect(h.at(-1)).toBeCloseTo(100);
+    expect(Math.min(...h)).toBeGreaterThan(80);
   });
   it('jours trop pauvres écartés (moins de 3 joueurs ou moins de la moitié du jour le plus fourni)', () => {
     const h = valueHistory([

@@ -96,7 +96,8 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
       </details>
       <p className="note">
         Reconstituée d’après les ventes de cartes de la saison : chaque jour, variation des prix médians des joueurs
-        vendus aussi le jour précédent, ramenée à la valeur estimée d’aujourd’hui. Jours avec trop peu de ventes écartés.
+        vendus aussi le jour précédent, ramenée à la valeur estimée d’aujourd’hui. Chaque point est une moyenne pondérée
+        des 7 derniers jours (le jour même compte le plus). Jours avec trop peu de ventes écartés.
       </p>
     </figure>
   );

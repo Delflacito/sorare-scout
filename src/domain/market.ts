@@ -148,6 +148,8 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
 export interface DailyPrice { slug: string; day: string; price: number }
 /** Jours glissants sur lesquels le prix de chaque joueur est lissé. */
 export const SMOOTH_DAYS = 3;
+/** Jours de la moyenne pondérée de la courbe : le jour même pèse WEIGHTED_DAYS, la veille un de moins, etc. */
+export const WEIGHTED_DAYS = 7;
 export interface ValuePoint { day: string; value: number; players: number }
 
 /**
@@ -156,7 +158,7 @@ export interface ValuePoint { day: string; value: number; players: number }
  * Jours écartés : moins de 3 joueurs vendus, ou moins de la moitié du jour le plus fourni (seuil plafonné à 20 joueurs, assez
  * pour un championnat entier) : une vente isolée fausserait la courbe.
  */
-export function valueHistory(prices: DailyPrice[], current: number): ValuePoint[] {
+export function valueHistory(prices: DailyPrice[], current: number, weightedDays = WEIGHTED_DAYS): ValuePoint[] {
   // Prix de chaque joueur un jour donné : médiane de ses prix médians des SMOOTH_DAYS derniers jours (lisse le bruit quotidien).
   const dayMs = 86_400_000;
   const byPlayer = new Map<string, { t: number; price: number }[]>();
@@ -180,5 +182,13 @@ export function valueHistory(prices: DailyPrice[], current: number): ValuePoint[
     const sumBefore = common.reduce((t, s) => t + before.get(s)!, 0);
     values[i - 1] = sumNow && sumBefore ? values[i] * (sumBefore / sumNow) : values[i];
   }
-  return days.map((day, i) => ({ day, value: values[i], players: byDay.get(day)!.size }));
+  // Moyenne pondérée des jours précédents (poids décroissants) pour qu'un seul jour ne fasse pas plonger la courbe,
+  // puis remise à l'échelle : le dernier point reste la valeur estimée actuelle.
+  const weighted = values.map((_, i) => {
+    const window = values.slice(Math.max(0, i - weightedDays + 1), i + 1).reverse();
+    const weights = window.map((__, j) => weightedDays - j);
+    return window.reduce((t, v, j) => t + v * weights[j], 0) / weights.reduce((a, b) => a + b, 0);
+  });
+  const scale = weighted.at(-1) ? current / weighted.at(-1)! : 1;
+  return days.map((day, i) => ({ day, value: weighted[i] * scale, players: byDay.get(day)!.size }));
 }
