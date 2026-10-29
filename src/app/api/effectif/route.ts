@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
   let cards;
   try {
     cards = await sorare.userCards(user, await sorare.exchangeRates());
-  } catch {
+  } catch (e) {
+    console.error('import galerie Sorare', user, e);
     return NextResponse.json({ error: 'Sorare ne répond pas, réessaie dans un instant' }, { status: 502 });
   }
   if (!cards) return NextResponse.json({ error: `Aucun manager Sorare « ${user} »` }, { status: 404 });
