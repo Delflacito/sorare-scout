@@ -35,14 +35,13 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// tokens.offers : arguments et champs.
+// Plancher manquant (Aguerd) : offres en cours d'un joueur.
 for (const [k, q] of Object.entries({
-  noargs: '{ tokens { offers { nodes { id } } } }',
-  xyzarg: '{ tokens { offers(xyzArg: 1) { nodes { id } } } }',
-  player: '{ tokens { offers(playerSlug: "oussama-targhalline") { nodes { id } } } }',
-  players: '{ tokens { offers(playerSlugs: ["oussama-targhalline"]) { nodes { id } } } }',
-  sport: '{ tokens { offers(sport: FOOTBALL, first: 2) { nodes { id } } } }',
-  xyzfield: '{ tokens { offers(first: 1) { nodes { xyzPrice } } } }',
+  liveOffers: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 5) { nodes { id receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } }',
+  liveOffersSport: '{ tokens { liveSingleSaleOffers(sport: FOOTBALL, playerSlug: "naif-aguerd", first: 5) { nodes { id } } } }',
+  playerCards: '{ anyPlayer(slug: "naif-aguerd") { ... on Player { cards(rarities: [limited], first: 50) { nodes { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } } }',
+  lowest: '{ anyPlayer(slug: "naif-aguerd") { ... on Player { inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } }',
+  offerType: '{ tokens { offers { id } } }',
 })) await sample(k, q);
 
 mkdirSync('spike-output', { recursive: true });
