@@ -385,3 +385,35 @@ describeDb('trading', () => {
     expect(await q.getPlayerSales('nuno-mendes')).toEqual([{ date: '2026-10-20T10:00:00.000Z', eur: 9, inSeason: true }]);
   });
 });
+
+describeDb('marché par club et effectif', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    await sql`update players set floor_in_season = 20, floor_classic = 5, market_updated_at = now() where sorare_slug = 'tagliafico'`;
+    await sql`update players set floor_in_season = 8 where sorare_slug = 'lacazette'`;
+    await db.repo.replacePlayerMarket([{ playerId: ids.tagliafico, referencePrice: 20, recentPrice: 21, priceTrend7: null, sales30: 4,
+      fairPrice: 30, valueRatio: 2 / 3, potentialPrice: 22, potentialGain: 0.1 }]);
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('valeur totale des cartes par club', async () => {
+    const clubs = await q.getClubsMarket();
+    expect(clubs[0]).toMatchObject({ slug: 'ol', players: 2, priced: 2, totalFloor: 28, topPlayer: 'Nicolás Tagliafico', topPrice: 20 });
+    expect(clubs.find((c) => c.slug === 'psg')).toMatchObject({ priced: 0, totalFloor: 0, topPlayer: null });
+    expect(await q.getClubsMarket('premier-league')).toEqual([]);
+  });
+
+  it('joueurs cotés : d’un club, par recherche, par liste', async () => {
+    expect((await q.getMarketPlayers({ team: 'ol' })).map((p) => [p.slug, p.price])).toEqual([['tagliafico', 20], ['lacazette', 8]]);
+    const [t] = await q.getMarketPlayers({ q: 'taglia' });
+    expect(t).toMatchObject({ team: 'Olympique Lyonnais', competitionSlug: 'ligue-1-fr', fairPrice: 30, potentialPrice: 22, floorClassic: 5 });
+    expect((await q.getMarketPlayers({ slugs: ['greenwood', 'tagliafico'] })).map((p) => p.slug)).toEqual(['tagliafico', 'greenwood']);
+    expect(await q.getMarketPlayers({ slugs: [] })).toEqual([]);
+  });
+});
