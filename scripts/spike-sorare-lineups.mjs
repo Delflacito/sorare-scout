@@ -41,12 +41,11 @@ out.samples.owner = owner.errors ? owner.errors.map((e) => e.message).join(' | '
 const slug = owner.data?.tokens?.liveSingleSaleOffers?.nodes?.[0]?.senderSide?.anyCards?.[0]?.user?.slug
   ?? owner.data?.tokens?.liveSingleSaleOffers?.nodes?.[0]?.sender?.slug ?? 'xyz';
 for (const [k, q] of Object.entries({
-  userCards: `{ user(slug: "${slug}") { slug nickname cards(first: 3) { nodes { slug rarityTyped seasonYear player { slug } } } } }`,
-  userAnyCards: `{ user(slug: "${slug}") { slug anyCards(first: 3) { nodes { slug rarityTyped seasonYear anyPlayer { slug } } } } }`,
-  userFootball: `{ user(slug: "${slug}") { slug footballCards(first: 3) { nodes { slug } } } }`,
-  userCardsRarity: `{ user(slug: "${slug}") { anyCards(rarities: [limited], first: 3) { totalCount nodes { slug seasonYear } } } }`,
-  userByNickname: `{ user(slug: "${slug}") { slug } nick: userByNickname(nickname: "${slug}") { slug } }`,
-  purchase: `{ user(slug: "${slug}") { anyCards(first: 1) { nodes { slug latestPrimaryOffer { id } ownershipHistory { amounts { eurCents } from } } } } }`,
+  cards: `{ user(slug: "${slug}") { slug nickname cards(first: 3) { totalCount pageInfo { hasNextPage endCursor } nodes { slug rarityTyped seasonYear anyPlayer { slug } } } } }`,
+  cardsLimited: `{ user(slug: "${slug}") { cards(rarities: [limited], first: 3) { totalCount nodes { slug rarityTyped } } } }`,
+  ownership: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug ownershipHistory { from amounts { eurCents usdCents wei } transferType } } } } }`,
+  owner: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug owner { from price { eurCents usdCents wei } transferType } } } } }`,
+  tokenOwner: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug tokenOwner { from price { eurCents } } } } } }`,
 })) await sample(k, q);
 
 mkdirSync('spike-output', { recursive: true });
