@@ -101,6 +101,25 @@ describe('client Sorare', () => {
     }]);
   });
 
+  it('marché : taux de change, prix planchers et ventes convertis en euros', async () => {
+    const f = fakeFetch([[/ExchangeRates/, fixture('exchange-rates')], [/PlayerMarkets/, fixture('player-markets')]]);
+    const client = createSorareClient('k', f.impl);
+    const rates = await client.exchangeRates();
+    expect(rates).toEqual({ usdToEur: 0.8, weiToEur: 2e-15 });
+    const [m, empty] = await client.playerMarkets(['kylian-mbappe-lottin', 'no-cards', 'inconnu'], rates, 2026, 30);
+    expect(f.requests[1].body.query).toContain('tokenPrices(rarity: limited, last: 30)');
+    expect(m).toEqual({
+      slug: 'kylian-mbappe-lottin', floorInSeason: 184.5, floorClassic: 52.4,
+      sales: [
+        { date: '2026-10-27T10:00:00Z', eur: 100, seasonYear: 2026 },
+        { date: '2026-10-28T18:58:42Z', eur: 170.11, seasonYear: 2026 },
+        { date: '2026-10-28T19:00:00Z', eur: 50, seasonYear: 2023 },
+      ],
+    });
+    // carte la moins chère de la saison en cours sans offre : pas de prix Classic
+    expect(empty).toEqual({ slug: 'no-cards', floorInSeason: null, floorClassic: null, sales: [] });
+  });
+
   it('erreur GraphQL → exception explicite', async () => {
     const f = fakeFetch([]);
     await expect(createSorareClient('k', f.impl).clubs('x')).rejects.toThrow(/Sorare GraphQL: unexpected/);

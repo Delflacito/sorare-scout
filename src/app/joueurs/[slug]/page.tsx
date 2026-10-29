@@ -9,6 +9,9 @@ import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { ScorePill } from '@/components/ScorePill';
 import { MiniPitch } from '@/components/MiniPitch';
+import { MarketCard } from '@/components/MarketCard';
+import { SalesChart } from '@/components/SalesChart';
+import { seasonStart } from '@/ingest/leagues';
 import { ageAt, fmtDate, fmtPct, fmtScore, indexClass, ratingClass, scoreTier, teamCode } from '@/lib/format';
 import { actionItems, describeActions } from '@/domain/actions';
 import { one, oneOf, type SearchParams } from '@/lib/params';
@@ -16,7 +19,7 @@ import { one, oneOf, type SearchParams } from '@/lib/params';
 export const dynamic = 'force-dynamic';
 
 const STATUS_LABEL = { started: 'titulaire', sub: 'remplaçant', absent: 'absent' } as const;
-const TABS = [['apercu', 'Aperçu'], ['matchs', 'Matchs'], ['statistiques', 'Statistiques']] as const;
+const TABS = [['apercu', 'Aperçu'], ['matchs', 'Matchs'], ['statistiques', 'Statistiques'], ['marche', 'Marché']] as const;
 type Tab = (typeof TABS)[number][0];
 /** Matchs de la saison chargés pour le graphique (filtrable) et la liste. */
 const SEASON_GAMES = 80;
@@ -322,6 +325,8 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
     queries.getPlayer(slug), queries.getPlayerGames(slug, SEASON_GAMES), queries.getUpcoming(slug, 5),
   ]);
   if (!player) notFound();
+  const sales = tab === 'marche' ? await queries.getPlayerSales(slug) : [];
+  const season = new Date(seasonStart()).getUTCFullYear();
   const s = player.summary;
 
   return (
@@ -342,6 +347,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           {s ? (
             <div className="cards">
               <FormCard player={player} games={games} />
+              <MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} />
             </div>
           ) : (
             <p className="empty">Pas encore de match importé pour ce joueur</p>
@@ -356,6 +362,20 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           {upcoming && <UpcomingTable upcoming={upcoming} />}
           <h2>Derniers matchs</h2>
           <LastGamesTable games={games} />
+        </>
+      )}
+
+      {tab === 'marche' && (
+        <>
+          <MarketCard market={player.market} season={season} />
+          <SalesChart sales={sales} season={season} />
+          <p className="note">
+            Plancher : carte Limited la moins chère en vente ({String(season % 100).padStart(2, '0')} = saison en cours, C = Classic).
+            Valeur estimée : prix moyen payé sur le marché pour un joueur de même niveau (L15), même forme (L5), même temps de jeu,
+            même âge, même championnat et même poste ; un prix bien en dessous signale une carte sous-évaluée.
+            Prix potentiel : prix attendu si le joueur marque son score potentiel au prochain match (son L5 et son L15 montent ou baissent d’autant).
+            Estimations indicatives, le marché ne suit pas toujours.
+          </p>
         </>
       )}
 

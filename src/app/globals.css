@@ -291,3 +291,21 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
   .game-team { gap: 4px; }
   .game-score .score-pill { min-width: 34px; height: 26px; font-size: 14px; }
 }
+
+/* Marché */
+.market-floors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 14px; }
+.market-floors dt { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.market-floors dd { margin: 4px 0 0; font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.market-floors small { font-size: 12px; font-weight: 600; }
+.season-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 18px; padding: 0 4px; border-radius: 5px;
+  font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #5b7cfa, #b06ef7); }
+.season-chip.classic { background: var(--neutral-bg); color: var(--text); border: 1px solid var(--border); }
+.market-estimates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.market-estimates strong { display: block; font-size: 22px; margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
+.badge-pill.neutral { background: var(--neutral-bg); color: var(--ink-2); }
+.card-link { display: inline-block; margin-top: 12px; font-size: 14px; }
+.chart-box .sale.start { fill: var(--series-start); } .chart-box .sale.sub { fill: var(--series-sub); }
+.chart-box .sale { stroke: var(--surface); stroke-width: 1.5; cursor: pointer; outline: none; }
+.chart-box .sales-trend { fill: none; stroke: var(--ink-2); stroke-width: 2; opacity: .8; }
+.legend .swatch.line { width: 14px; height: 2px; border-radius: 0; background: var(--ink-2); vertical-align: middle; }
+@media (max-width: 560px) { .market-floors { grid-template-columns: 1fr 1fr; } .market-floors dd { font-size: 17px; } }

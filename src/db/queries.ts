@@ -84,8 +84,26 @@ export interface PlayerDetail {
   country: { code: string; name: string; flagUrl: string | null } | null;
   firstName: string | null; lastName: string | null; height: number | null; shirtNumber: number | null;
   cardPositions: GenericPosition[];
+  market: PlayerMarketView | null;
   /** Photo détourée de la carte Sorare (à défaut, la photo carrée). */
   bodyPictureUrl: string | null;
+}
+
+/** Marché Limited d'un joueur (prix en euros). */
+export interface PlayerMarketView {
+  floorInSeason: number | null; floorClassic: number | null; referencePrice: number | null; recentPrice: number | null;
+  priceTrend7: number | null; sales30: number; fairPrice: number | null; valueRatio: number | null;
+  potentialPrice: number | null; potentialGain: number | null;
+}
+export interface SaleView { date: string; eur: number; inSeason: boolean }
+export type TradingView = 'sous' | 'sur' | 'gw';
+export interface TradingFilters { view: TradingView; competition?: string; position?: GenericPosition; maxPrice?: number; fixtureIds?: number[]; limit: number }
+export interface TradingRow {
+  slug: string; name: string; pictureUrl: string | null; team: string | null; teamPictureUrl: string | null; cardPositions: GenericPosition[];
+  usualPosition: DetailedPosition | null; l5: number; l15: number; startRate: number;
+  price: number; fairPrice: number | null; valueRatio: number | null; priceTrend7: number | null; sales30: number;
+  potentialPrice: number | null; potentialGain: number | null; nextProjected: number | null;
+  nextOpponent: string | null; nextOpponentPictureUrl: string | null; nextIsHome: boolean | null; nextDate: string | null;
 }
 
 /** Statistiques de championnat d'une saison (Sorare). */
@@ -302,9 +320,12 @@ export function createQueries(sql: postgres.Sql) {
           p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
           p.first_name, p.last_name, p.height, p.shirt_number, p.body_picture_url,
           coalesce(p.card_positions, array[p.position]) as card_positions,
+          p.floor_in_season, p.floor_classic, pm.reference_price, pm.recent_price, pm.price_trend7, pm.sales30, pm.fair_price,
+          pm.value_ratio, pm.potential_price, pm.potential_gain, p.market_updated_at,
           s.*, o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, n.date as next_date, n.opponent_id
         from players p
         left join player_summary s on s.player_id = p.id
+        left join player_market pm on pm.player_id = p.id
         left join teams t on t.id = p.team_id
         left join competitions c on c.id = t.competition_id
         left join next_fx n on n.team_id = p.team_id
@@ -342,7 +363,55 @@ export function createQueries(sql: postgres.Sql) {
         country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
         firstName: r.first_name, lastName: r.last_name, height: r.height, shirtNumber: r.shirt_number, bodyPictureUrl: r.body_picture_url,
         cardPositions: r.card_positions,
+        market: r.market_updated_at ? {
+          floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, referencePrice: r.reference_price, recentPrice: r.recent_price,
+          priceTrend7: r.price_trend7, sales30: r.sales30 ?? 0, fairPrice: r.fair_price, valueRatio: r.value_ratio,
+          potentialPrice: r.potential_price, potentialGain: r.potential_gain,
+        } : null,
       };
+    },
+
+    /** Ventes Limited des 60 derniers jours, de la plus ancienne à la plus récente. */
+    async getPlayerSales(slug: string): Promise<SaleView[]> {
+      const rows = await sql`select s.sold_at, s.price_eur, s.in_season from card_sales s join players p on p.id = s.player_id
+        where p.sorare_slug = ${slug} order by s.sold_at`;
+      return rows.map((r) => ({ date: (r.sold_at as Date).toISOString(), eur: r.price_eur, inSeason: r.in_season }));
+    },
+
+    /**
+     * Trading : « sous » / « sur » = cartes les plus sous- ou surévaluées d'après leurs performances (au moins 3 ventes en 4 semaines) ;
+     * « gw » = plus fort potentiel de hausse avant la Game Week (`fixtureIds`), joueurs disponibles et titulaires réguliers.
+     */
+    async getTrading(f: TradingFilters): Promise<TradingRow[]> {
+      const order = f.view === 'sous' ? sql`pm.value_ratio asc` : f.view === 'sur' ? sql`pm.value_ratio desc` : sql`pm.potential_gain desc`;
+      const rows = await sql`
+        select p.sorare_slug, p.name, p.picture_url, t.name as team, t.picture_url as team_picture,
+          coalesce(p.card_positions, array[p.position]) as card_positions, s.usual_position, s.l5, s.l15, s.start_rate5,
+          pm.reference_price, pm.fair_price, pm.value_ratio, pm.price_trend7, pm.sales30, pm.potential_price, pm.potential_gain,
+          s.next_projected, o.name as next_opponent, o.picture_url as next_opponent_picture, fx.home_team_id = t.id as next_is_home, fx.date as next_date
+        from player_market pm
+        join players p on p.id = pm.player_id
+        join player_summary s on s.player_id = p.id
+        join teams t on t.id = p.team_id
+        join competitions c on c.id = t.competition_id
+        left join fixtures fx on fx.id = s.next_fixture_id
+        left join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
+        where pm.fair_price is not null and pm.sales30 >= 3
+          ${f.view === 'gw' ? sql`and s.next_fixture_id = any(${f.fixtureIds ?? []}) and pm.potential_gain is not null
+            and s.start_rate5 >= 0.6 and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'` : sql``}
+          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
+          ${f.maxPrice ? sql`and pm.reference_price <= ${f.maxPrice}` : sql``}
+        order by ${order}, p.name
+        limit ${f.limit}`;
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, team: r.team, teamPictureUrl: r.team_picture, cardPositions: r.card_positions,
+        usualPosition: r.usual_position, l5: r.l5, l15: r.l15, startRate: r.start_rate5,
+        price: r.reference_price, fairPrice: r.fair_price, valueRatio: r.value_ratio, priceTrend7: r.price_trend7, sales30: r.sales30,
+        potentialPrice: r.potential_price, potentialGain: r.potential_gain, nextProjected: r.next_projected,
+        nextOpponent: r.next_opponent, nextOpponentPictureUrl: r.next_opponent_picture, nextIsHome: r.next_is_home,
+        nextDate: r.next_date ? (r.next_date as Date).toISOString() : null,
+      }));
     },
 
     async getPlayerSeasons(slug: string): Promise<PlayerSeasonView[]> {

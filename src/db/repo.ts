@@ -39,6 +39,21 @@ export interface PlayerProfileInput {
   activeClub?: { slug: string; name: string; pictureUrl: string | null } | null;
   seasons: { startYear: number; appearances: number; substituteIn: number; goals: number; assists: number; minutes: number; yellowCards: number; redCards: number }[];
 }
+export interface PlayerMarketInput {
+  slug: string; floorInSeason: number | null; floorClassic: number | null;
+  sales: { date: string; eur: number; seasonYear: number | null }[];
+}
+/** Joueur coté : ce qui entre dans la valeur estimée et le potentiel. */
+export interface MarketInputRow {
+  playerId: number; floorInSeason: number | null; l15: number; l5: number; startRate: number; birthDate: string | null;
+  league: string; position: GenericPosition; nextProjected: number | null;
+  /** Ventes de cartes de la saison des 28 derniers jours. */
+  sales: { date: string; eur: number }[];
+}
+export interface PlayerMarketRow {
+  playerId: number; referencePrice: number; recentPrice: number | null; priceTrend7: number | null; sales30: number;
+  fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null;
+}
 export interface PlayerSummaryRow {
   playerId: number; l5: number; l15: number; l40: number; stdDev5: number;
   startRate5: number; avgMinutes5: number; startRate15: number; avgMinutes15: number;
@@ -321,6 +336,51 @@ function createBaseRepo(sql: Sql) {
     /** Marque des joueurs comme traités même si Sorare ne les connaît pas (évite de les redemander chaque jour). */
     async touchProfiles(slugs: string[]): Promise<void> {
       if (slugs.length) await sql`update players set profile_updated_at = now() where sorare_slug = any(${slugs})`;
+    },
+
+    /** Joueurs des clubs suivis ayant déjà joué, ceux dont le marché est le plus ancien d'abord. */
+    async playersForMarket(): Promise<string[]> {
+      const rows = await sql`select p.sorare_slug from players p join player_summary s on s.player_id = p.id
+        join teams t on t.id = p.team_id and t.competition_id is not null
+        order by p.market_updated_at nulls first, p.id`;
+      return rows.map((r) => r.sorare_slug);
+    },
+
+    /** Prix planchers et ventes (saison `season` = cartes de la saison en cours) ; ventes de plus de 60 jours supprimées. */
+    async saveMarkets(markets: PlayerMarketInput[], season: number): Promise<void> {
+      for (const m of markets) {
+        const [p] = await sql`update players set floor_in_season = ${m.floorInSeason}, floor_classic = ${m.floorClassic},
+          market_updated_at = now() where sorare_slug = ${m.slug} returning id`;
+        if (!p) continue;
+        if (m.sales.length) await sql`insert into card_sales ${sql(m.sales.map((x) => ({
+          player_id: p.id, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season,
+        })))} on conflict do nothing`;
+      }
+      await sql`delete from card_sales where sold_at < now() - interval '60 days'`;
+    },
+
+    async marketInputs(): Promise<MarketInputRow[]> {
+      const rows = await sql`
+        select p.id, p.floor_in_season, s.l15, s.l5, s.start_rate5, p.birth_date::text as birth_date, c.slug as league, p.position,
+          s.next_projected,
+          coalesce((select json_agg(json_build_object('date', cs.sold_at, 'eur', cs.price_eur)) from card_sales cs
+            where cs.player_id = p.id and cs.in_season and cs.sold_at > now() - interval '28 days'), '[]') as sales
+        from players p join player_summary s on s.player_id = p.id
+        join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
+        where p.market_updated_at is not null`;
+      return rows.map((r) => ({
+        playerId: r.id, floorInSeason: r.floor_in_season, l15: r.l15, l5: r.l5, startRate: r.start_rate5, birthDate: r.birth_date,
+        league: r.league, position: r.position, nextProjected: r.next_projected,
+        sales: (r.sales as { date: string; eur: number }[]).map((x) => ({ date: new Date(x.date).toISOString(), eur: x.eur })),
+      }));
+    },
+
+    async replacePlayerMarket(rows: PlayerMarketRow[]): Promise<void> {
+      await sql`delete from player_market`;
+      for (const chunk of chunks(rows)) await sql`insert into player_market ${sql(chunk.map((r) => ({
+        player_id: r.playerId, reference_price: r.referencePrice, recent_price: r.recentPrice, price_trend7: r.priceTrend7,
+        sales30: r.sales30, fair_price: r.fairPrice, value_ratio: r.valueRatio, potential_price: r.potentialPrice, potential_gain: r.potentialGain,
+      })))}`;
     },
 
     /** Club actuel de chaque joueur. */

@@ -1,0 +1,87 @@
+{
+ "data": {
+  "p0": {
+   "slug": "kylian-mbappe-lottin",
+   "inSeason": {
+    "seasonYear": 2026,
+    "liveSingleSaleOffer": {
+     "receiverSide": {
+      "amounts": {
+       "eurCents": 18450,
+       "usdCents": null,
+       "wei": null
+      }
+     }
+    }
+   },
+   "anySeason": {
+    "seasonYear": 2021,
+    "liveSingleSaleOffer": {
+     "receiverSide": {
+      "amounts": {
+       "eurCents": null,
+       "usdCents": 6550,
+       "wei": null
+      }
+     }
+    }
+   },
+   "tokenPrices": {
+    "nodes": [
+     {
+      "date": "2026-10-27T10:00:00Z",
+      "amounts": {
+       "eurCents": null,
+       "usdCents": null,
+       "wei": "50000000000000000"
+      },
+      "card": {
+       "seasonYear": 2026
+      }
+     },
+     {
+      "date": "2026-10-28T18:58:42Z",
+      "amounts": {
+       "eurCents": 17011,
+       "usdCents": null,
+       "wei": null
+      },
+      "card": {
+       "seasonYear": 2026
+      }
+     },
+     {
+      "date": "2026-10-28T19:00:00Z",
+      "amounts": {
+       "eurCents": 5000,
+       "usdCents": null,
+       "wei": null
+      },
+      "card": {
+       "seasonYear": 2023
+      }
+     },
+     {
+      "date": "2026-10-28T20:00:00Z",
+      "amounts": null,
+      "card": {
+       "seasonYear": 2026
+      }
+     }
+    ]
+   }
+  },
+  "p1": {
+   "slug": "no-cards",
+   "inSeason": null,
+   "anySeason": {
+    "seasonYear": 2026,
+    "liveSingleSaleOffer": null
+   },
+   "tokenPrices": {
+    "nodes": []
+   }
+  },
+  "p2": null
+ }
+}

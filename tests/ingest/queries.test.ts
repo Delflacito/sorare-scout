@@ -346,3 +346,42 @@ describeDb('Ma Game Week et journée', () => {
     expect(rows[0]).toMatchObject({ slug: 'nuno-mendes', nextProjected: expect.any(Number) });
   });
 });
+
+describeDb('trading', () => {
+  let sql: postgres.Sql;
+  let q: Queries;
+  let ids: Record<string, number>;
+  beforeEach(async () => {
+    const db = await freshDb();
+    sql = db.sql;
+    ids = await seedLeague(db.repo);
+    await sql`update players set market_updated_at = now(), floor_in_season = 10`;
+    const rows = [['nuno-mendes', 10, 20, 0.5, 0.2], ['greenwood', 30, 20, 1.5, -0.1], ['tagliafico', 15, 15, 1, 0.05]] as const;
+    await db.repo.replacePlayerMarket(rows.map(([slug, price, fair, ratio, gain]) => ({
+      playerId: ids[slug], referencePrice: price, recentPrice: price, priceTrend7: 0, sales30: 5, fairPrice: fair, valueRatio: ratio,
+      potentialPrice: price * (1 + gain), potentialGain: gain,
+    })));
+    q = createQueries(sql);
+  });
+  afterEach(() => sql.end());
+
+  it('sous- et surévalués, filtre de prix', async () => {
+    expect((await q.getTrading({ view: 'sous', limit: 10 })).map((r) => r.slug)).toEqual(['nuno-mendes', 'tagliafico', 'greenwood']);
+    expect((await q.getTrading({ view: 'sur', limit: 10 }))[0].slug).toBe('greenwood');
+    expect((await q.getTrading({ view: 'sous', maxPrice: 12, limit: 10 })).map((r) => r.slug)).toEqual(['nuno-mendes']);
+  });
+
+  it('hausse avant la GW : matchs de la journée, plus forte plus-value d’abord', async () => {
+    const fixtures = await q.getGameWeekFixtures();
+    const rows = await q.getTrading({ view: 'gw', fixtureIds: fixtures.map((f) => f.id), limit: 10 });
+    // PSG–OM : Nuno Mendes (+20 %) et Greenwood (titulaire 1 fois sur 2 → exclu)
+    expect(rows.map((r) => [r.slug, r.potentialGain])).toEqual([['nuno-mendes', 0.2]]);
+    expect(rows[0]).toMatchObject({ nextOpponent: 'Olympique de Marseille', nextIsHome: true, price: 10 });
+  });
+
+  it('fiche : marché du joueur et ventes', async () => {
+    await sql`insert into card_sales (player_id, sold_at, price_eur, in_season) values (${ids['nuno-mendes']}, '2026-10-20T10:00:00Z', 9, true)`;
+    expect((await q.getPlayer('nuno-mendes'))!.market).toMatchObject({ floorInSeason: 10, fairPrice: 20, valueRatio: 0.5 });
+    expect(await q.getPlayerSales('nuno-mendes')).toEqual([{ date: '2026-10-20T10:00:00.000Z', eur: 9, inSeason: true }]);
+  });
+});
