@@ -22,7 +22,7 @@ function Boost({ p }: { p: GameWeekPlayer }) {
   const sign = diff >= 0 ? '+' : '−';
   return (
     <span className={`gw-boost ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`} title="Écart avec le niveau habituel (L15)">
-      {sign}{fmtScore(Math.abs(diff))} <span className="small">({sign}{Math.abs(pct)} %)</span>
+      {sign}{fmtScore(Math.abs(diff))} <span className="gw-boost-pct">({sign}{Math.abs(pct)} %)</span>
     </span>
   );
 }
@@ -51,11 +51,11 @@ function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
         <MatchLine p={p} />
         <div className="gw-meta">
           <span>{fmtDate(p.date)}</span>
-          {p.cardPositions.length > 1 && <span title="Postes de la carte">{cardLabel(p.cardPositions)}</span>}
-          {p.usualPosition && <span title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
+          {p.cardPositions.length > 1 && <span className="gw-meta-pos" title="Postes de la carte">{cardLabel(p.cardPositions)}</span>}
+          {p.usualPosition && <span className="gw-meta-pos" title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
           <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(p.base)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(p.startRate)}</span>
-          {p.sorareProjection !== null && <span><abbr title="Projection officielle de Sorare">Sorare</abbr> {Math.round(p.sorareProjection)}</span>}
+          {p.sorareProjection !== null && <span className="gw-meta-sorare"><abbr title="Projection officielle de Sorare">Sorare</abbr> {Math.round(p.sorareProjection)}</span>}
         </div>
       </div>
       <div className="gw-score">
@@ -160,12 +160,14 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
             <span className="toggle-box" aria-hidden="true">{startersOnly ? '' : '✓'}</span>Inclure les remplaçants
           </Link>
         </div>
-        <p className="note">
+        <details className="gw-help">
+          <summary>Comment lire ce classement</summary>
           {sort === 'boost'
             ? 'Matchs qui s’annoncent nettement au-dessus du niveau habituel (score potentiel − L15). '
             : 'Score potentiel : ce que chaque joueur devrait marquer selon son niveau, l’adversaire et le lieu. '}
           Blessés et suspendus exclus{startersOnly && ', ainsi que les joueurs titulaires moins de 3 fois sur leurs 5 derniers matchs'}.
-        </p>
+          {' '}Sous le score : écart avec le niveau habituel (L15).
+        </details>
       </div>
 
       {fixtures.length > 0 && (
