@@ -82,14 +82,14 @@ describe('valueHistory', () => {
     const h = valueHistory([sale('a', '2026-10-01', 10), sale('a', '2026-10-02', 10), sale('b', '2026-10-02', 50)], 60, 1);
     expect(h.map((p) => Math.round(p.value))).toEqual([60, 60]);
   });
-  it('moyenne pondérée des jours précédents (7, 6, 5…) : un jour isolé pèse moins, le dernier point reste la valeur actuelle', () => {
+  it('moyenne pondérée des 3 derniers jours (3, 2, 1) : un jour isolé pèse moins, le dernier point reste la valeur actuelle', () => {
     const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
     const prices = [100, 100, 100, 50, 100].map((p, i) => sale('a', days[i], p));
     expect(valueHistory(prices, 100, 1).map((p) => Math.round(p.value))).toEqual([100, 100, 100, 50, 100]);
     const h = valueHistory(prices, 100).map((p) => p.value);
-    // Le creux : (7 × 50 + 6 × 100 + 5 × 100 + 4 × 100) / 22, remis à l'échelle du dernier point
-    const last = (7 * 100 + 6 * 50 + 5 * 100 + 4 * 100 + 3 * 100) / 25;
-    expect(h[3]).toBeCloseTo(((7 * 50 + 6 * 100 + 5 * 100 + 4 * 100) / 22) * (100 / last));
+    // Le creux : (3 × 50 + 2 × 100 + 1 × 100) / 6 = 75, remis à l'échelle du dernier point (3 × 100 + 2 × 50 + 100) / 6
+    const last = (3 * 100 + 2 * 50 + 1 * 100) / 6;
+    expect(h[3]).toBeCloseTo(75 * (100 / last));
     expect(h.at(-1)).toBeCloseTo(100);
     expect(Math.min(...h)).toBeGreaterThan(80);
   });

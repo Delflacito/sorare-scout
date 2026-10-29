@@ -96,7 +96,7 @@ export function ValueChart({ points, subject = 'l’effectif' }: { points: Value
       </details>
       <p className="note">
         Reconstituée d’après les ventes de cartes de la saison : chaque jour, chaque joueur compte pour sa vente moyenne
-        du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 7 derniers jours (le jour même
+        du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 3 derniers jours (le jour même
         compte le plus), ramenée à la valeur estimée d’aujourd’hui.
       </p>
     </figure>

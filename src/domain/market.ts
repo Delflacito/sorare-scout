@@ -148,7 +148,7 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
 /** Prix moyen des ventes d'un joueur un jour donné. */
 export interface DailyPrice { slug: string; day: string; price: number }
 /** Jours de la moyenne pondérée de la courbe : le jour même pèse WEIGHTED_DAYS, la veille un de moins, etc. */
-export const WEIGHTED_DAYS = 7;
+export const WEIGHTED_DAYS = 3;
 /** players : joueurs vendus ce jour-là. */
 export interface ValuePoint { day: string; value: number; players: number }
 

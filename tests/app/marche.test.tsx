@@ -59,10 +59,10 @@ describe('/marche', () => {
     expect(total).toHaveTextContent('10 €');
     expect(screen.getByText(/2 cartes en vente sur 3 joueurs/)).toBeInTheDocument();
     // Graphique : le dernier jour vaut la valeur estimée actuelle ; prix +25 % entre les deux jours, adouci par la
-    // moyenne pondérée : (7 × 50 + 6 × 40) / 13 = 45,4 contre 40, soit +13 %
+    // moyenne pondérée : (3 × 50 + 2 × 40) / 5 = 46 contre 40, soit +15 %
     const chart = screen.getByRole('figure');
     expect(chart).toHaveTextContent('Évolution de la valeur estimée');
     expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2); // 21 et 22 octobre
-    expect(within(chart).getByText('+13 %')).toBeInTheDocument();
+    expect(within(chart).getByText('+15 %')).toBeInTheDocument();
   });
 });
