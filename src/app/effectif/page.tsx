@@ -4,12 +4,13 @@ import { SquadBuilder } from '@/components/SquadBuilder';
 export const dynamic = 'force-dynamic';
 
 export default async function EffectifPage() {
-  const competitions = await getQueries().listCompetitions();
+  const queries = getQueries();
+  const [competitions, teams] = await Promise.all([queries.listCompetitions(), queries.listTeams()]);
   return (
     <main>
       <h1>Mon effectif</h1>
-      <p className="subtitle">Par championnat : prix d’achat, valeur actuelle des cartes et coût d’un achat envisagé</p>
-      <SquadBuilder competitions={competitions} />
+      <p className="subtitle">Par championnat : choisis un club, coche tes joueurs, puis note leur prix d’achat</p>
+      <SquadBuilder competitions={competitions} teams={teams} />
     </main>
   );
 }

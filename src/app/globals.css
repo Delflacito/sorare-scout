@@ -327,7 +327,8 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .tab-btn[aria-current='page'] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
 .tab-count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--neutral-bg); font-size: 12px; }
 .squad-search { position: relative; margin-bottom: 14px; }
-.squad-search input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
+.squad-search select { width: 100%; padding: 10px 12px; border-radius: 10px; }
+.squad-search input[type=search] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
 .search-results { list-style: none; margin: 6px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .search-results li { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 8px; }
 .search-results li + li { border-top: 1px solid var(--border); }
