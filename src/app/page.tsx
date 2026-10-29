@@ -35,7 +35,7 @@ function Panel({ title, href, empty, children }: { title: string; href: string; 
   return (
     <section className="card home-panel" aria-label={title}>
       <h2 className="card-title">{title}</h2>
-      {empty ? <p className="empty">Pas encore de données</p> : <ol className="home-list">{children}</ol>}
+      {empty ? <p className="empty">Pas encore de données : elles apparaîtront après le prochain import.</p> : <ol className="home-list">{children}</ol>}
       <Link href={href} className="card-link">Tout voir →</Link>
     </section>
   );

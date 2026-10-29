@@ -26,8 +26,8 @@ export function StatusBadges({ playingStatus, injury, suspension, compact = fals
   if (compact) {
     return (
       <span className="status-icons">
-        {injuryText && <span className="status-icon critical" title={injuryText} aria-label={injuryText}>✚</span>}
-        {suspensionText && <span className="status-icon critical" title={suspensionText} aria-label={suspensionText}>■</span>}
+        {injuryText && <span className="status-icon critical" role="img" title={injuryText} aria-label={injuryText}>✚</span>}
+        {suspensionText && <span className="status-icon critical" role="img" title={suspensionText} aria-label={suspensionText}>■</span>}
       </span>
     );
   }

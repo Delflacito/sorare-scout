@@ -10,11 +10,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
       <body>
+        <a href="#contenu" className="skip-link">Aller au contenu</a>
         <header className="site">
           <Link href="/" className="brand">Sorare Scout</Link>
           <NavTabs />
         </header>
-        {children}
+        <div id="contenu" tabIndex={-1}>{children}</div>
         <DataFooter />
       </body>
     </html>

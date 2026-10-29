@@ -30,11 +30,11 @@ function PlayersTable({ title, players }: { title: string; players: GameWeekPlay
   return (
     <section>
       <h2>{title}</h2>
-      {players.length === 0 ? <p className="empty">Aucun joueur</p> : (
+      {players.length === 0 ? <p className="empty">Aucun joueur à ce poste pour ces filtres</p> : (
         <div className="table-wrap">
           <table aria-label={title}>
             <thead>
-              <tr><th>#</th><th>Joueur</th><th>Match</th><th>Carte</th><th>Potentiel</th><th>Habitude (L15)</th><th>vs habitude</th><th>% titu</th><th>Proj. Sorare</th></tr>
+              <tr><th scope="col">#</th><th scope="col">Joueur</th><th scope="col">Match</th><th scope="col">Carte</th><th scope="col"><abbr title="Score attendu au prochain match, selon l’adversaire">Potentiel</abbr></th><th scope="col"><abbr title="Moyenne des 15 derniers matchs">Habitude (L15)</abbr></th><th scope="col">vs habitude</th><th scope="col"><abbr title="Part des matchs commencés comme titulaire">% titu</abbr></th><th scope="col"><abbr title="Projection officielle de Sorare pour le prochain match">Proj. Sorare</abbr></th></tr>
             </thead>
             <tbody>
               {players.map((p, i) => (
@@ -101,7 +101,7 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
           <input type="checkbox" name="tous" value="1" defaultChecked={!startersOnly} /> Inclure les remplaçants
         </label>
         {sort === 'boost' && <input type="hidden" name="vue" value="boost" />}
-        <button type="submit">Filtrer</button>
+        <button type="submit">Appliquer</button>
       </form>
       <nav className="tabs" aria-label="Classement">
         <Link href={tabHref()} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
