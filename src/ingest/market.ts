@@ -58,8 +58,10 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
   const model = fitPriceModel(priced.filter((x) => x.r.floorInSeason !== null && x.r.sales.length >= 3).map(toRow));
   return priced.map((x) => {
     const row = toRow(x);
-    const fair = model ? fairPrice(model, row) : null;
-    const potential = model && x.r.nextProjected !== null ? potentialPrice(model, row, x.r.nextProjected) : null;
+    // Sans offre, le prix vient des ventes (gonflées par les ventes primaires) : pas comparable au modèle.
+    const comparable = model && x.r.floorInSeason !== null ? model : null;
+    const fair = comparable ? fairPrice(comparable, row) : null;
+    const potential = comparable && x.r.nextProjected !== null ? potentialPrice(comparable, row, x.r.nextProjected) : null;
     return {
       playerId: x.r.playerId, referencePrice: x.referencePrice, recentPrice: x.recentPrice, priceTrend7: priceTrend(x.r.sales, now),
       sales30: x.r.sales.length, fairPrice: fair, valueRatio: fair ? x.referencePrice / fair : null,

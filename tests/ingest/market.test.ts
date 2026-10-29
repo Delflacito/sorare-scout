@@ -37,6 +37,17 @@ describe('computeMarket', () => {
     expect(typical.potentialGain).toBeCloseTo(0, 5); // score attendu = son niveau
   });
 
+  it('calibré sur les planchers : les ventes gonflées des joueurs sans offre ne faussent pas la valeur estimée', () => {
+    const rows = inputs();
+    for (const i of [1, 2, 3, 4, 5, 6]) {
+      rows[i] = { ...rows[i], floorInSeason: null, sales: rows[i].sales.map((s) => ({ ...s, eur: s.eur * 3 })) };
+    }
+    const out = computeMarket(rows, NOW);
+    expect(out.find((r) => r.playerId === 10)!.valueRatio).toBeCloseTo(1, 1);
+    const noFloor = out.find((r) => r.playerId === 1)!;
+    expect(noFloor).toMatchObject({ fairPrice: null, valueRatio: null, potentialPrice: null, potentialGain: null });
+  });
+
   it('joueur sans prix ignoré ; trop peu de joueurs cotés : pas de valeur estimée', () => {
     const rows = inputs().slice(0, 5);
     rows.push({ ...rows[0], playerId: 99, floorInSeason: null, sales: [] });
