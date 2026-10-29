@@ -14,7 +14,7 @@ const competitions = [{ slug: 'eredivisie', name: 'Eredivisie' }, { slug: 'ligue
 const teams = [{ slug: 'psv', name: 'PSV', competitionSlug: 'eredivisie' }, { slug: 'psg', name: 'PSG', competitionSlug: 'ligue-1-fr' }];
 
 describe('totaux de l’effectif', () => {
-  it('coût réel, valeur, achats envisagés, potentiel', () => {
+  it('coût réel (prix d’achat, à défaut prix actuel), valeur, achats envisagés, potentiel', () => {
     const info = new Map([['a', player('a', 30, 33)], ['b', player('b', 10)], ['c', player('c', 50, 55)]]);
     const entries: SquadEntry[] = [
       { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 20 },
@@ -22,7 +22,7 @@ describe('totaux de l’effectif', () => {
       { slug: 'c', competition: 'eredivisie', status: 'target', purchasePrice: 45 },
     ];
     expect(squadTotals(entries, info)).toEqual({
-      cost: 20, value: 40, gain: 20, missingPurchase: 1, targets: 45, costWithTargets: 65, potential: 33 + 10 + 55,
+      cost: 20 + 10, value: 40, gain: 10, missingPurchase: 1, targets: 45, costWithTargets: 75, potential: 33 + 10 + 55,
     });
   });
 });
@@ -100,7 +100,7 @@ describe('Mon effectif', () => {
     expect(screen.getByRole('combobox', { name: 'Club' })).not.toHaveTextContent('PSG'); // clubs du championnat affiché
     fireEvent.change(screen.getByRole('combobox', { name: 'Club' }), { target: { value: 'psv' } });
     const list = await screen.findByRole('list', { name: 'Joueurs du club' });
-    fireEvent.click(within(list).getByRole('checkbox', { name: /XAVI/ }));
+    fireEvent.click(within(list).getByRole('button', { name: 'J’ai XAVI' }));
     const input = await screen.findByRole('textbox', { name: 'Prix d’achat de XAVI' });
     fireEvent.change(input, { target: { value: '22,5' } });
     fireEvent.blur(input);
@@ -109,9 +109,28 @@ describe('Mon effectif', () => {
     expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toEqual([
       { slug: 'xavi', competition: 'eredivisie', status: 'owned', purchasePrice: 22.5 },
     ]);
-    // décocher retire la carte
-    fireEvent.click(within(list).getByRole('checkbox', { name: /XAVI/ }));
+    // retirer depuis la liste du club
+    fireEvent.click(within(list).getByRole('button', { name: 'Dans mes cartes ✕' }));
     await waitFor(() => expect(screen.getByText(/Aucune carte dans ce championnat/)).toBeInTheDocument());
+  });
+
+  it('cartes par poste (poste vide signalé, un clic pour filtrer) ; carte à acheter passée en « Acheté »', async () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 0 }, // craftée
+      { slug: 'b', competition: 'eredivisie', status: 'target', purchasePrice: 25 },
+    ]));
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    const mine = await screen.findByRole('list', { name: 'Mes cartes' });
+    await waitFor(() => expect(within(mine).getByText('+30 €')).toBeInTheDocument()); // craftée 0 €, vaut 30 €
+    expect(screen.getByRole('button', { name: /Attaquants/ })).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: /Gardiens/ })).toHaveTextContent('aucun');
+    expect(screen.getByRole('button', { name: /Gardiens/ })).toHaveClass('missing');
+    fireEvent.click(screen.getByRole('button', { name: /Gardiens/ }));
+    expect(screen.getByText('Aucune carte pour ce filtre')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Gardiens/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'À acheter' })).getByRole('button', { name: 'Acheté ✓' }));
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toContainEqual(
+      { slug: 'b', competition: 'eredivisie', status: 'owned', purchasePrice: 25 }));
   });
 
   it('achat envisagé : coût total avec achats ; un onglet par championnat', async () => {
@@ -120,7 +139,7 @@ describe('Mon effectif', () => {
       { slug: 'b', competition: 'eredivisie', status: 'target', purchasePrice: null },
     ]));
     render(<SquadBuilder competitions={competitions} teams={teams} />);
-    await waitFor(() => expect(screen.getByText('Avec les achats envisagés').nextSibling).toHaveTextContent('50 €'));
+    await waitFor(() => expect(screen.getByText('Achats envisagés').parentElement).toHaveTextContent('30 €total avec l’effectif : 50 €'));
     expect(screen.getByRole('button', { name: /Eredivisie/ })).toHaveTextContent('2');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Ligue 1' })); });
     expect(screen.getByText(/Aucune carte dans ce championnat/)).toBeInTheDocument();

@@ -104,6 +104,6 @@ export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!
 export const USER_CARDS_QUERY = `query UserCards($slug: String!, $after: String, $first: Int!) {
   user(slug: $slug) { cards(rarities: [limited], first: $first, after: $after) {
     pageInfo { hasNextPage endCursor }
-    nodes { seasonYear anyPlayer { slug } ownershipHistory { amounts { eurCents usdCents gbpCents wei } } }
+    nodes { seasonYear anyPlayer { slug } ownershipHistory { transferType amounts { eurCents usdCents gbpCents wei } } }
   } }
 }`;

@@ -104,15 +104,17 @@ describe('client Sorare', () => {
   });
 
   it('galerie d’un utilisateur : toutes les pages, prix payé par le dernier propriétaire', async () => {
-    const card = (slug: string, seasonYear: number, amounts: unknown) => ({ seasonYear, anyPlayer: { slug }, ownershipHistory: [{ amounts: null }, { amounts }] });
+    const card = (slug: string, seasonYear: number, amounts: unknown, transferType = 'INSTANT_BUY') =>
+      ({ seasonYear, anyPlayer: { slug }, ownershipHistory: [{ transferType: 'SHARDS', amounts: null }, { transferType, amounts }] });
     const f = fakeFetch([[/UserCards/, (v: Record<string, unknown>) => (v.slug === 'inconnu' ? { data: { user: null } } : { data: { user: { cards: v.after
-      ? { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [card('b', 2025, null)] }
+      ? { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [card('b', 2025, null, 'DIRECT_OFFER'), card('c', 2026, null, 'SHARDS')] }
       : { pageInfo: { hasNextPage: true, endCursor: 'p2' }, nodes: [card('a', 2026, { eurCents: 688, usdCents: 767, gbpCents: null, wei: null })] } } } })]]);
     const client = createSorareClient('k', f.impl);
     const rates = { usdToEur: 1, gbpToEur: 1, weiToEur: 0 };
     expect(await client.userCards('delflacito', rates)).toEqual([
       { playerSlug: 'a', seasonYear: 2026, purchaseEur: 6.88 },
-      { playerSlug: 'b', seasonYear: 2025, purchaseEur: null }, // reçue sans achat
+      { playerSlug: 'b', seasonYear: 2025, purchaseEur: null }, // reçue par échange : prix inconnu
+      { playerSlug: 'c', seasonYear: 2026, purchaseEur: 0 }, // craftée
     ]);
     expect(f.requests.map((r) => r.body.variables)).toEqual([{ slug: 'delflacito', after: null, first: 50 }, { slug: 'delflacito', after: 'p2', first: 50 }]);
     expect(await client.userCards('inconnu', rates)).toBeNull();
