@@ -9,7 +9,7 @@ export default async function EffectifPage() {
   return (
     <main>
       <h1>Mon effectif</h1>
-      <p className="subtitle">Par championnat : choisis un club, coche tes joueurs, puis note leur prix d’achat</p>
+      <p className="subtitle">Importe ta galerie avec ton pseudo Sorare, ou choisis un club et coche tes joueurs</p>
       <SquadBuilder competitions={competitions} teams={teams} />
     </main>
   );

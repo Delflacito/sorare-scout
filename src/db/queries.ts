@@ -2,6 +2,7 @@ import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
 import type { DailyPrice } from '@/domain/market';
+import type { SquadEntry } from '@/components/SquadBuilder';
 
 export const SORTS = ['projected', 'l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
@@ -698,6 +699,17 @@ export function createQueries(sql: postgres.Sql) {
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
         group by 1, 2, 3`;
       return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price, inSeason: r.in_season }));
+    },
+
+    /** Effectif « Mon effectif » enregistré pour un pseudo Sorare ; null s'il n'y en a pas. */
+    async getSquad(pseudo: string): Promise<SquadEntry[] | null> {
+      const [r] = await sql`select entries from squads where pseudo = ${pseudo}`;
+      return r ? (r.entries as SquadEntry[]) : null;
+    },
+
+    async saveSquad(pseudo: string, entries: SquadEntry[]): Promise<void> {
+      await sql`insert into squads (pseudo, entries) values (${pseudo}, ${sql.json(entries as unknown as postgres.JSONValue)})
+        on conflict (pseudo) do update set entries = excluded.entries, updated_at = now()`;
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {

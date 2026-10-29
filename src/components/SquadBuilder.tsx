@@ -70,6 +70,13 @@ export function squadTotals(entries: SquadEntry[], info: Map<string, MarketPlaye
   };
 }
 
+/** Effectif enregistré en base pour ce pseudo (null s'il n'y en a pas encore). */
+async function loadServer(pseudo: string): Promise<SquadEntry[] | null> {
+  const res = await fetch(`/api/effectif/enregistre?user=${encodeURIComponent(pseudo)}`);
+  if (!res.ok) throw new Error('lecture impossible');
+  return (await res.json()).entries;
+}
+
 const parsePrice = (v: string) => {
   const n = Number(v.replace(',', '.'));
   return v.trim() === '' || !Number.isFinite(n) || n < 0 ? null : n;
@@ -87,16 +94,35 @@ export function SquadBuilder({ competitions, teams }: {
   const [pseudo, setPseudo] = useState('');
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
+  // Pseudo dont l'effectif en base a été chargé : les modifications y sont ensuite enregistrées.
+  const [syncedPseudo, setSyncedPseudo] = useState<string | null>(null);
 
   // Effectif enregistré dans ce navigateur ; on ouvre le premier championnat qui contient des cartes.
   useEffect(() => {
     const stored = load();
     setEntries(stored);
-    try { setPseudo(window.localStorage.getItem(PSEUDO_KEY) ?? ''); } catch { /* stockage indisponible */ }
+    let storedPseudo = '';
+    try { storedPseudo = window.localStorage.getItem(PSEUDO_KEY) ?? ''; } catch { /* stockage indisponible */ }
+    setPseudo(storedPseudo);
     setLoaded(true);
+    // Même effectif sur tous les appareils : la copie en base l'emporte sur celle du navigateur.
+    if (storedPseudo) {
+      loadServer(storedPseudo)
+        .then((server) => { if (server) setEntries(server); setSyncedPseudo(storedPseudo); })
+        .catch(() => setImportMessage('Effectif en ligne indisponible : copie de ce navigateur affichée'));
+    }
     if (stored.length && !stored.some((e) => e.competition === competitions[0]?.slug)) setLeague(stored[0].competition);
   }, [competitions]);
   useEffect(() => { if (loaded) save(entries); }, [entries, loaded]);
+  useEffect(() => {
+    if (!syncedPseudo) return;
+    const t = setTimeout(() => {
+      fetch(`/api/effectif/enregistre?user=${encodeURIComponent(syncedPseudo)}`, {
+        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries }),
+      }).catch(() => setImportMessage('Modification non enregistrée en ligne (réseau)'));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [entries, syncedPseudo]);
 
   // Prix à jour des cartes de l'effectif.
   const slugsKey = [...new Set(entries.map((e) => e.slug))].sort().join(',');
@@ -137,8 +163,12 @@ export function SquadBuilder({ competitions, teams }: {
       const res = await fetch(`/api/effectif?user=${encodeURIComponent(pseudo.trim())}`);
       const body = await res.json();
       if (!res.ok) { setImportMessage(body.error ?? 'Import impossible'); return; }
-      try { window.localStorage.setItem(PSEUDO_KEY, pseudo.trim()); } catch { /* stockage indisponible */ }
-      setEntries((es) => mergeImport(es, body.entries));
+      const p = pseudo.trim().toLowerCase();
+      try { window.localStorage.setItem(PSEUDO_KEY, p); } catch { /* stockage indisponible */ }
+      // Nouvel appareil ou nouveau pseudo : on part de l'effectif enregistré en base (prix saisis, achats envisagés).
+      const base = syncedPseudo === p ? null : await loadServer(p);
+      setEntries((es) => mergeImport(base ?? es, body.entries));
+      setSyncedPseudo(p);
       const skipped = [body.classic && `${body.classic} Classic`, body.untracked && `${body.untracked} de championnats non suivis`].filter(Boolean).join(', ');
       setImportMessage(`${body.entries.length} joueur${body.entries.length > 1 ? 's' : ''} importé${body.entries.length > 1 ? 's' : ''}${skipped ? ` (ignorées : ${skipped})` : ''}`);
     } catch {
@@ -257,7 +287,7 @@ export function SquadBuilder({ competitions, teams }: {
         </p>
       )}
       <p className="note">
-        Prix actuel : carte Limited de la saison la moins chère en vente. Effectif enregistré dans ce navigateur (il n’est pas partagé entre ton téléphone et ton ordinateur).
+        Prix actuel : carte Limited de la saison la moins chère en vente. Une fois ton pseudo Sorare saisi, l’effectif est enregistré en ligne : le même sur ton téléphone et ton ordinateur. « Mettre à jour depuis Sorare » relit ta galerie à tout moment.
       </p>
     </div>
   );

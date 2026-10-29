@@ -1,11 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getQueries } from '@/db/queries';
 import { seasonStart } from '@/ingest/leagues';
+import { PSEUDO } from '@/lib/squad';
 import { createSorareClient } from '@/sources/sorare';
 
 export const dynamic = 'force-dynamic';
-
-const PSEUDO = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 /** Cartes Limited de la saison d'un utilisateur Sorare (galerie publique), en lignes d'effectif des joueurs suivis. */
 export async function GET(req: NextRequest) {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SquadBuilder, STORAGE_KEY, mergeImport, squadTotals, type SquadEntry } from '@/components/SquadBuilder';
+import { parseSquad } from '@/lib/squad';
 import type { MarketPlayerView } from '@/db/queries';
 
 const player = (slug: string, price: number | null, potentialPrice: number | null = null): MarketPlayerView => ({
@@ -47,6 +48,37 @@ describe('import depuis Sorare', () => {
       { slug: 'd', competition: 'eredivisie', status: 'owned', purchasePrice: 12, fromSorare: true },
       { slug: 'f', competition: 'eredivisie', status: 'owned', purchasePrice: null, fromSorare: true },
     ]);
+  });
+});
+
+describe('effectif enregistré en ligne', () => {
+  it('vérifie ce qui est reçu : champs connus seulement, statut et prix valides', () => {
+    expect(parseSquad([{ slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 3, fromSorare: true, extra: 'x' }]))
+      .toEqual([{ slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 3, fromSorare: true }]);
+    expect(parseSquad([{ slug: 'a', competition: 'e', status: 'vendu', purchasePrice: 3 }])).toBeNull();
+    expect(parseSquad([{ slug: 'a', competition: 'e', status: 'owned', purchasePrice: -1 }])).toBeNull();
+    expect(parseSquad({ slug: 'a' })).toBeNull();
+  });
+
+  it('pseudo connu : l’effectif en ligne remplace celui du navigateur, chaque modification y est renvoyée', async () => {
+    window.localStorage.clear();
+    window.localStorage.setItem('sorare-scout:pseudo', 'delflacito');
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ slug: 'vieux', competition: 'eredivisie', status: 'owned', purchasePrice: null }]));
+    const saved: unknown[] = [];
+    global.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const u = new URL(String(url), 'http://x');
+      if (u.pathname === '/api/effectif/enregistre') {
+        if (init?.method === 'PUT') { saved.push(JSON.parse(String(init.body)).entries); return new Response('{"ok":true}'); }
+        return new Response(JSON.stringify({ entries: [{ slug: 'xavi', competition: 'eredivisie', status: 'owned', purchasePrice: 20, fromSorare: true }] }));
+      }
+      return new Response(JSON.stringify(u.searchParams.get('slugs')?.split(',').map((x) => player(x, 30)) ?? []));
+    }) as unknown as typeof fetch;
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'xavi' })).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'vieux' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mettre à jour depuis Sorare' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer xavi' }));
+    await waitFor(() => expect(saved.at(-1)).toEqual([]));
   });
 });
 
