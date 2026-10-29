@@ -35,13 +35,15 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Devise du prix plancher manquant (Ferri, Read) et types de vente.
-await probe('Amounts', (c) => `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { liveSingleSaleOffer { receiverSide { amounts { ${c} } } } } } } }`, [
-  'referenceCurrency', 'gbpCents', 'xyzCents', 'eurCents usdCents gbpCents wei referenceCurrency',
-]);
-await sample('read-offer', `{ anyPlayer(slug: "givairo-read") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) {
-  slug liveSingleSaleOffer { __typename receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } }`);
-await sample('deal-types', `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { tokenPrices(rarity: limited, last: 50) { nodes { date amounts { eurCents } deal { __typename } } } } } }`);
+// Prix plancher manquant (Targhalline) : carte la moins chère de la saison et ses offres.
+await sample('targhalline', `{ anyPlayer(slug: "oussama-targhalline") { ... on Player {
+  inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear inSeasonEligible
+    liveSingleSaleOffer { __typename receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } }
+    latestEnglishAuction { id } }
+  anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { slug seasonYear
+    liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } }
+} } }`);
+await probe('Player (prix)', (c) => `{ anyPlayer(slug: "oussama-targhalline") { ... on Player { ${c} } } }`, ['cardPrice', 'xyzCardPrice']);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
