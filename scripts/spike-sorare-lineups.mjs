@@ -48,7 +48,12 @@ async function run(name, q) {
   out.samples[name] = { ms: Date.now() - t, n: j.data?.players?.length, errors: j.errors?.map((e) => e.message).slice(0, 3), first: JSON.stringify(j.data?.players?.[0] ?? null).slice(0, 600) };
 }
 await run('profiles20', `query P($slugs: [String!]!) { players(slugs: $slugs) { ... on Player { slug firstName lastName height shirtNumber pictureUrl birthDate country { code name flagUrl } activeClub { slug name pictureUrl } s2026: stats(seasonStartYear: 2026) { ${SEASON_STATS} } s2025: stats(seasonStartYear: 2025) { ${SEASON_STATS} } } } }`);
-await run('market20', `query M($slugs: [String!]!) { players(slugs: $slugs) { ... on Player { slug inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PRICE} } anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PRICE} } tokenPrices(rarity: limited, last: 30) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } } } } }`);
+await run('floors20', `query M($slugs: [String!]!) { players(slugs: $slugs) { ... on Player { slug inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PRICE} } anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PRICE} } } } }`);
+{
+  const t = Date.now();
+  const r = await gql(`{ anyPlayer(slug: "${slugs[0]}") { ... on Player { tokenPrices(rarity: limited, last: 30) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } } } } }`);
+  out.samples.sales1 = { ms: Date.now() - t - 350, n: r.data?.anyPlayer?.tokenPrices?.nodes?.length, errors: r.errors?.map((e) => e.message) };
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
