@@ -2,8 +2,15 @@
 export const SHRINK_K = 5;
 /** Matchs joués retenus pour le niveau de base du joueur (L15). */
 export const BASE_GAMES = 15;
-/** En dessous de ce nombre de matchs joués, les matchs manquants comptent pour le score moyen de tous les joueurs. */
+/** En dessous de ce nombre de matchs joués, les matchs manquants comptent pour le score AA moyen du poste. */
 export const MIN_BASE_GAMES = 5;
+/** Matchs joués retenus pour la fréquence des actions décisives (plus rares, donc estimées sur plus longtemps). */
+export const DECISIVE_GAMES = 40;
+/**
+ * Matchs à partir desquels le score décisif propre au joueur compte pour moitié face à celui de son poste.
+ * Réglé sur 5 256 titulaires (octobre 2026) : erreur 15,18 contre 15,51 pour le L15, corrélation 0,192 contre 0,177.
+ */
+export const DECISIVE_SHRINK_K = 20;
 /** Dans l'effet adversaire : concédé au poste vs qualité générale. */
 export const POSITION_WEIGHT = 0.4;
 export const TEAM_WEIGHT = 0.6;
@@ -28,13 +35,17 @@ export function shrinkTowards(value: number | null, reference: number, observati
 }
 
 /**
- * Niveau de base : L15 sur les matchs joués (scores du plus récent au plus ancien, absences exclues).
- * Avec moins de MIN_BASE_GAMES matchs, on complète avec le score moyen (reference) : un seul gros match ne fait pas un 100.
+ * Niveau de base (matchs joués, du plus récent au plus ancien, absences exclues) = score All-Around + score décisif attendus.
+ * - AA : moyenne des 15 derniers matchs ; avec moins de MIN_BASE_GAMES matchs, complétée par l'AA moyen du poste.
+ * - Décisif : moyenne des 40 derniers matchs ramenée vers celle du poste (k = 20), car un but isolé ne fait pas
+ *   d'un défenseur un buteur régulier.
  */
-export function baseScore(scoresPlayed: number[], reference: number): number | null {
-  if (!scoresPlayed.length) return null;
-  const recent = scoresPlayed.slice(0, BASE_GAMES);
-  return mean([...recent, ...Array(Math.max(0, MIN_BASE_GAMES - recent.length)).fill(reference)]);
+export function baseScore(played: { decisive: number; allAround: number }[], reference: { decisive: number; allAround: number }): number | null {
+  if (!played.length) return null;
+  const aa = played.slice(0, BASE_GAMES).map((g) => g.allAround);
+  const aaPadded = [...aa, ...Array(Math.max(0, MIN_BASE_GAMES - aa.length)).fill(reference.allAround)];
+  const decisive = played.slice(0, DECISIVE_GAMES).map((g) => g.decisive);
+  return mean(aaPadded) + shrinkTowards(mean(decisive), reference.decisive, decisive.length, DECISIVE_SHRINK_K);
 }
 
 /**

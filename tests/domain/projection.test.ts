@@ -17,15 +17,23 @@ describe('shrinkTowards', () => {
   });
 });
 
-describe('baseScore (L15 sur les matchs joués)', () => {
-  it('moyenne des 15 derniers matchs joués', () => {
-    expect(baseScore([...Array(15).fill(60), 0, 0], 47)).toBe(60);
+describe('baseScore (AA des 15 derniers matchs + décisif ramené vers le poste)', () => {
+  const g = (decisive: number, allAround: number) => ({ decisive, allAround });
+  const cb = { decisive: 37.4, allAround: 14.4 };
+  it('AA : moyenne des 15 derniers matchs joués ; décisif : 40 derniers, ramené vers le poste (k = 20)', () => {
+    // 15 matchs à AA 20 puis 5 plus anciens à AA 0 (ignorés pour l'AA) ; décisif 35 partout
+    const played = [...Array(15).fill(g(35, 20)), ...Array(5).fill(g(35, 0))];
+    expect(baseScore(played, cb)).toBeCloseTo(20 + (20 * 35 + 20 * 37.4) / 40);
   });
-  it('5 matchs ou plus : moyenne disponible', () => expect(baseScore([80, 60, 80, 60, 70], 47)).toBe(70));
-  it('moins de 5 matchs : complété par le score moyen (un seul match à 98,7 ne fait pas 100)', () => {
-    expect(baseScore([98.7], 47.3)).toBeCloseTo((98.7 + 4 * 47.3) / 5);
+  it('un but isolé ne fait pas d’un défenseur un buteur : son L15 monte de 1,7, sa base de moins de 1', () => {
+    const quiet = Array(15).fill(g(35, 15));
+    const withGoal = [g(60, 15), ...quiet.slice(1)];
+    expect(baseScore(withGoal, cb)! - baseScore(quiet, cb)!).toBeCloseTo(25 / 35);
   });
-  it('aucun match joué → null', () => expect(baseScore([], 47)).toBeNull());
+  it('moins de 5 matchs : AA complété par celui du poste (un seul gros match ne fait pas 100)', () => {
+    expect(baseScore([g(70, 28.7)], cb)).toBeCloseTo((28.7 + 4 * 14.4) / 5 + (70 + 20 * 37.4) / 21);
+  });
+  it('aucun match joué → null', () => expect(baseScore([], cb)).toBeNull());
 });
 
 describe('playerVenueFactor', () => {
