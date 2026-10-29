@@ -9,6 +9,8 @@ export interface MarketRow {
   l5: number;
   /** Moyenne All-Around sur 15 matchs du club (0 si absent). */
   allAround: number;
+  /** Moyenne du score décisif sur 15 matchs du club (0 si absent). */
+  decisive: number;
   startRate: number;
   /** Minutes moyennes sur 15 matchs du club. */
   minutes: number;
@@ -41,6 +43,8 @@ const RIDGE = 1;
 const CLUB_SHRINK = 3;
 /** Points par match d'un club sans match joué (moyenne des championnats). */
 const AVG_PPG = 1.4;
+/** Part du prix habituel du joueur (ajusté à sa forme) dans la valeur estimée ; le reste vient du profil type. */
+export const ANCHOR_WEIGHT = 0.7;
 
 export const median = (xs: number[]) => {
   if (!xs.length) return null;
@@ -53,6 +57,9 @@ export const median = (xs: number[]) => {
  * Variables du modèle, choisies d'après les prix planchers d'octobre 2026 (77 % des écarts de prix expliqués hors
  * échantillon, contre 39 % avec L15 / forme / âge / ligue / poste seuls) : niveau (L15), forme (L5 − L15), All-Around,
  * temps de jeu, âge, force du club, buts + passes de la saison passée, sélection, statut Sorare, championnat et poste.
+ * Ajouts d'octobre 2026 (79,5 % au lieu de 77,9 % en validation croisée) : L15² (les meilleurs se paient plus que
+ * proportionnellement) et poids du score décisif et de l'All-Around propres à chaque poste (les buts comptent plus
+ * pour un attaquant).
  */
 function features(r: Profile, m: Omit<PriceModel, 'coef' | 'clubs'>): number[] {
   const age = ((r.age ?? m.meanAge) - m.meanAge) / 5;
@@ -62,6 +69,8 @@ function features(r: Profile, m: Omit<PriceModel, 'coef' | 'clubs'>): number[] {
     r.status === 'STARTER' ? 1 : 0, r.status === 'SUBSTITUTE' || r.status === 'NOT_PLAYING' ? 1 : 0,
     ...m.leagues.slice(1).map((l) => (r.league === l ? 1 : 0)),
     ...m.positions.slice(1).map((p) => (r.position === p ? 1 : 0)),
+    (r.l15 / 10) ** 2,
+    ...m.positions.flatMap((p) => (r.position === p ? [r.decisive / 10, r.allAround / 10] : [0, 0])),
   ];
 }
 
@@ -120,6 +129,17 @@ const linear = (m: PriceModel, r: Profile) => dot(features(r, m), m.coef);
 /** Prix « juste » d'après le profil : ce que le marché paie en moyenne pour ce profil dans ce club. */
 export function fairPrice(m: PriceModel, r: Profile): number {
   return Math.exp(linear(m, r) + (r.teamId === null ? 0 : m.clubs[r.teamId] ?? 0));
+}
+
+/** Ajustement à la forme : effet que le modèle attribue à l'écart entre le L5 et le L15. */
+export const formFactor = (m: PriceModel, r: Profile) => Math.exp(linear(m, r) - linear(m, { ...r, l5: r.l15 }));
+
+/**
+ * Valeur estimée : 70 % prix habituel du joueur (`usual`, médiane de ses enchères et reventes) ajusté à sa forme,
+ * 30 % profil type (moyenne géométrique). Le profil seul ignore la notoriété : Füllkrug y valait ×7 moins que son prix.
+ */
+export function estimatedValue(m: PriceModel, r: Profile, usual: number): number {
+  return Math.exp(ANCHOR_WEIGHT * Math.log(usual * formFactor(m, r)) + (1 - ANCHOR_WEIGHT) * Math.log(fairPrice(m, r)));
 }
 
 /**

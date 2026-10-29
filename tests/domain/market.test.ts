@@ -1,7 +1,7 @@
 import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, valueHistory, valueSeries, type MarketRow } from '@/domain/market';
 
 const profile = {
-  allAround: 30, startRate: 0.8, minutes: 70, teamId: null, clubPpg: 1.5, prevGoalsAssists: 5, international: false, status: 'STARTER',
+  allAround: 30, decisive: 35, startRate: 0.8, minutes: 70, teamId: null, clubPpg: 1.5, prevGoalsAssists: 5, international: false, status: 'STARTER',
 } as const;
 
 /**

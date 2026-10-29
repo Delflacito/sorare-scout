@@ -14,10 +14,10 @@ function inputs(): MarketInputRow[] {
     const l15 = 30 + (i % 40);
     const price = 2 * Math.exp(0.05 * l15) * (1 + ((i * 7) % 5 - 2) / 100);
     return {
-      playerId: i, floorInSeason: price, l15, l5: l15, allAround: 30, startRate: 0.9, minutes: 80, birthDate: '2000-01-01',
+      playerId: i, floorInSeason: price, l15, l5: l15, allAround: 30, decisive: 35, startRate: 0.9, minutes: 80, birthDate: '2000-01-01',
       league: 'ligue-1-fr', position: 'Forward', nextProjected: l15, teamId: i % 5, clubPpg: 1.5, prevGoalsAssists: 4,
       international: false, status: 'STARTER',
-      sales: [daysAgo(1), daysAgo(2), daysAgo(3)].map((date) => ({ date, eur: price })),
+      sales: [daysAgo(1), daysAgo(2), daysAgo(3)].map((date) => ({ date, eur: price, secondary: true })),
     };
   });
 }
@@ -25,16 +25,33 @@ function inputs(): MarketInputRow[] {
 describe('computeMarket', () => {
   it('sous-évalué : prix nettement sous la valeur estimée ; potentiel selon le score attendu', () => {
     const rows = inputs();
-    rows[0] = { ...rows[0], l15: 70, l5: 75, floorInSeason: 20, nextProjected: 85 }; // valeur attendue ≈ 66 €
+    // Profil type ≈ 66 € (L15 70), échangé autour de 20 € : valeur estimée = 70 % prix habituel + 30 % profil
+    // (moyenne géométrique). Le joueur entre lui-même dans l'ajustement et tire son profil vers le bas : écart
+    // entre (20 / 66)^0,3 ≈ 0,7 et 1, toujours sous-évalué.
+    rows[0] = { ...rows[0], l15: 70, l5: 75, floorInSeason: 20, nextProjected: 85, sales: rows[0].sales.map((x) => ({ ...x, eur: 20 })) };
     rows[1] = { ...rows[1], floorInSeason: null }; // pas d'offre : médiane des ventes
     const out = computeMarket(rows, NOW);
     const cheap = out.find((r) => r.playerId === 0)!;
-    expect(cheap.valueRatio).toBeLessThan(0.5);
+    expect(cheap.valueRatio).toBeGreaterThan(0.6);
+    expect(cheap.valueRatio).toBeLessThan(0.95);
     expect(cheap.potentialGain).toBeGreaterThan(0);
     expect(out.find((r) => r.playerId === 1)!.referencePrice).toBeCloseTo(out.find((r) => r.playerId === 1)!.recentPrice!);
     const typical = out.find((r) => r.playerId === 10)!;
     expect(typical.valueRatio).toBeCloseTo(1, 1);
     expect(typical.potentialGain).toBeCloseTo(0, 5); // score attendu = son niveau
+  });
+
+  it('joueur réputé payé ×7 au-dessus de son profil : valeur estimée ancrée sur son prix habituel (reventes seules)', () => {
+    const rows = inputs();
+    const profile = rows[0].floorInSeason!; // profil type du joueur 0 (L15 30)
+    rows[0] = { ...rows[0], floorInSeason: 7 * profile, sales: [
+      ...rows[0].sales.map((x) => ({ ...x, eur: 7 * profile })),
+      { date: daysAgo(1), eur: 30 * profile, secondary: false }, // vente directe de Sorare : ignorée
+    ] };
+    const ratio = computeMarket(rows, NOW).find((r) => r.playerId === 0)!.valueRatio!;
+    // 7^0,3 ≈ 1,8 au plus (le joueur et la prime de son club relèvent un peu son profil), au lieu de 7 avec le seul profil
+    expect(ratio).toBeGreaterThan(1.3);
+    expect(ratio).toBeLessThan(7 ** 0.3 + 0.05);
   });
 
   it('calibré sur les planchers : les ventes gonflées des joueurs sans offre ne faussent pas la valeur estimée', () => {

@@ -1,6 +1,6 @@
 import type { MarketInputRow, PlayerMarketRow, Repo } from '@/db/repo';
 import type { SorareClient } from '@/sources/sorare';
-import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, type MarketRow } from '@/domain/market';
+import { estimatedValue, fitPriceModel, median, potentialPrice, priceTrend, type MarketRow } from '@/domain/market';
 import { ageAt } from '@/lib/format';
 import { seasonStart } from './leagues';
 
@@ -50,7 +50,7 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
   }).filter((x): x is typeof x & { referencePrice: number } => x.referencePrice !== null && x.referencePrice > 0);
 
   const toRow = ({ r, referencePrice }: (typeof priced)[number]): MarketRow => ({
-    playerId: r.playerId, price: referencePrice, l15: r.l15, l5: r.l5, allAround: r.allAround, startRate: r.startRate, minutes: r.minutes,
+    playerId: r.playerId, price: referencePrice, l15: r.l15, l5: r.l5, allAround: r.allAround, decisive: r.decisive, startRate: r.startRate, minutes: r.minutes,
     age: r.birthDate ? ageAt(r.birthDate, new Date(now)) : null, league: r.league, position: r.position, teamId: r.teamId,
     clubPpg: r.clubPpg, prevGoalsAssists: r.prevGoalsAssists, international: r.international, status: r.status,
   });
@@ -61,7 +61,9 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
     const row = toRow(x);
     // Sans offre, le prix vient des ventes (gonflées par les ventes primaires) : pas comparable au modèle.
     const comparable = model && x.r.floorInSeason !== null ? model : null;
-    const fair = comparable ? fairPrice(comparable, row) : null;
+    // Prix habituel : médiane des enchères et reventes entre managers sur 4 semaines, à défaut le plancher.
+    const usual = median(x.r.sales.filter((s) => s.secondary).map((s) => s.eur)) ?? x.referencePrice;
+    const fair = comparable ? estimatedValue(comparable, row, usual) : null;
     const potential = comparable && x.r.nextProjected !== null ? potentialPrice(comparable, row, x.r.nextProjected) : null;
     return {
       playerId: x.r.playerId, referencePrice: x.referencePrice, recentPrice: x.recentPrice, priceTrend7: priceTrend(x.r.sales, now),
