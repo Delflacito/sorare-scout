@@ -35,18 +35,25 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Galerie d'un utilisateur : vendeur d'une offre en cours, puis ses cartes.
-const owner = await gql('{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 1) { nodes { sender { ... on User { slug nickname } } senderSide { anyCards { slug user { slug nickname } } } } } } }');
-out.samples.owner = owner.errors ? owner.errors.map((e) => e.message).join(' | ') : owner.data;
-const slug = owner.data?.tokens?.liveSingleSaleOffers?.nodes?.[0]?.senderSide?.anyCards?.[0]?.user?.slug
-  ?? owner.data?.tokens?.liveSingleSaleOffers?.nodes?.[0]?.sender?.slug ?? 'xyz';
-for (const [k, q] of Object.entries({
-  cards: `{ user(slug: "${slug}") { slug nickname cards(first: 3) { totalCount pageInfo { hasNextPage endCursor } nodes { slug rarityTyped seasonYear anyPlayer { slug } } } } }`,
-  cardsLimited: `{ user(slug: "${slug}") { cards(rarities: [limited], first: 3) { totalCount nodes { slug rarityTyped } } } }`,
-  ownership: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug ownershipHistory { from amounts { eurCents usdCents wei } transferType } } } } }`,
-  owner: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug owner { from price { eurCents usdCents wei } transferType } } } } }`,
-  tokenOwner: `{ user(slug: "${slug}") { cards(first: 2) { nodes { slug tokenOwner { from price { eurCents } } } } } }`,
-})) await sample(k, q);
+// Championnats des cartes de la saison de delflacito (pour choisir ceux à ajouter).
+{
+  const counts = {};
+  let after = null;
+  for (let page = 0; page < 40; page++) {
+    const r = await gql(`{ user(slug: "delflacito") { cards(rarities: [limited], first: 50${after ? `, after: "${after}"` : ''}) {
+      pageInfo { hasNextPage endCursor }
+      nodes { seasonYear anyPlayer { ... on Player { activeClub { ... on Club { slug domesticLeague { slug name } } } } } } } } }`);
+    if (r.errors) { out.samples.leagueError = r.errors.map((e) => e.message).join(' | '); break; }
+    for (const n of r.data.user.cards.nodes) {
+      const l = n.anyPlayer?.activeClub?.domesticLeague;
+      const k = `${l?.slug ?? '?'} | ${l?.name ?? '?'} | saison ${n.seasonYear}`;
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    if (!r.data.user.cards.pageInfo.hasNextPage) break;
+    after = r.data.user.cards.pageInfo.endCursor;
+  }
+  out.samples.leagues = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
