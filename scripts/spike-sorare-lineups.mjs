@@ -35,13 +35,13 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Plancher manquant (Aguerd) : offres en cours d'un joueur.
+// Plancher manquant (Aguerd) : saison et rareté des cartes des offres en cours.
 for (const [k, q] of Object.entries({
-  liveOffers: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 5) { nodes { id receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } }',
-  liveOffersSport: '{ tokens { liveSingleSaleOffers(sport: FOOTBALL, playerSlug: "naif-aguerd", first: 5) { nodes { id } } } }',
-  playerCards: '{ anyPlayer(slug: "naif-aguerd") { ... on Player { cards(rarities: [limited], first: 50) { nodes { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } } }',
-  lowest: '{ anyPlayer(slug: "naif-aguerd") { ... on Player { inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { slug seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } } } } } }',
-  offerType: '{ tokens { offers { id } } }',
+  anyCards: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 3) { nodes { receiverSide { amounts { eurCents usdCents gbpCents wei referenceCurrency } } senderSide { anyCards { slug seasonYear rarityTyped } } } } } }',
+  cards: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 3) { nodes { senderSide { cards { slug seasonYear rarity } } } } } }',
+  rarityArg: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", rarities: [limited], first: 3) { nodes { id } } } }',
+  seasonArg: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", seasonYear: 2026, first: 3) { nodes { id } } } }',
+  total: '{ tokens { liveSingleSaleOffers(playerSlug: "naif-aguerd", first: 1) { totalCount } } }',
 })) await sample(k, q);
 
 mkdirSync('spike-output', { recursive: true });
