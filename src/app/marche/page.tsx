@@ -3,6 +3,8 @@ import { getQueries, type ClubMarketView, type MarketPlayerView } from '@/db/que
 import { POSITION_LABEL_FR, cardLabel } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { valueLabel } from '@/components/MarketCard';
+import { ValueChart } from '@/components/ValueChart';
+import { valueHistory, type ValuePoint } from '@/domain/market';
 import { fmtChange, fmtEur, fmtScore } from '@/lib/format';
 import { one, type SearchParams } from '@/lib/params';
 import { seasonStart } from '@/ingest/leagues';
@@ -47,7 +49,7 @@ function ClubsTable({ clubs, competition }: { clubs: ClubMarketView[]; competiti
   );
 }
 
-function ClubPlayers({ players, yy }: { players: MarketPlayerView[]; yy: string }) {
+function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy: string; history: ValuePoint[] }) {
   const priced = players.filter((p) => p.floorInSeason !== null);
   return (
     <>
@@ -57,6 +59,7 @@ function ClubPlayers({ players, yy }: { players: MarketPlayerView[]; yy: string 
         <div className="card"><div className="card-kicker">Total planchers Classic</div><strong>{fmtEur(sum(players.map((p) => p.floorClassic)))}</strong></div>
         <div className="card"><div className="card-kicker">Total valeur estimée</div><strong>{fmtEur(sum(players.map((p) => p.fairPrice)))}</strong></div>
       </div>
+      <ValueChart points={history} />
       <div className="table-wrap">
         <table aria-label="Prix des cartes du club">
           <thead>
@@ -116,6 +119,10 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   const [competitions, teams] = await Promise.all([queries.listCompetitions(), queries.listTeams()]);
   const clubTeam = club ? teams.find((t) => t.slug === club) : undefined;
   const yy = String(new Date(seasonStart()).getUTCFullYear() % 100).padStart(2, '0');
+  const clubView = async (team: string) => {
+    const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getClubDailyPrices(team)]);
+    return <ClubPlayers players={players} yy={yy} history={valueHistory(prices, sum(players.map((p) => p.fairPrice)))} />;
+  };
 
   return (
     <main>
@@ -134,7 +141,7 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
       </form>
       {clubTeam && <p><Link href={competition ? `/marche?competition=${competition}` : '/marche'}>← Tous les clubs</Link></p>}
       {clubTeam
-        ? <ClubPlayers players={await queries.getMarketPlayers({ team: clubTeam.slug })} yy={yy} />
+        ? await clubView(clubTeam.slug)
         : <ClubsTable clubs={await queries.getClubsMarket(competition)} competition={competition} />}
     </main>
   );

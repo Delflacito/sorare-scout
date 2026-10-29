@@ -1,6 +1,7 @@
 import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
+import type { DailyPrice } from '@/domain/market';
 
 export const SORTS = ['projected', 'l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
@@ -674,6 +675,19 @@ export function createQueries(sql: postgres.Sql) {
         price: r.reference_price ?? r.floor_in_season, fairPrice: r.fair_price, valueRatio: r.value_ratio,
         potentialPrice: r.potential_price, potentialGain: r.potential_gain, priceTrend7: r.price_trend7, lastAuction: toAuction(r.last_auction),
       }));
+    },
+
+    /** Prix médian des cartes de la saison de chaque joueur d'un club, jour par jour (heure de Paris). */
+    async getClubDailyPrices(team: string): Promise<DailyPrice[]> {
+      const rows = await sql`
+        select p.sorare_slug, to_char(cs.sold_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day,
+          percentile_cont(0.5) within group (order by cs.price_eur) as price
+        from card_sales cs
+        join players p on p.id = cs.player_id
+        join teams t on t.id = p.team_id
+        where t.sorare_slug = ${team} and cs.in_season and exists (select 1 from player_summary s where s.player_id = p.id)
+        group by 1, 2`;
+      return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price }));
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {

@@ -1,4 +1,4 @@
-import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, type MarketRow } from '@/domain/market';
+import { fairPrice, fitPriceModel, median, potentialPrice, priceTrend, valueHistory, type MarketRow } from '@/domain/market';
 
 const profile = {
   allAround: 30, startRate: 0.8, minutes: 70, teamId: null, clubPpg: 1.5, prevGoalsAssists: 5, international: false, status: 'STARTER',
@@ -62,5 +62,38 @@ describe('tendance du prix', () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(median([4, 1, 2, 3])).toBe(2.5);
     expect(median([])).toBeNull();
+  });
+});
+
+describe('valueHistory', () => {
+  const day = (d: string, prices: Record<string, number>) => Object.entries(prices).map(([slug, price]) => ({ slug, day: d, price }));
+  it('chaîne les variations des joueurs vendus aux deux dates et finit sur la valeur estimée actuelle', () => {
+    // Dates espacées de plus de 3 jours : pas de lissage entre elles.
+    const h = valueHistory([
+      ...day('2026-10-01', { a: 10, b: 30, c: 5 }),
+      ...day('2026-10-05', { a: 12, b: 36, c: 6 }), // +20 %
+      ...day('2026-10-09', { a: 12, d: 99, e: 7 }), // seul a en commun : stable
+    ], 120);
+    expect(h.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-05', '2026-10-09']);
+    expect(h.map((p) => Math.round(p.value))).toEqual([100, 120, 120]);
+    expect(h.map((p) => p.players)).toEqual([3, 3, 3]);
+  });
+  it('prix lissé sur 3 jours glissants : une journée aberrante ne fait pas plonger la courbe', () => {
+    const h = valueHistory([
+      ...day('2026-10-22', { a: 10, b: 10, c: 10 }),
+      ...day('2026-10-23', { a: 10, b: 10, c: 10 }),
+      ...day('2026-10-24', { a: 2, b: 10, c: 10 }), // a : médiane (10, 10, 2) = 10
+    ], 30);
+    expect(h.map((p) => Math.round(p.value))).toEqual([30, 30, 30]);
+  });
+  it('jours trop pauvres écartés (moins de 3 joueurs ou moins de la moitié du jour le plus fourni)', () => {
+    const h = valueHistory([
+      ...day('2026-10-16', { a: 2 }),
+      ...day('2026-10-21', { a: 10, b: 10, c: 10 }),
+      ...day('2026-10-22', { a: 10, b: 10, c: 10, d: 1, e: 1, f: 1, g: 1 }),
+      ...day('2026-10-23', { a: 11, b: 11, c: 11, d: 1.1 }),
+    ], 50);
+    expect(h.map((p) => p.day)).toEqual(['2026-10-22', '2026-10-23']);
+    expect(valueHistory([], 80)).toEqual([]);
   });
 });

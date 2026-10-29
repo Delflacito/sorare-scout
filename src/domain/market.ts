@@ -144,3 +144,40 @@ export function priceTrend(sales: { date: string; eur: number }[], now = Date.no
   }).map((s) => s.eur));
   return recent !== null && before ? recent / before - 1 : null;
 }
+
+export interface DailyPrice { slug: string; day: string; price: number }
+/** Jours glissants sur lesquels le prix de chaque joueur est lissé. */
+export const SMOOTH_DAYS = 3;
+export interface ValuePoint { day: string; value: number; players: number }
+
+/**
+ * Évolution de la valeur d'un effectif, chaînée jour par jour comme un indice : d'un jour au suivant, variation des prix
+ * médians des joueurs vendus les deux jours ; le dernier jour vaut `current` (valeur estimée actuelle).
+ * Jours écartés : moins de 3 joueurs vendus ou moins de la moitié du jour le plus fourni (une vente isolée fausserait la courbe).
+ */
+export function valueHistory(prices: DailyPrice[], current: number): ValuePoint[] {
+  // Prix de chaque joueur un jour donné : médiane de ses prix médians des SMOOTH_DAYS derniers jours (lisse le bruit quotidien).
+  const dayMs = 86_400_000;
+  const byPlayer = new Map<string, { t: number; price: number }[]>();
+  for (const p of prices) byPlayer.set(p.slug, [...(byPlayer.get(p.slug) ?? []), { t: Date.parse(p.day), price: p.price }]);
+  const byDay = new Map<string, Map<string, number>>();
+  for (const p of prices) {
+    const t = Date.parse(p.day);
+    const recent = byPlayer.get(p.slug)!.filter((x) => x.t <= t && x.t > t - SMOOTH_DAYS * dayMs).map((x) => x.price);
+    byDay.set(p.day, (byDay.get(p.day) ?? new Map()).set(p.slug, median(recent)!));
+  }
+  const most = Math.max(0, ...[...byDay.values()].map((m) => m.size));
+  const days = [...byDay.keys()].filter((d) => byDay.get(d)!.size >= Math.max(3, most / 2)).sort();
+  if (!days.length) return [];
+  const values = new Array<number>(days.length);
+  values[days.length - 1] = current;
+  for (let i = days.length - 1; i > 0; i--) {
+    const now = byDay.get(days[i])!;
+    const before = byDay.get(days[i - 1])!;
+    const common = [...now.keys()].filter((s) => before.has(s));
+    const sumNow = common.reduce((t, s) => t + now.get(s)!, 0);
+    const sumBefore = common.reduce((t, s) => t + before.get(s)!, 0);
+    values[i - 1] = sumNow && sumBefore ? values[i] * (sumBefore / sumNow) : values[i];
+  }
+  return days.map((day, i) => ({ day, value: values[i], players: byDay.get(day)!.size }));
+}

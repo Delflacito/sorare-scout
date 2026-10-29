@@ -499,3 +499,13 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
   .next-label, .opp-word { display: none; }
   .opp-badge { text-transform: capitalize; }
 }
+
+/* Évolution de la valeur d'un effectif */
+.chart-box .value-line { fill: none; stroke: var(--series-start); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-box .value-dot { fill: var(--series-start); stroke: var(--surface); stroke-width: 2; }
+.chart-box rect[data-testid="value-hit"] { cursor: pointer; outline: none; }
+.chart-box rect[data-testid="value-hit"]:focus-visible { fill: color-mix(in srgb, var(--accent) 8%, transparent); }
+.chart-data { margin: 6px 0 0; font-size: 13px; }
+.chart-data summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 32px; display: inline-flex; align-items: center; }
+.chart-data table { margin-top: 6px; }
+.chart-card .note { margin: 6px 0 8px; }

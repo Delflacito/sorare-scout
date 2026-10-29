@@ -8,6 +8,9 @@ vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
   getQueries: () => ({
     getClubsMarket, getMarketPlayers,
+    getClubDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
+      { slug, day: '2026-10-15', price: 40 }, { slug, day: '2026-10-22', price: 50 },
+    ]),
     listCompetitions: async () => [{ slug: 'eredivisie', name: 'Eredivisie' }],
     listTeams: async () => [{ slug: 'psv', name: 'PSV', competitionSlug: 'eredivisie' }],
   }),
@@ -44,5 +47,10 @@ describe('/marche', () => {
     expect(total).toHaveTextContent('52,5 €');
     expect(total).toHaveTextContent('10 €');
     expect(screen.getByText(/2 cartes en vente sur 3 joueurs/)).toBeInTheDocument();
+    // Graphique : le dernier jour vaut la valeur estimée actuelle, la veille en est déduite (prix +25 % entre les deux)
+    const chart = screen.getByRole('figure');
+    expect(chart).toHaveTextContent('Évolution de la valeur estimée');
+    expect(within(chart).getAllByTestId('value-hit')).toHaveLength(2);
+    expect(within(chart).getByText('+25 %')).toBeInTheDocument();
   });
 });
