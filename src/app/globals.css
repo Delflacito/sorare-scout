@@ -472,3 +472,30 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 @media (max-width: 400px) {
   .gw-meta-sorare { display: none; }
 }
+
+/* Joueurs : mêmes lignes que Ma Game Week, sans rang */
+.gw-row.no-rank { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.player-search { display: grid; gap: 8px; }
+.player-search input[type=search] { width: 100%; min-height: 44px; padding: 8px 14px; border: 1px solid var(--control-border); border-radius: 12px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }
+.player-search .filters { margin: 0; }
+.search-line { display: flex; gap: 8px; }
+.search-line input[type=search] { flex: 1; min-width: 0; }
+.search-line button { min-height: 44px; padding: 0 16px; border: none; border-radius: 12px; background: var(--accent); color: var(--surface); font: inherit; font-weight: 600; cursor: pointer; }
+.player-search .reset { justify-self: start; min-height: 32px; display: inline-flex; align-items: center; font-size: 14px; color: var(--muted); }
+.gw-match > .muted { white-space: nowrap; }
+.more-filters summary { display: inline-flex; align-items: center; min-height: 36px; cursor: pointer; color: var(--accent); font-weight: 600; font-size: 14px; }
+.more-filters[open] summary { margin-bottom: 6px; }
+.sort-row { align-items: center; }
+.sort-row > span { font-size: 13px; white-space: nowrap; margin-right: 2px; }
+.next-line { flex-wrap: wrap; row-gap: 2px; }
+.opp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  white-space: nowrap; background: var(--neutral-bg); color: var(--ink-2); cursor: help; }
+.opp-badge.hot { background: var(--hot-bg); color: var(--hot); }
+.opp-badge.cold { background: var(--cold-bg); color: var(--cold); }
+.opp-pct { font-variant-numeric: tabular-nums; opacity: .85; }
+@media (max-width: 560px) {
+  .gw-row.no-rank { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .next-label, .opp-word { display: none; }
+  .opp-badge { text-transform: capitalize; }
+}

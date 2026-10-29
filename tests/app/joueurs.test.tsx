@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { PlayerListRow, SearchFilters } from '@/db/queries';
 
 const searchPlayers = vi.fn<(f: SearchFilters) => Promise<PlayerListRow[]>>();
@@ -21,26 +21,33 @@ const row: PlayerListRow = {
 describe('/joueurs', () => {
   beforeEach(() => searchPlayers.mockReset());
 
-  it('affiche le tableau des joueurs', async () => {
+  it('une ligne par joueur : score potentiel et adversaire du prochain match en avant', async () => {
     searchPlayers.mockResolvedValue([row]);
     render(await Page({ searchParams: Promise.resolve({}) }));
-    for (const h of ['L5', 'L15', 'L40', '% titu', 'Prochain match', 'Indice adv.']) expect(screen.getByRole('columnheader', { name: h })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Nuno Mendes' })).toHaveAttribute('href', '/joueurs/nuno-mendes');
-    expect(screen.getByText('62.4')).toBeInTheDocument();
-    expect(screen.getByText('80 %')).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: /^Défenseur \/ Milieu\s*· DG$/ })).toBeInTheDocument();
-    expect(screen.getByText('123')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Olympique de Marseille' })).toHaveAttribute('href', '/equipes/om');
-    expect(screen.getByTitle('Domicile')).toHaveTextContent('D');
+    const line = within(screen.getByRole('list', { name: 'Joueurs' })).getAllByRole('listitem')[0];
+    expect(within(line).getByRole('link', { name: 'Nuno Mendes' })).toHaveAttribute('href', '/joueurs/nuno-mendes');
+    expect(within(line).getByTitle('Score potentiel au prochain match')).toHaveTextContent('71.3');
+    expect(within(line).getByText('Olympique de Marseille')).toBeInTheDocument();
+    expect(within(line).getByTitle('Domicile')).toHaveTextContent('D');
+    expect(within(line).getByTitle(/concède \+23 %/)).toHaveClass('hot');
+    expect(within(line).getByText('+23 %')).toBeInTheDocument();
+    expect(within(line).getByText('Sorare 41')).toBeInTheDocument();
+    expect(line).toHaveTextContent('L5 62.4');
+    expect(line).toHaveTextContent('Titu 80 %');
+    expect(line).toHaveTextContent('Défenseur / Milieu · DG');
+    expect(within(line).getByRole('img', { name: 'Nuno Mendes' })).toHaveAttribute('src', 'https://p/nuno.png');
+    expect(within(line).getByLabelText('Blessé · Thigh Injury')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Club' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Nuno Mendes' })).toHaveAttribute('src', 'https://p/nuno.png');
-    expect(screen.getByRole('img', { name: 'Paris Saint-Germain' })).toHaveAttribute('src', 'https://t/psg.png');
-    expect(screen.getByLabelText('Blessé · Thigh Injury')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Proj. Sorare' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: '41' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Potentiel' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: '71.3' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Masquer blessés et suspendus' })).not.toBeChecked();
+  });
+
+  it('pastilles de filtre et de tri qui gardent les autres filtres', async () => {
+    searchPlayers.mockResolvedValue([row]);
+    render(await Page({ searchParams: Promise.resolve({ competition: 'ligue-1-fr', sort: 'l5' }) }));
+    expect(screen.getByRole('link', { name: 'Ligue 1' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Défenseur' })).toHaveAttribute('href', '/joueurs?position=Defender&competition=ligue-1-fr&sort=l5');
+    expect(screen.getByRole('link', { name: 'Adversaire le plus facile' })).toHaveAttribute('href', '/joueurs?competition=ligue-1-fr&sort=nextIndex');
+    expect(screen.getByRole('link', { name: 'Score potentiel' })).toHaveAttribute('href', '/joueurs?competition=ligue-1-fr');
   });
 
   it('tri par défaut : score potentiel ; option pour masquer les indisponibles', async () => {

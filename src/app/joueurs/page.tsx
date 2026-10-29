@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { getQueries, PAGE_SIZE, SORTS } from '@/db/queries';
+import { getQueries, PAGE_SIZE, SORTS, type PlayerListRow, type Sort } from '@/db/queries';
 import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
-import { fmtIndex, fmtPct, fmtScore, indexClass } from '@/lib/format';
+import { fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
+import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { one, oneOf, type SearchParams } from '@/lib/params';
@@ -10,7 +11,64 @@ import { one, oneOf, type SearchParams } from '@/lib/params';
 export const dynamic = 'force-dynamic';
 
 const GENERIC = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
-const SORT_LABEL = { projected: 'score potentiel', l5: 'L5', l15: 'L15', l40: 'L40', startRate: '% titu', nextIndex: 'Indice adversaire' } as const;
+const SORT_LABEL: Record<Sort, string> = {
+  projected: 'Score potentiel', nextIndex: 'Adversaire le plus facile', l5: 'L5', l15: 'L15', l40: 'L40', startRate: '% titu',
+};
+
+/** Facilité du prochain adversaire à ce poste : points qu'il concède par rapport à la moyenne de la ligue. */
+function Opponent({ r }: { r: PlayerListRow }) {
+  if (r.nextIndex === null) return null;
+  const pct = Math.round((r.nextIndex - 1) * 100);
+  const cls = indexClass(r.nextIndex);
+  const label = cls === 'hot' ? 'favorable' : cls === 'cold' ? 'difficile' : 'moyen';
+  return (
+    <span className={`opp-badge ${cls} ${r.nextLowSample ? 'low-sample' : ''}`}
+      title={`Il concède ${pct >= 0 ? '+' : '−'}${Math.abs(pct)} % de points à ce poste par rapport à la moyenne de la ligue${r.nextLowSample ? ' (moins de 3 matchs observés)' : ''}`}>
+      <span className="opp-word">Adversaire </span>{label} <span className="opp-pct">{pct >= 0 ? '+' : '−'}{Math.abs(pct)} %</span>
+    </span>
+  );
+}
+
+function PlayerRow({ r }: { r: PlayerListRow }) {
+  return (
+    <li className="gw-row no-rank">
+      <PlayerAvatar name={r.name} url={r.pictureUrl} size={40} />
+      <div className="gw-who">
+        <div className="gw-name">
+          <Link href={`/joueurs/${r.slug}`}>{r.name}</Link>
+          <StatusBadges compact playingStatus={r.playingStatus}
+            injury={r.injuryKind ? { kind: r.injuryKind, end: null } : null}
+            suspension={r.suspensionReason ? { reason: r.suspensionReason, end: null } : null} />
+        </div>
+        <div className="gw-match">
+          {r.team && <ClubLogo name={r.team} url={r.teamPictureUrl} size={16} />}
+          <span className="gw-opp">{r.team ?? '—'}</span>
+          <span className="muted">· {cardLabel(r.cardPositions)}{r.usualPosition && ` · ${POSITION_LABEL_FR[r.usualPosition]}`}</span>
+        </div>
+        <div className="gw-match next-line">
+          {r.nextOpponent ? (
+            <>
+              <span className="muted next-label">Prochain :</span>
+              {r.nextIsHome !== null && <Venue isHome={r.nextIsHome} />}
+              <span className="gw-opp">{r.nextOpponent}</span>
+              <Opponent r={r} />
+            </>
+          ) : <span className="muted">Pas de match programmé</span>}
+        </div>
+        <div className="gw-meta">
+          <span><abbr title="Moyenne des 5 derniers matchs">L5</abbr> {fmtScore(r.l5)}</span>
+          <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(r.l15)}</span>
+          <span className="gw-meta-pos"><abbr title="Moyenne des 40 derniers matchs">L40</abbr> {fmtScore(r.l40)}</span>
+          <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(r.startRate)}</span>
+        </div>
+      </div>
+      <div className="gw-score">
+        <ScorePill score={r.nextProjected} precise title="Score potentiel au prochain match" />
+        {r.sorareProjection !== null && <span className="gw-boost" title="Projection officielle de Sorare">Sorare {Math.round(r.sorareProjection)}</span>}
+      </div>
+    </li>
+  );
+}
 
 export default async function JoueursPage({ searchParams }: { searchParams: SearchParams }) {
   const p = await searchParams;
@@ -27,43 +85,68 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
   };
   const queries = getQueries();
   const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions(), queries.listTeams()]);
-  const pageHref = (n: number) => {
-    const { available, offset: _, ...rest } = filters;
-    const qs = new URLSearchParams(Object.entries({ ...rest, dispo: available ? '1' : undefined, page: String(n) }).filter(([, v]) => v) as [string, string][]);
-    return `/joueurs?${qs}`;
+  // Lien qui garde les filtres en cours et en change certains (retour en page 1 sauf demande).
+  const href = (o: Partial<Omit<typeof filters, 'offset'>> & { page?: number } = {}) => {
+    const { available, offset: _, ...rest } = { ...filters, page: undefined, ...o };
+    const qs = new URLSearchParams(Object.entries({
+      ...rest, sort: rest.sort === 'projected' ? undefined : rest.sort, dispo: available ? '1' : undefined, page: rest.page && rest.page > 1 ? String(rest.page) : undefined,
+    }).filter(([, v]) => v) as [string, string][]);
+    return `/joueurs${qs.size ? `?${qs}` : ''}`;
   };
   const activeFilters = [filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
+  const advanced = [filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
 
   return (
-    <main>
+    <main className="gw">
       <h1>Joueurs</h1>
-      <form className="filters" method="get">
-        <input name="q" type="search" placeholder="Nom du joueur" defaultValue={filters.q} aria-label="Nom du joueur" />
-        <select name="competition" defaultValue={filters.competition ?? ''} aria-label="Compétition">
-          <option value="">Toutes les ligues</option>
-          {competitions.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-        </select>
-        <select name="team" defaultValue={filters.team ?? ''} aria-label="Club">
-          <option value="">Tous les clubs</option>
-          {teams.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
-        </select>
-        <select name="position" defaultValue={filters.position ?? ''} aria-label="Poste">
-          <option value="">Tous les postes (carte)</option>
-          {GENERIC.map((g) => <option key={g} value={g}>{GENERIC_LABEL_FR[g]}</option>)}
-        </select>
-        <select name="detailedPosition" defaultValue={filters.detailedPosition ?? ''} aria-label="Poste précis">
-          <option value="">Tous les postes sur le terrain</option>
-          {DETAILED_POSITIONS.map((d) => <option key={d} value={d}>{POSITION_LABEL_FR[d]}</option>)}
-        </select>
-        <select name="sort" defaultValue={filters.sort} aria-label="Tri">
-          {SORTS.map((s) => <option key={s} value={s}>Trier par {SORT_LABEL[s]}</option>)}
-        </select>
-        <label className="check">
-          <input type="checkbox" name="dispo" value="1" defaultChecked={filters.available} /> Masquer blessés et suspendus
-        </label>
-        <button type="submit">Appliquer</button>
-        {activeFilters > 0 && <Link href="/joueurs" className="reset">Effacer les filtres ({activeFilters})</Link>}
-      </form>
+      <div className="gw-toolbar">
+        <form method="get" className="player-search" role="search">
+          <div className="search-line">
+            <input name="q" type="search" placeholder="Nom du joueur" defaultValue={filters.q} aria-label="Nom du joueur" />
+            <button type="submit">Rechercher</button>
+          </div>
+          {filters.competition && <input type="hidden" name="competition" value={filters.competition} />}
+          {filters.position && <input type="hidden" name="position" value={filters.position} />}
+          {filters.sort !== 'projected' && <input type="hidden" name="sort" value={filters.sort} />}
+          <details className="more-filters" open={advanced > 0}>
+            <summary>Plus de filtres{advanced > 0 && ` (${advanced})`}</summary>
+            <div className="filters">
+              <select name="team" defaultValue={filters.team ?? ''} aria-label="Club">
+                <option value="">Tous les clubs</option>
+                {teams.filter((t) => !filters.competition || t.competitionSlug === filters.competition)
+                  .map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
+              </select>
+              <select name="detailedPosition" defaultValue={filters.detailedPosition ?? ''} aria-label="Poste précis">
+                <option value="">Tous les postes sur le terrain</option>
+                {DETAILED_POSITIONS.map((d) => <option key={d} value={d}>{POSITION_LABEL_FR[d]}</option>)}
+              </select>
+              <label className="check">
+                <input type="checkbox" name="dispo" value="1" defaultChecked={filters.available} /> Masquer blessés et suspendus
+              </label>
+            </div>
+          </details>
+          {activeFilters > 0 && <Link href="/joueurs" className="reset">Effacer les filtres ({activeFilters})</Link>}
+        </form>
+
+        <nav className="chip-row" aria-label="Championnat">
+          <Link href={href({ competition: undefined, team: undefined })} aria-current={filters.competition ? undefined : 'page'}>Toutes les ligues</Link>
+          {competitions.map((c) => (
+            <Link key={c.slug} href={href({ competition: c.slug, team: undefined })} aria-current={filters.competition === c.slug ? 'page' : undefined}>{c.name}</Link>
+          ))}
+        </nav>
+        <nav className="chip-row" aria-label="Poste">
+          <Link href={href({ position: undefined })} aria-current={filters.position ? undefined : 'page'}>Tous les postes</Link>
+          {GENERIC.map((g) => (
+            <Link key={g} href={href({ position: g })} aria-current={filters.position === g ? 'page' : undefined}>{GENERIC_LABEL_FR[g]}</Link>
+          ))}
+        </nav>
+        <nav className="chip-row sort-row" aria-label="Trier par">
+          <span className="muted">Trier par</span>
+          {SORTS.map((s) => (
+            <Link key={s} href={href({ sort: s })} aria-current={filters.sort === s ? 'page' : undefined}>{SORT_LABEL[s]}</Link>
+          ))}
+        </nav>
+      </div>
 
       {rows.length === 0 ? (
         <div className="empty">
@@ -71,62 +154,14 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           <p className="small">Élargis la recherche (ligue, club ou poste) ou <Link href="/joueurs">efface tous les filtres</Link>.</p>
         </div>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Joueur</th><th scope="col">Club</th><th scope="col">Poste</th>
-                <th scope="col"><abbr title="Moyenne des 5 derniers matchs">L5</abbr></th>
-                <th scope="col"><abbr title="Moyenne des 15 derniers matchs">L15</abbr></th>
-                <th scope="col"><abbr title="Moyenne des 40 derniers matchs">L40</abbr></th>
-                <th scope="col"><abbr title="Part des matchs commencés comme titulaire">% titu</abbr></th>
-                <th scope="col">Prochain match</th>
-                <th scope="col"><abbr title="Score attendu au prochain match, selon l’adversaire">Potentiel</abbr></th>
-                <th scope="col"><abbr title="Points concédés par l’adversaire à ce poste, par rapport à la moyenne de la ligue (vert = favorable)">Indice adv.</abbr></th>
-                <th scope="col"><abbr title="Projection officielle de Sorare pour le prochain match">Proj. Sorare</abbr></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.slug}>
-                  <td>
-                    <span className="player-cell">
-                      <PlayerAvatar name={r.name} url={r.pictureUrl} size={32} />
-                      <Link href={`/joueurs/${r.slug}`}>{r.name}</Link>
-                      <StatusBadges compact playingStatus={r.playingStatus}
-                        injury={r.injuryKind ? { kind: r.injuryKind, end: null } : null}
-                        suspension={r.suspensionReason ? { reason: r.suspensionReason, end: null } : null} />
-                    </span>
-                  </td>
-                  <td><span className="club-link"><ClubLogo name={r.team ?? ''} url={r.teamPictureUrl} />{r.team ?? '—'}</span></td>
-                  <td>
-                    {cardLabel(r.cardPositions)}
-                    {r.usualPosition && <span className="muted small" title="Poste occupé sur le terrain"> · {POSITION_LABEL_FR[r.usualPosition]}</span>}
-                  </td>
-                  <td className="num">{fmtScore(r.l5)}</td>
-                  <td className="num">{fmtScore(r.l15)}</td>
-                  <td className="num">{fmtScore(r.l40)}</td>
-                  <td className="num">{fmtPct(r.startRate)}</td>
-                  <td>
-                    {r.nextOpponent && r.nextOpponentSlug ? (
-                      <span className="club-link">{r.nextIsHome !== null && <Venue isHome={r.nextIsHome} />}<Link href={`/equipes/${r.nextOpponentSlug}`}>{r.nextOpponent}</Link></span>
-                    ) : '—'}
-                  </td>
-                  <td className="num strong">{r.nextProjected === null ? '—' : fmtScore(r.nextProjected)}</td>
-                  <td className={`num ${indexClass(r.nextIndex)} ${r.nextLowSample ? 'low-sample' : ''}`}>
-                    {r.nextIndex === null ? '—' : fmtIndex(r.nextIndex)}
-                  </td>
-                  <td className="num">{r.sorareProjection === null ? '—' : Math.round(r.sorareProjection)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <section className="card gw-section">
+          <ol className="gw-list" aria-label="Joueurs">{rows.map((r) => <PlayerRow key={r.slug} r={r} />)}</ol>
+        </section>
       )}
       <nav className="pager" aria-label="Pagination">
-        {pageNum > 1 && <Link href={pageHref(pageNum - 1)}>← Précédent</Link>}
+        {pageNum > 1 && <Link href={href({ page: pageNum - 1 })}>← Précédent</Link>}
         {(pageNum > 1 || rows.length === PAGE_SIZE) && <span className="muted">Page {pageNum}</span>}
-        {rows.length === PAGE_SIZE && <Link href={pageHref(pageNum + 1)}>Suivant →</Link>}
+        {rows.length === PAGE_SIZE && <Link href={href({ page: pageNum + 1 })}>Suivant →</Link>}
       </nav>
     </main>
   );
