@@ -96,3 +96,11 @@ export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!
     tokenPrices(rarity: limited, last: $last) { nodes { date amounts { eurCents usdCents gbpCents wei } card { seasonYear } deal { __typename } } }
   } }
 }`;
+
+/** Cartes Limited d'un utilisateur (galerie publique), 50 par page ; dernier propriétaire = l'utilisateur, avec son prix d'achat. */
+export const USER_CARDS_QUERY = `query UserCards($slug: String!, $after: String) {
+  user(slug: $slug) { cards(rarities: [limited], first: 50, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    nodes { seasonYear anyPlayer { slug } ownershipHistory { amounts { eurCents usdCents gbpCents wei } } }
+  } }
+}`;

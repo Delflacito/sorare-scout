@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { SquadBuilder, STORAGE_KEY, squadTotals, type SquadEntry } from '@/components/SquadBuilder';
+import { SquadBuilder, STORAGE_KEY, mergeImport, squadTotals, type SquadEntry } from '@/components/SquadBuilder';
 import type { MarketPlayerView } from '@/db/queries';
 
 const player = (slug: string, price: number | null, potentialPrice: number | null = null): MarketPlayerView => ({
@@ -23,6 +23,30 @@ describe('totaux de l’effectif', () => {
     expect(squadTotals(entries, info)).toEqual({
       cost: 20, value: 40, gain: 20, missingPurchase: 1, targets: 45, costWithTargets: 65, potential: 33 + 10 + 55,
     });
+  });
+});
+
+describe('import depuis Sorare', () => {
+  it('cartes de la galerie possédées ; prix saisi à la main gardé ; cartes vendues retirées ; ajouts manuels intacts', () => {
+    const before: SquadEntry[] = [
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 9 }, // saisi à la main, encore possédé
+      { slug: 'b', competition: 'eredivisie', status: 'owned', purchasePrice: 3, fromSorare: true }, // vendu depuis
+      { slug: 'c', competition: 'eredivisie', status: 'owned', purchasePrice: 4 }, // ajout manuel (Classic…)
+      { slug: 'd', competition: 'eredivisie', status: 'target', purchasePrice: 10 }, // envisagé puis acheté
+      { slug: 'e', competition: 'eredivisie', status: 'target', purchasePrice: null }, // toujours envisagé
+    ];
+    const after = mergeImport(before, [
+      { slug: 'a', competition: 'eredivisie', purchasePrice: 7 },
+      { slug: 'd', competition: 'eredivisie', purchasePrice: 12 },
+      { slug: 'f', competition: 'eredivisie', purchasePrice: null },
+    ]);
+    expect(after).toEqual([
+      { slug: 'c', competition: 'eredivisie', status: 'owned', purchasePrice: 4 },
+      { slug: 'e', competition: 'eredivisie', status: 'target', purchasePrice: null },
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 9, fromSorare: true },
+      { slug: 'd', competition: 'eredivisie', status: 'owned', purchasePrice: 12, fromSorare: true },
+      { slug: 'f', competition: 'eredivisie', status: 'owned', purchasePrice: null, fromSorare: true },
+    ]);
   });
 });
 

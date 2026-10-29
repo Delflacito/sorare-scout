@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, playerProfilesQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, USER_CARDS_QUERY, playerProfilesQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -73,6 +73,8 @@ export interface SorarePlayerProfile {
 export interface ExchangeRates { usdToEur: number; gbpToEur: number; weiToEur: number }
 /** auction : vente aux enchères (sinon vente d'un manager ou vente primaire de Sorare). */
 /** dealType : type de vente selon Sorare (TokenAuction pour une enchère…), null s'il n'est pas renseigné. */
+/** Carte Limited d'un utilisateur ; purchaseEur : prix payé (null si reçue sans achat : récompense, échange…). */
+export interface SorareUserCard { playerSlug: string; seasonYear: number | null; purchaseEur: number | null }
 export interface SorareSale { date: string; eur: number; seasonYear: number | null; auction: boolean; dealType: string | null }
 /** Marché Limited d'un joueur (prix en euros). */
 export interface SorarePlayerMarket {
@@ -283,6 +285,22 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
         });
       }
       return result;
+    },
+
+    /** Cartes Limited de la galerie d'un utilisateur (toutes les pages) ; null si le pseudo n'existe pas. */
+    async userCards(userSlug: string, rates: ExchangeRates): Promise<SorareUserCard[] | null> {
+      type Page = { user: { cards: { pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: { seasonYear: number | null; anyPlayer: { slug: string } | null; ownershipHistory: { amounts: RawAmounts | null }[] }[] } } | null };
+      const cards: SorareUserCard[] = [];
+      for (let after: string | null = null; ;) {
+        const d: Page = await query<Page>(USER_CARDS_QUERY, { slug: userSlug, after });
+        if (!d.user) return null;
+        for (const n of d.user.cards.nodes) {
+          if (n.anyPlayer) cards.push({ playerSlug: n.anyPlayer.slug, seasonYear: n.seasonYear, purchaseEur: toEuros(n.ownershipHistory.at(-1)?.amounts, rates) });
+        }
+        if (!d.user.cards.pageInfo.hasNextPage) return cards;
+        after = d.user.cards.pageInfo.endCursor;
+      }
     },
 
     async gameDetail(gameId: string): Promise<SorareGameDetail> {

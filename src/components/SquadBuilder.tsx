@@ -7,10 +7,32 @@ import { cardLabel } from '@/domain/types';
 import { fmtChange, fmtEur } from '@/lib/format';
 import { PlayerAvatar } from './Media';
 
-/** Carte de l'effectif : possédée (avec son prix d'achat) ou envisagée (prix d'achat prévu, à défaut le prix actuel). */
-export interface SquadEntry { slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null }
+/**
+ * Carte de l'effectif : possédée (avec son prix d'achat) ou envisagée (prix d'achat prévu, à défaut le prix actuel) ;
+ * fromSorare : importée de la galerie Sorare (retirée à la mise à jour suivante si elle n'y est plus).
+ */
+export interface SquadEntry { slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null; fromSorare?: boolean }
 
 export const STORAGE_KEY = 'sorare-scout:effectif:v1';
+const PSEUDO_KEY = 'sorare-scout:pseudo';
+
+/**
+ * Fusionne la galerie Sorare dans l'effectif : ses cartes deviennent possédées (prix saisi à la main conservé, sinon prix
+ * payé selon Sorare), les cartes importées absentes de la galerie (vendues) sont retirées, les ajouts manuels gardés.
+ */
+export function mergeImport(entries: SquadEntry[], imported: { slug: string; competition: string; purchasePrice: number | null }[]): SquadEntry[] {
+  const key = (e: { slug: string; competition: string }) => `${e.slug}|${e.competition}`;
+  const prev = new Map(entries.map((e) => [key(e), e]));
+  const owned = new Set(imported.map(key));
+  return [
+    ...entries.filter((e) => !owned.has(key(e)) && !e.fromSorare),
+    ...imported.map((e) => {
+      const before = prev.get(key(e));
+      const manual = before?.status === 'owned' && !before.fromSorare ? before.purchasePrice : null;
+      return { ...e, status: 'owned' as const, purchasePrice: manual ?? e.purchasePrice, fromSorare: true };
+    }),
+  ];
+}
 
 function load(): SquadEntry[] {
   try {
@@ -62,11 +84,15 @@ export function SquadBuilder({ competitions, teams }: {
   const [league, setLeague] = useState(competitions[0]?.slug ?? '');
   const [club, setClub] = useState('');
   const [clubPlayers, setClubPlayers] = useState<MarketPlayerView[]>([]);
+  const [pseudo, setPseudo] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
 
   // Effectif enregistré dans ce navigateur ; on ouvre le premier championnat qui contient des cartes.
   useEffect(() => {
     const stored = load();
     setEntries(stored);
+    try { setPseudo(window.localStorage.getItem(PSEUDO_KEY) ?? ''); } catch { /* stockage indisponible */ }
     setLoaded(true);
     if (stored.length && !stored.some((e) => e.competition === competitions[0]?.slug)) setLeague(stored[0].competition);
   }, [competitions]);
@@ -103,9 +129,34 @@ export function SquadBuilder({ competitions, teams }: {
     setEntries((es) => es.map((e) => (e.slug === slug && e.competition === league ? { ...e, ...patch } : e)));
   const remove = (slug: string) => setEntries((es) => es.filter((e) => !(e.slug === slug && e.competition === league)));
   const count = (slug: string) => entries.filter((e) => e.competition === slug).length;
+  const importFromSorare = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setImporting(true);
+    setImportMessage('Import en cours…');
+    try {
+      const res = await fetch(`/api/effectif?user=${encodeURIComponent(pseudo.trim())}`);
+      const body = await res.json();
+      if (!res.ok) { setImportMessage(body.error ?? 'Import impossible'); return; }
+      try { window.localStorage.setItem(PSEUDO_KEY, pseudo.trim()); } catch { /* stockage indisponible */ }
+      setEntries((es) => mergeImport(es, body.entries));
+      const skipped = [body.classic && `${body.classic} Classic`, body.untracked && `${body.untracked} de championnats non suivis`].filter(Boolean).join(', ');
+      setImportMessage(`${body.entries.length} joueur${body.entries.length > 1 ? 's' : ''} importé${body.entries.length > 1 ? 's' : ''}${skipped ? ` (ignorées : ${skipped})` : ''}`);
+    } catch {
+      setImportMessage('Import impossible, réessaie dans un instant');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <div className="squad">
+      <form className="squad-import" onSubmit={importFromSorare}>
+        <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="Pseudo Sorare" aria-label="Pseudo Sorare" autoCapitalize="none" required />
+        <button type="submit" disabled={importing || !pseudo.trim()}>
+          {entries.some((e) => e.fromSorare) ? 'Mettre à jour depuis Sorare' : 'Importer depuis Sorare'}
+        </button>
+        {importMessage && <span className="muted small" role="status">{importMessage}</span>}
+      </form>
       <nav className="tabs" aria-label="Championnats">
         {competitions.map((c) => (
           <button key={c.slug} type="button" className="tab-btn" aria-current={league === c.slug ? 'page' : undefined} onClick={() => { setLeague(c.slug); setClub(''); }}>
@@ -178,7 +229,7 @@ export function SquadBuilder({ competitions, teams }: {
                       </select>
                     </td>
                     <td>
-                      <input className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${p?.name ?? e.slug}`}
+                      <input key={`${e.slug}-${e.purchasePrice}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${p?.name ?? e.slug}`}
                         defaultValue={e.purchasePrice ?? ''} placeholder={p?.price != null ? String(Math.round(p.price * 100) / 100) : '€'}
                         onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value) })} />
                     </td>
