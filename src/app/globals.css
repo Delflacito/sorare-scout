@@ -394,7 +394,9 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .toggle-box { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--control-border); border-radius: 4px;
   font-size: 12px; font-weight: 800; color: var(--surface); }
 .toggle-link[aria-current='true'] .toggle-box { background: var(--accent); border-color: var(--accent); }
-.gw-toolbar .note { margin: 0; }
+.gw-help { font-size: 13px; color: var(--muted); }
+.gw-help summary { display: inline-flex; align-items: center; min-height: 32px; cursor: pointer; color: var(--accent); font-weight: 600; }
+.gw-help[open] summary { margin-bottom: 2px; }
 
 .gw-lineup { margin: 0 0 18px; padding: 16px 18px 18px; border-radius: 18px; color: #eef2f8;
   background: radial-gradient(120% 90% at 80% 0%, #233a5e 0%, rgba(35, 58, 94, 0) 60%), linear-gradient(180deg, #121c2c 0%, #0f2418 100%); }
@@ -412,7 +414,16 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .gw-lineup .t0 { color: #f87171; } .gw-lineup .t25 { color: #fb923c; } .gw-lineup .t40 { color: #facc15; }
 .gw-lineup .t55 { color: #a3e635; } .gw-lineup .t70 { color: #4ade80; } .gw-lineup .t90 { color: #2dd4bf; }
 @media (max-width: 720px) {
-  .gw-lineup-grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 132px; overflow-x: auto; scrollbar-width: none; }
+  /* Téléphone : l'équipe type en 5 lignes compactes, tout visible sans défiler de côté. */
+  .gw-lineup { padding: 14px 12px; border-radius: 16px; }
+  .gw-lineup-grid { grid-template-columns: 1fr; gap: 6px; }
+  .gw-slot { grid-template-columns: 68px 36px minmax(0, 1fr) auto; grid-template-areas: 'pos av name pill' 'pos av match pill';
+    justify-items: start; align-items: center; gap: 0 10px; padding: 8px 10px; border-radius: 12px; text-align: left; }
+  .gw-slot-pos { grid-area: pos; font-size: 10px; letter-spacing: .04em; }
+  .gw-slot .avatar { grid-area: av; width: 36px !important; height: 36px !important; border-radius: 10px; font-size: 13px; }
+  .gw-slot-name { grid-area: name; }
+  .gw-slot-match { grid-area: match; }
+  .gw-slot .score-pill { grid-area: pill; min-width: 44px; height: 32px; font-size: 16px; }
 }
 
 .gw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 14px; align-items: start; }
@@ -420,7 +431,11 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .gw-section .card-title { padding: 0 12px; margin-bottom: 4px; }
 .gw-section .empty { padding: 12px; }
 .gw-list { list-style: none; margin: 0; padding: 0; }
-.gw-row { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: 12px; }
+.gw-row { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: 12px; position: relative; }
+/* Toute la ligne ouvre la fiche joueur (cible tactile large). */
+.gw-name a::after { content: ''; position: absolute; inset: 0; border-radius: 12px; }
+.gw-name a:focus-visible { outline: none; }
+.gw-name a:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }
 .gw-row + .gw-row { border-top: 1px solid var(--border); }
 .gw-row:hover { background: var(--bg); }
 .gw-row:first-child .gw-rank { color: var(--accent); }
@@ -435,7 +450,25 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .gw-score { display: grid; justify-items: end; gap: 4px; }
 .gw-boost { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) {
-  .gw-row { grid-template-columns: 32px minmax(0, 1fr) auto; padding: 10px 8px; gap: 2px 10px; }
+  .gw-row { grid-template-columns: 36px minmax(0, 1fr) auto; padding: 10px 8px; gap: 2px 10px; }
   .gw-rank { display: none; }
-  .gw-row .avatar { width: 32px; height: 32px; }
+  .gw-row .avatar { width: 36px !important; height: 36px !important; font-size: 13px; }
+  .gw-meta-pos, .gw-boost-pct { display: none; }
+  .gw-meta { gap: 0 8px; font-size: 11.5px; }
+  .gw-score .score-pill { min-width: 46px; height: 28px; font-size: 14px; }
+  .gw-section { padding: 12px 4px 4px; border-radius: 16px; }
+  .gw-section .card-title { padding: 0 8px; font-size: 17px; }
+  .gw-head { align-items: start; }
+  .gw-head h1 { font-size: 22px; }
+  .gw-head-link { min-height: 32px; font-size: 14px; }
+  .gw-toolbar { margin: 10px 0 14px; gap: 8px; }
+  /* Pastilles collées aux bords de l'écran, défilement horizontal. */
+  .chip-row { margin: 0 -16px; padding: 0 16px 2px; scroll-padding: 0 16px; }
+  .gw-controls { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .gw-controls .segmented { display: grid; grid-template-columns: 1fr 1fr; }
+  .gw-controls .segmented a { justify-content: center; min-height: 40px; padding: 0 8px; }
+  .toggle-link { min-height: 40px; }
+}
+@media (max-width: 400px) {
+  .gw-meta-sorare { display: none; }
 }
