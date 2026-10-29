@@ -129,7 +129,7 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
           <option value="">Tous les clubs</option>
           {teams.filter((t) => !competition || t.competitionSlug === competition).map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
         </select>
-        <button type="submit">Afficher</button>
+        <button type="submit">Appliquer</button>
       </form>
       {clubTeam && <p><Link href={competition ? `/marche?competition=${competition}` : '/marche'}>← Tous les clubs</Link></p>}
       {clubTeam

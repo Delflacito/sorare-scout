@@ -39,7 +39,7 @@ export default async function JourneePage({ searchParams }: { searchParams: Sear
           {competitions.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
         </select>
         {sort && <input type="hidden" name="tri" value={sort} />}
-        <button type="submit">Filtrer</button>
+        <button type="submit">Appliquer</button>
       </form>
       {rows.length > 0 && (
         <>
@@ -53,9 +53,9 @@ export default async function JourneePage({ searchParams }: { searchParams: Sear
               <thead>
                 <tr>
                   <th>Équipe</th><th>Adversaire</th>
-                  <th className={sort ? '' : 'sorted'}><Link href={href()}>Note adv.</Link></th>
+                  <th className={sort ? '' : 'sorted'} aria-sort={sort ? undefined : 'ascending'}><Link href={href()} title="Trier par note de l’adversaire (le plus faible en premier)">Note adv.</Link></th>
                   {COLUMNS.map((c) => (
-                    <th key={c} className={sort === c ? 'sorted' : ''}><Link href={href(c)}>{POSITION_LABEL_FR[c]}</Link></th>
+                    <th key={c} className={sort === c ? 'sorted' : ''} aria-sort={sort === c ? 'descending' : undefined}><Link href={href(c)} title={`Trier par points concédés au poste ${POSITION_LABEL_FR[c]}`}>{POSITION_LABEL_FR[c]}</Link></th>
                   ))}
                 </tr>
               </thead>

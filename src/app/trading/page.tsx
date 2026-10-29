@@ -57,8 +57,8 @@ function ValueTable({ rows, view }: { rows: TradingRow[]; view: 'sous' | 'sur' }
       <table aria-label={view === 'sous' ? 'Joueurs sous-évalués' : 'Joueurs surévalués'}>
         <thead>
           <tr>
-            <th>#</th><th>Joueur</th><th>Carte</th><th>Prix</th><th>Valeur estimée</th><th>Écart</th>
-            <th>Forme</th><th>Prix 7 j</th><th>Prochain match</th><th>Potentiel GW</th>
+            <th>#</th><th>Joueur</th><th>Carte</th><th>Prix</th><th>Valeur estimée</th><th><abbr title="Écart entre le prix et la valeur estimée (positif = carte moins chère que sa valeur)">Écart</abbr></th>
+            <th><abbr title="L5 comparé au L15 : ↗ en forme, ↘ en baisse">Forme</abbr></th><th><abbr title="Évolution du prix des ventes sur 7 jours">Prix 7 j</abbr></th><th>Prochain match</th><th>Potentiel GW</th>
           </tr>
         </thead>
         <tbody>
@@ -154,7 +154,7 @@ export default async function TradingPage({ searchParams }: { searchParams: Sear
           {GENERIC.map((g) => <option key={g} value={g}>{GENERIC_LABEL_FR[g]}</option>)}
         </select>
         <input name="prixMax" type="number" min="1" step="1" placeholder="Prix max (€)" defaultValue={maxPrice} aria-label="Prix maximum" />
-        <button type="submit">Filtrer</button>
+        <button type="submit">Appliquer</button>
       </form>
       <p className="note">
         {view === 'gw' ? (
@@ -173,7 +173,7 @@ export default async function TradingPage({ searchParams }: { searchParams: Sear
         {' '}Estimations indicatives.
       </p>
       {rows.length === 0 ? (
-        <p className="empty">Aucun joueur pour ces filtres (les prix sont mis à jour à chaque import)</p>
+        <p className="empty">Aucun joueur pour ces filtres. Essaie un prix max plus élevé ou une autre ligue (les prix sont mis à jour à chaque import).</p>
       ) : view === 'gw' ? <GwTable rows={rows} /> : <ValueTable rows={rows} view={view} />}
     </main>
   );

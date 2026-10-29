@@ -32,12 +32,13 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     const qs = new URLSearchParams(Object.entries({ ...rest, dispo: available ? '1' : undefined, page: String(n) }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs?${qs}`;
   };
+  const activeFilters = [filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
 
   return (
     <main>
       <h1>Joueurs</h1>
       <form className="filters" method="get">
-        <input name="q" placeholder="Nom du joueur" defaultValue={filters.q} aria-label="Nom du joueur" />
+        <input name="q" type="search" placeholder="Nom du joueur" defaultValue={filters.q} aria-label="Nom du joueur" />
         <select name="competition" defaultValue={filters.competition ?? ''} aria-label="Compétition">
           <option value="">Toutes les ligues</option>
           {competitions.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
@@ -60,18 +61,29 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
         <label className="check">
           <input type="checkbox" name="dispo" value="1" defaultChecked={filters.available} /> Masquer blessés et suspendus
         </label>
-        <button type="submit">Filtrer</button>
+        <button type="submit">Appliquer</button>
+        {activeFilters > 0 && <Link href="/joueurs" className="reset">Effacer les filtres ({activeFilters})</Link>}
       </form>
 
       {rows.length === 0 ? (
-        <p className="empty">Aucun joueur ne correspond à ces filtres</p>
+        <div className="empty">
+          <p>Aucun joueur ne correspond à ces filtres</p>
+          <p className="small">Élargis la recherche (ligue, club ou poste) ou <Link href="/joueurs">efface tous les filtres</Link>.</p>
+        </div>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Joueur</th><th>Club</th><th>Poste</th><th>L5</th><th>L15</th><th>L40</th><th>% titu</th>
-                <th>Prochain match</th><th>Potentiel</th><th>Indice adv.</th><th>Proj. Sorare</th>
+                <th scope="col">Joueur</th><th scope="col">Club</th><th scope="col">Poste</th>
+                <th scope="col"><abbr title="Moyenne des 5 derniers matchs">L5</abbr></th>
+                <th scope="col"><abbr title="Moyenne des 15 derniers matchs">L15</abbr></th>
+                <th scope="col"><abbr title="Moyenne des 40 derniers matchs">L40</abbr></th>
+                <th scope="col"><abbr title="Part des matchs commencés comme titulaire">% titu</abbr></th>
+                <th scope="col">Prochain match</th>
+                <th scope="col"><abbr title="Score attendu au prochain match, selon l’adversaire">Potentiel</abbr></th>
+                <th scope="col"><abbr title="Points concédés par l’adversaire à ce poste, par rapport à la moyenne de la ligue (vert = favorable)">Indice adv.</abbr></th>
+                <th scope="col"><abbr title="Projection officielle de Sorare pour le prochain match">Proj. Sorare</abbr></th>
               </tr>
             </thead>
             <tbody>
@@ -111,8 +123,9 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           </table>
         </div>
       )}
-      <nav className="pager">
+      <nav className="pager" aria-label="Pagination">
         {pageNum > 1 && <Link href={pageHref(pageNum - 1)}>← Précédent</Link>}
+        {(pageNum > 1 || rows.length === PAGE_SIZE) && <span className="muted">Page {pageNum}</span>}
         {rows.length === PAGE_SIZE && <Link href={pageHref(pageNum + 1)}>Suivant →</Link>}
       </nav>
     </main>
