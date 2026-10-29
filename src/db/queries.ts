@@ -691,7 +691,9 @@ export function createQueries(sql: postgres.Sql) {
         join players p on p.id = cs.player_id
         join teams t on t.id = p.team_id
         join competitions c on c.id = t.competition_id
-        where exists (select 1 from player_summary s where s.player_id = p.id)
+        -- Enchères et reventes entre managers seulement : les ventes directes de Sorare (TokenPrimaryOffer, ×3,5 le
+        -- plancher en moyenne) et les ventes au type inconnu sont écartées.
+        where cs.deal_type in ('TokenAuction', 'TokenOffer') and exists (select 1 from player_summary s where s.player_id = p.id)
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
         group by 1, 2, 3`;

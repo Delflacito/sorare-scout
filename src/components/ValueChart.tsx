@@ -119,7 +119,8 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
       <p className="note">
         Reconstituée d’après les ventes de cartes {season ? `de la saison ${yy}` : 'Classic'} : chaque jour, chaque joueur compte
         pour sa vente moyenne du jour, sinon pour sa dernière vente. Chaque point est une moyenne pondérée des 3 derniers
-        jours (le jour même compte le plus). Seules les ventes réelles comptent : la valeur estimée n’intervient pas.
+        jours (le jour même compte le plus). Seules les enchères et les reventes entre managers comptent : ni les ventes
+        directes de Sorare, ni la valeur estimée.
       </p>
     </figure>
   );
