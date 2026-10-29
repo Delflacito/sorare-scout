@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_SALES_QUERY, playerProfilesQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, playerProfilesQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -85,6 +85,10 @@ export interface SorarePlayerMarket {
 }
 interface RawAmounts { eurCents: number | null; usdCents: number | null; gbpCents?: number | null; wei: string | null }
 interface RawPriced { seasonYear: number | null; liveSingleSaleOffer: { receiverSide: { amounts: RawAmounts | null } | null } | null }
+interface RawOffer {
+  receiverSide: { amounts: RawAmounts | null } | null;
+  senderSide: { anyCards: { seasonYear: number | null; rarityTyped: string | null }[] } | null;
+}
 
 /** Montant en euros, quelle que soit la devise de référence de l'offre ou de la vente. */
 export function toEuros(a: RawAmounts | null | undefined, rates: ExchangeRates): number | null {
@@ -259,9 +263,19 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
       const result: SorarePlayerMarket[] = [];
       for (const p of d.players.filter((x): x is RawFloors => !!x?.slug)) {
         const s = await query<{ anyPlayer: RawSales | null }>(PLAYER_SALES_QUERY, { slug: p.slug, last: sales });
+        let floorInSeason = p.inSeason?.seasonYear === season ? offer(p.inSeason) : null;
+        // Plancher vide alors que des cartes sont en vente : la moins chère des offres Limited de la saison.
+        if (floorInSeason === null) {
+          const o = await query<{ tokens: { liveSingleSaleOffers: { nodes: RawOffer[] } } }>(PLAYER_OFFERS_QUERY, { slug: p.slug });
+          const prices = o.tokens.liveSingleSaleOffers.nodes
+            .filter((n) => n.senderSide?.anyCards.length === 1 && n.senderSide.anyCards[0].rarityTyped === 'limited' && n.senderSide.anyCards[0].seasonYear === season)
+            .map((n) => toEuros(n.receiverSide?.amounts, rates))
+            .filter((x): x is number => x !== null && x > 0);
+          floorInSeason = prices.length ? Math.min(...prices) : null;
+        }
         result.push({
           slug: p.slug,
-          floorInSeason: p.inSeason?.seasonYear === season ? offer(p.inSeason) : null,
+          floorInSeason,
           floorClassic: p.anySeason && p.anySeason.seasonYear !== season ? offer(p.anySeason) : null,
           sales: (s.anyPlayer?.tokenPrices?.nodes ?? [])
             .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null, auction: n.deal?.__typename === 'TokenAuction', dealType: n.deal?.__typename ?? null }))

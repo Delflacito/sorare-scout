@@ -103,6 +103,23 @@ describe('client Sorare', () => {
     }]);
   });
 
+  it('plancher vide alors que des cartes sont en vente : offre Limited de la saison la moins chère', async () => {
+    const eur = (c: number) => ({ amounts: { eurCents: c, usdCents: null, gbpCents: null, wei: null } });
+    const offer = (c: number, seasonYear: number, rarityTyped: string, cards = 1) =>
+      ({ receiverSide: eur(c), senderSide: { anyCards: Array(cards).fill({ seasonYear, rarityTyped }) } });
+    const f = fakeFetch([
+      [/PlayerFloors/, { data: { players: [{ slug: 'naif-aguerd', inSeason: { seasonYear: 2026, liveSingleSaleOffer: null }, anySeason: null }] } }],
+      [/PlayerSales/, { data: { anyPlayer: { tokenPrices: { nodes: [] } } } }],
+      [/PlayerOffers/, { data: { tokens: { liveSingleSaleOffers: { nodes: [
+        offer(231, 2025, 'rare'), offer(42, 2024, 'limited'), offer(300, 2026, 'limited', 2), offer(715, 2026, 'limited'), offer(980, 2026, 'limited'),
+      ] } } } }],
+    ]);
+    const [m] = await createSorareClient('k', f.impl).playerMarkets(['naif-aguerd'], { usdToEur: 1, gbpToEur: 1, weiToEur: 0 }, 2026);
+    // Rare, Classic 2024 et lot de deux cartes écartés : 7,15 €
+    expect(m.floorInSeason).toBe(7.15);
+    expect(f.requests.at(-1)!.body.variables).toEqual({ slug: 'naif-aguerd' });
+  });
+
   it('marché : taux de change, prix planchers et ventes convertis en euros', async () => {
     const sales = fixture('player-sales');
     const f = fakeFetch([[/ExchangeRates/, fixture('exchange-rates')], [/PlayerFloors/, fixture('player-floors')],

@@ -79,6 +79,17 @@ export const PLAYER_FLOORS_QUERY = `query PlayerFloors($slugs: [String!]!) {
   } }
 }`;
 
+/**
+ * Offres en cours d'un joueur, toutes raretés et saisons confondues (Sorare ne les filtre pas) : secours quand
+ * lowestPriceAnyCard renvoie une carte dont l'offre vient de disparaître.
+ * shortcut: 50 premières offres seulement, la moins chère peut manquer au-delà ; à paginer si des planchers restent vides.
+ */
+export const PLAYER_OFFERS_QUERY = `query PlayerOffers($slug: String!) {
+  tokens { liveSingleSaleOffers(playerSlug: $slug, first: 50) { nodes {
+    receiverSide { amounts { eurCents usdCents gbpCents wei } } senderSide { anyCards { seasonYear rarityTyped } }
+  } } }
+}`;
+
 /** Dernières ventes Limited d'un joueur (Sorare n'accepte pas ce champ dans une liste de joueurs). */
 export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!) {
   anyPlayer(slug: $slug) { ... on Player {
