@@ -52,14 +52,17 @@ export const CLUB_PLAYERS_QUERY = `query ClubPlayers($slug: String!) {
 /** Statistiques de championnat d'une saison (Sorare ne précise ni le club ni la compétition). */
 const SEASON_STATS = 'appearances substituteIn goals assists minutesPlayed yellowCards redCards';
 
-/** Identité et historique par saison de plusieurs joueurs en une requête (un alias par joueur et par saison). */
-export function playerProfilesQuery(count: number, seasons: number[]): string {
-  const vars = Array.from({ length: count }, (_, i) => `$p${i}: String!`).join(', ');
-  const players = Array.from({ length: count }, (_, i) => `p${i}: anyPlayer(slug: $p${i}) { ... on Player {
+/**
+ * Identité et historique par saison de plusieurs joueurs en une requête (champ racine `players`, Sorare refusant
+ * plusieurs `anyPlayer` dans une même requête).
+ */
+export function playerProfilesQuery(seasons: number[]): string {
+  return `query PlayerProfiles($slugs: [String!]!) {
+  players(slugs: $slugs) { ... on Player {
     slug firstName lastName height shirtNumber pictureUrl birthDate country { code name flagUrl } activeClub { slug name pictureUrl }
     ${seasons.map((y) => `s${y}: stats(seasonStartYear: ${y}) { ${SEASON_STATS} }`).join('\n    ')}
-  } }`).join('\n  ');
-  return `query PlayerProfiles(${vars}) {\n  ${players}\n}`;
+  } }
+}`;
 }
 
 const PRICE = 'seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCents usdCents wei } } }';
@@ -67,14 +70,18 @@ const PRICE = 'seasonYear liveSingleSaleOffer { receiverSide { amounts { eurCent
 /** Taux de change Sorare (ETH → EUR / USD) pour convertir les prix affichés en dollars ou en ETH. */
 export const EXCHANGE_RATES_QUERY = `query ExchangeRates { config { exchangeRate { rates } } }`;
 
-/** Marché Limited de plusieurs joueurs : prix planchers (saison en cours, toutes saisons) et dernières ventes. */
-export function playerMarketsQuery(count: number, sales: number): string {
-  const vars = Array.from({ length: count }, (_, i) => `$p${i}: String!`).join(', ');
-  const players = Array.from({ length: count }, (_, i) => `p${i}: anyPlayer(slug: $p${i}) { ... on Player {
+/** Prix planchers Limited de plusieurs joueurs (saison en cours, toutes saisons). */
+export const PLAYER_FLOORS_QUERY = `query PlayerFloors($slugs: [String!]!) {
+  players(slugs: $slugs) { ... on Player {
     slug
     inSeason: lowestPriceAnyCard(rarity: limited, inSeason: true) { ${PRICE} }
     anySeason: lowestPriceAnyCard(rarity: limited, inSeason: false) { ${PRICE} }
-    tokenPrices(rarity: limited, last: ${sales}) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } }
-  } }`).join('\n  ');
-  return `query PlayerMarkets(${vars}) {\n  ${players}\n}`;
-}
+  } }
+}`;
+
+/** Dernières ventes Limited d'un joueur (Sorare n'accepte pas ce champ dans une liste de joueurs). */
+export const PLAYER_SALES_QUERY = `query PlayerSales($slug: String!, $last: Int!) {
+  anyPlayer(slug: $slug) { ... on Player {
+    tokenPrices(rarity: limited, last: $last) { nodes { date amounts { eurCents usdCents wei } card { seasonYear } } }
+  } }
+}`;

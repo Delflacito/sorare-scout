@@ -22,7 +22,7 @@ export function recentSeasons(now = new Date(), count = 6): number[] {
 /** Identité (naissance, nationalité) et historique en championnat des joueurs, rafraîchis une fois par semaine. */
 export async function importProfiles(deps: ProfilesDeps, opts: ProfilesOptions = {}): Promise<{ updated: number; errors: string[] }> {
   const seasons = opts.seasons ?? recentSeasons();
-  const size = opts.batchSize ?? 5;
+  const size = opts.batchSize ?? 20;
   const slugs = await deps.repo.playersNeedingProfile();
   const batches = Array.from({ length: Math.ceil(slugs.length / size) }, (_, i) => slugs.slice(i * size, (i + 1) * size));
   let updated = 0;

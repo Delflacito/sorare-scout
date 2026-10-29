@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, playerMarketsQuery, playerProfilesQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_SALES_QUERY, playerProfilesQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -219,8 +219,8 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
       type Raw = {
         slug: string; birthDate: string | null; firstName?: string | null; lastName?: string | null; height?: number | null;
         shirtNumber?: number | null; pictureUrl?: string | null; country: { code: string; name: string; flagUrl: string | null } | null; activeClub?: Club | null } & Record<string, unknown>;
-      const d = await query<Record<string, Raw | null>>(playerProfilesQuery(slugs.length, seasons), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
-      return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
+      const d = await query<{ players: (Raw | null)[] }>(playerProfilesQuery(seasons), { slugs });
+      return d.players.filter((p): p is Raw => !!p?.slug).map((p) => ({
         slug: p.slug,
         birthDate: p.birthDate ? p.birthDate.slice(0, 10) : null,
         firstName: p.firstName ?? null, lastName: p.lastName ?? null, height: p.height || null, shirtNumber: p.shirtNumber ?? null,
@@ -243,23 +243,29 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
       return { usdToEur: r.eth.eur / r.eth.usd, weiToEur: r.wei.eur };
     },
 
-    /** Prix planchers et dernières ventes Limited ; `season` : année de début de la saison en cours. */
+    /**
+     * Prix planchers (par lot) et dernières ventes (une requête par joueur) Limited ;
+     * `season` : année de début de la saison en cours.
+     */
     async playerMarkets(slugs: string[], rates: ExchangeRates, season: number, sales = 30): Promise<SorarePlayerMarket[]> {
       if (!slugs.length) return [];
-      type Raw = {
-        slug: string; inSeason: RawPriced | null; anySeason: RawPriced | null;
-        tokenPrices: { nodes: { date: string; amounts: RawAmounts | null; card: { seasonYear: number | null } | null }[] } | null;
-      };
-      const d = await query<Record<string, Raw | null>>(playerMarketsQuery(slugs.length, sales), Object.fromEntries(slugs.map((s, i) => [`p${i}`, s])));
+      type RawFloors = { slug: string; inSeason: RawPriced | null; anySeason: RawPriced | null };
+      type RawSales = { tokenPrices: { nodes: { date: string; amounts: RawAmounts | null; card: { seasonYear: number | null } | null }[] } | null };
+      const d = await query<{ players: (RawFloors | null)[] }>(PLAYER_FLOORS_QUERY, { slugs });
       const offer = (c: RawPriced | null) => toEuros(c?.liveSingleSaleOffer?.receiverSide?.amounts, rates);
-      return Object.values(d).filter((p): p is Raw => !!p?.slug).map((p) => ({
-        slug: p.slug,
-        floorInSeason: p.inSeason?.seasonYear === season ? offer(p.inSeason) : null,
-        floorClassic: p.anySeason && p.anySeason.seasonYear !== season ? offer(p.anySeason) : null,
-        sales: (p.tokenPrices?.nodes ?? [])
-          .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null }))
-          .filter((x): x is SorareSale => x.eur !== null && x.eur > 0),
-      }));
+      const result: SorarePlayerMarket[] = [];
+      for (const p of d.players.filter((x): x is RawFloors => !!x?.slug)) {
+        const s = await query<{ anyPlayer: RawSales | null }>(PLAYER_SALES_QUERY, { slug: p.slug, last: sales });
+        result.push({
+          slug: p.slug,
+          floorInSeason: p.inSeason?.seasonYear === season ? offer(p.inSeason) : null,
+          floorClassic: p.anySeason && p.anySeason.seasonYear !== season ? offer(p.anySeason) : null,
+          sales: (s.anyPlayer?.tokenPrices?.nodes ?? [])
+            .map((n) => ({ date: n.date, eur: toEuros(n.amounts, rates), seasonYear: n.card?.seasonYear ?? null }))
+            .filter((x): x is SorareSale => x.eur !== null && x.eur > 0),
+        });
+      }
+      return result;
     },
 
     async gameDetail(gameId: string): Promise<SorareGameDetail> {
