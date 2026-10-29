@@ -62,6 +62,16 @@ describe('/joueurs', () => {
     expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, available: undefined, sort: 'l15', offset: 50 });
   });
 
+  it('seuil de titularisation choisi : transmis à la recherche et gardé par les autres pastilles', async () => {
+    searchPlayers.mockResolvedValue([row]);
+    render(await Page({ searchParams: Promise.resolve({ titu: '80' }) }));
+    expect(searchPlayers).toHaveBeenCalledWith(expect.objectContaining({ minStartRate: 0.8 }));
+    const titu = screen.getByRole('navigation', { name: 'Titularisations minimum' });
+    expect(within(titu).getByRole('link', { name: '≥ 80 %' })).toHaveAttribute('aria-current', 'page');
+    expect(within(titu).getByRole('link', { name: 'Tous' })).toHaveAttribute('href', '/joueurs');
+    expect(screen.getByRole('link', { name: 'Défenseur' })).toHaveAttribute('href', '/joueurs?position=Defender&titu=80');
+  });
+
   it('valeurs de filtre invalides ignorées', async () => {
     searchPlayers.mockResolvedValue([]);
     await Page({ searchParams: Promise.resolve({ position: 'Pilote', sort: 'DROP', detailedPosition: 'XX' }) });

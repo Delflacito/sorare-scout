@@ -14,6 +14,8 @@ export interface SearchFilters {
   detailedPosition?: DetailedPosition;
   /** Masque les joueurs blessés ou suspendus. */
   available?: boolean;
+  /** Part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
+  minStartRate?: number;
   sort: Sort;
   offset: number;
 }
@@ -55,7 +57,8 @@ export interface RoundMatchup {
 }
 /** projected : meilleurs scores potentiels ; boost : plus gros gains par rapport au niveau habituel. */
 export type GameWeekSort = 'projected' | 'boost';
-export interface GameWeekFilters { competition?: string; position?: GenericPosition; startersOnly: boolean; limit: number; sort?: GameWeekSort }
+/** minStartRate : part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
+export interface GameWeekFilters { competition?: string; position?: GenericPosition; minStartRate: number; limit: number; sort?: GameWeekSort }
 
 /** Joueur indisponible : blessé ou suspendu. */
 const UNAVAILABLE = 'p.injury_kind is not null or p.injury_end is not null or p.suspension_reason is not null or p.suspension_end is not null';
@@ -228,6 +231,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
           ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
+          ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
         limit ${PAGE_SIZE} offset ${f.offset}`;
       return rows.map((r) => ({
@@ -288,7 +292,7 @@ export function createQueries(sql: postgres.Sql) {
           join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
           where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null and s.base is not null
             and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
-            ${f.startersOnly ? sql`and s.start_rate5 >= 0.6` : sql``}
+            ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
             ${f.position ? sql`and g.position = ${f.position}` : sql``}
         ) x where rank <= ${f.limit}
         order by array_position(array['Goalkeeper','Defender','Midfielder','Forward'], position), rank`;

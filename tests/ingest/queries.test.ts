@@ -302,11 +302,11 @@ describeDb('Ma Game Week et journée', () => {
 
   it('meilleurs scores potentiels par poste, blessés exclus', async () => {
     const fixtures = await q.getGameWeekFixtures();
-    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: false, limit: 10 });
+    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { minStartRate: 0, limit: 10 });
     expect(players.map((p) => p.slug)).toEqual(['nuno-mendes', 'greenwood']); // défenseur puis attaquant
     expect(players[0]).toMatchObject({ team: 'Paris Saint-Germain', opponent: 'Olympique de Marseille', isHome: true, projected: expect.any(Number) });
     await sql`update players set injury_kind = 'Knee' where sorare_slug = 'nuno-mendes'`;
-    const after = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: true, limit: 10 });
+    const after = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { minStartRate: 0.6, limit: 10 });
     expect(after.map((p) => p.slug)).toEqual([]); // Greenwood : titulaire 1 fois sur 2
   });
 
@@ -316,16 +316,16 @@ describeDb('Ma Game Week et journée', () => {
     await sql`update player_summary set base = 40, next_projected = 60 where player_id = ${ids.greenwood}`;
     await sql`update players set position = 'Defender' where sorare_slug = 'greenwood'`;
     const ids9 = fixtures.map((f) => f.id);
-    const top = await q.getGameWeekPlayers(ids9, { startersOnly: false, limit: 10 });
+    const top = await q.getGameWeekPlayers(ids9, { minStartRate: 0, limit: 10 });
     expect(top.map((p) => p.slug)).toEqual(['nuno-mendes', 'greenwood']);
-    const boost = await q.getGameWeekPlayers(ids9, { startersOnly: false, limit: 10, sort: 'boost' });
+    const boost = await q.getGameWeekPlayers(ids9, { minStartRate: 0, limit: 10, sort: 'boost' });
     expect(boost.map((p) => [p.slug, p.base])).toEqual([['greenwood', 40], ['nuno-mendes', 90]]);
   });
 
   it('cartes à plusieurs postes : le joueur apparaît dans chaque section', async () => {
     await sql`update players set card_positions = '{Defender,Midfielder}' where sorare_slug = 'nuno-mendes'`;
     const fixtures = await q.getGameWeekFixtures();
-    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { startersOnly: false, limit: 10 });
+    const players = await q.getGameWeekPlayers(fixtures.map((f) => f.id), { minStartRate: 0, limit: 10 });
     expect(players.map((p) => [p.slug, p.position])).toEqual([['nuno-mendes', 'Defender'], ['nuno-mendes', 'Midfielder'], ['greenwood', 'Forward']]);
     const mids = await q.searchPlayers({ sort: 'l5', position: 'Midfielder', offset: 0 });
     expect(mids.map((r) => r.slug)).toContain('nuno-mendes');

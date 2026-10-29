@@ -6,7 +6,7 @@ import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
-import { one, oneOf, type SearchParams } from '@/lib/params';
+import { START_RATE_LEVELS, one, oneOf, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +80,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     team: one(p.team),
     detailedPosition: oneOf(one(p.detailedPosition), DETAILED_POSITIONS),
     available: one(p.dispo) === '1' || undefined,
+    minStartRate: startRateParam(one(p.titu), 0) / 100 || undefined,
     sort: oneOf(one(p.sort), SORTS) ?? 'projected',
     offset: (pageNum - 1) * PAGE_SIZE,
   };
@@ -87,13 +88,14 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
   const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions(), queries.listTeams()]);
   // Lien qui garde les filtres en cours et en change certains (retour en page 1 sauf demande).
   const href = (o: Partial<Omit<typeof filters, 'offset'>> & { page?: number } = {}) => {
-    const { available, offset: _, ...rest } = { ...filters, page: undefined, ...o };
+    const { available, minStartRate, offset: _, ...rest } = { ...filters, page: undefined, ...o };
     const qs = new URLSearchParams(Object.entries({
-      ...rest, sort: rest.sort === 'projected' ? undefined : rest.sort, dispo: available ? '1' : undefined, page: rest.page && rest.page > 1 ? String(rest.page) : undefined,
+      ...rest, sort: rest.sort === 'projected' ? undefined : rest.sort, dispo: available ? '1' : undefined,
+      titu: minStartRate ? String(Math.round(minStartRate * 100)) : undefined, page: rest.page && rest.page > 1 ? String(rest.page) : undefined,
     }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs${qs.size ? `?${qs}` : ''}`;
   };
-  const activeFilters = [filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
+  const activeFilters = [filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available, filters.minStartRate].filter(Boolean).length;
   const advanced = [filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
 
   return (
@@ -108,6 +110,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           {filters.competition && <input type="hidden" name="competition" value={filters.competition} />}
           {filters.position && <input type="hidden" name="position" value={filters.position} />}
           {filters.sort !== 'projected' && <input type="hidden" name="sort" value={filters.sort} />}
+          {filters.minStartRate && <input type="hidden" name="titu" value={Math.round(filters.minStartRate * 100)} />}
           <details className="more-filters" open={advanced > 0}>
             <summary>Plus de filtres{advanced > 0 && ` (${advanced})`}</summary>
             <div className="filters">
@@ -138,6 +141,13 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           <Link href={href({ position: undefined })} aria-current={filters.position ? undefined : 'page'}>Tous les postes</Link>
           {GENERIC.map((g) => (
             <Link key={g} href={href({ position: g })} aria-current={filters.position === g ? 'page' : undefined}>{GENERIC_LABEL_FR[g]}</Link>
+          ))}
+        </nav>
+        <nav className="chip-row sort-row" aria-label="Titularisations minimum">
+          <span className="muted" title="Part des 5 derniers matchs du club commencés comme titulaire">Titulaire</span>
+          {START_RATE_LEVELS.map((n) => (
+            <Link key={n} href={href({ minStartRate: n / 100 || undefined })}
+              aria-current={Math.round((filters.minStartRate ?? 0) * 100) === n ? 'page' : undefined}>{startRateLabel(n)}</Link>
           ))}
         </nav>
         <nav className="chip-row sort-row" aria-label="Trier par">

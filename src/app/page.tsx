@@ -46,7 +46,7 @@ export default async function Home() {
   const fixtures = await queries.getGameWeekFixtures();
   const ids = fixtures.map((f) => f.id);
   const [gwPlayers, cheap, rising] = await Promise.all([
-    queries.getGameWeekPlayers(ids, { startersOnly: true, limit: 5 }),
+    queries.getGameWeekPlayers(ids, { minStartRate: 0.6, limit: 5 }),
     queries.getTrading({ view: 'sous', limit: 5 }),
     queries.getTrading({ view: 'gw', fixtureIds: ids, limit: 5 }),
   ]);

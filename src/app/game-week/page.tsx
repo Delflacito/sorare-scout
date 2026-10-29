@@ -6,7 +6,7 @@ import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
-import { one, type SearchParams } from '@/lib/params';
+import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,18 +121,19 @@ function Lineup({ players, sort }: { players: GameWeekPlayer[]; sort: GameWeekSo
 export default async function GameWeekPage({ searchParams }: { searchParams: SearchParams }) {
   const p = await searchParams;
   const competition = one(p.competition);
-  const startersOnly = one(p.tous) !== '1';
+  // Par défaut : titulaires au moins 3 fois sur les 5 derniers matchs.
+  const titu = startRateParam(one(p.titu), 60);
   const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
-  const href = (o: { competition?: string; tous?: boolean; vue?: GameWeekSort }) => {
-    const next = { competition, tous: !startersOnly, vue: sort, ...o };
+  const href = (o: { competition?: string; titu?: number; vue?: GameWeekSort }) => {
+    const next = { competition, titu, vue: sort, ...o };
     const qs = new URLSearchParams(Object.entries({
-      competition: next.competition, tous: next.tous ? '1' : undefined, vue: next.vue === 'boost' ? 'boost' : undefined,
+      competition: next.competition, titu: next.titu === 60 ? undefined : String(next.titu), vue: next.vue === 'boost' ? 'boost' : undefined,
     }).filter(([, v]) => v) as [string, string][]);
     return `/game-week${qs.size ? `?${qs}` : ''}`;
   };
   const queries = getQueries();
   const [fixtures, competitions] = await Promise.all([queries.getGameWeekFixtures(competition), queries.listCompetitions()]);
-  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, startersOnly, limit: PER_POSITION, sort });
+  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, minStartRate: titu / 100, limit: PER_POSITION, sort });
 
   return (
     <main className="gw">
@@ -156,16 +157,19 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
             <Link href={href({ vue: 'projected' })} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
             <Link href={href({ vue: 'boost' })} aria-current={sort === 'boost' ? 'page' : undefined}>Plus gros boosts</Link>
           </nav>
-          <Link href={href({ tous: startersOnly })} className="toggle-link" aria-current={startersOnly ? undefined : 'true'}>
-            <span className="toggle-box" aria-hidden="true">{startersOnly ? '' : '✓'}</span>Inclure les remplaçants
-          </Link>
         </div>
+        <nav className="chip-row sort-row" aria-label="Titularisations minimum">
+          <span className="muted" title="Part des 5 derniers matchs du club commencés comme titulaire">Titulaire</span>
+          {START_RATE_LEVELS.map((n) => (
+            <Link key={n} href={href({ titu: n })} aria-current={titu === n ? 'page' : undefined}>{startRateLabel(n)}</Link>
+          ))}
+        </nav>
         <details className="gw-help">
           <summary>Comment lire ce classement</summary>
           {sort === 'boost'
             ? 'Matchs qui s’annoncent nettement au-dessus du niveau habituel (score potentiel − L15). '
             : 'Score potentiel : ce que chaque joueur devrait marquer selon son niveau, l’adversaire et le lieu. '}
-          Blessés et suspendus exclus{startersOnly && ', ainsi que les joueurs titulaires moins de 3 fois sur leurs 5 derniers matchs'}.
+          Blessés et suspendus exclus{titu > 0 && `, ainsi que les joueurs titulaires moins de ${titu} % du temps sur les 5 derniers matchs de leur club`}.
           {' '}Sous le score : écart avec le niveau habituel (L15).
         </details>
       </div>
