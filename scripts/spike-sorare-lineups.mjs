@@ -35,13 +35,12 @@ async function sample(name, query) {
   out.samples[name] = r.errors ? r.errors.map((e) => e.message).join(' | ').slice(0, 600) : r.data;
 }
 
-// Tiers des joueurs (classement Sorare utilisé pour les compétitions / le marché).
-await probe('Player (tier)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { ${c} } } }`, [
-  'tier', 'playerTier', 'xyzTier', 'cardTier', 'tiers', 'seasonTier', 'currentTier', 'xyzRank', 'ranking', 'xyzLevel', 'xyzGrade', 'grade', 'xyzStar',
-]);
-await probe('Card (tier)', (c) => `{ anyPlayer(slug: "kylian-mbappe-lottin") { ... on Player { lowestPriceAnyCard(rarity: limited, inSeason: true) { ${c} } } } }`, [
-  'tier', 'xyzTier', 'playerTier', 'xyzGrade', 'grade', 'xyzLevel', 'level',
-]);
+// Tier affiché par Sorare sur la fiche joueur (ex. « Star » avec 4 points).
+const words = ['stars', 'starRating', 'starLevel', 'starTier', 'status', 'category', 'playerCategory', 'classification', 'class', 'playerClass',
+  'segment', 'bracket', 'popularity', 'fame', 'reputation', 'prestige', 'level', 'playerLevel', 'rank', 'rating', 'badge', 'label',
+  'tierLabel', 'tierName', 'scarcity', 'xyzStars', 'xyzCategory', 'xyzClass', 'xyzStatus', 'xyzBadge', 'xyzLabel', 'xyzSegment', 'xyzPop'];
+await probe('Player (tier 2)', (c) => `{ anyPlayer(slug: "liam-millar") { ... on Player { ${c} } } }`, words);
+await probe('Player (tier 3)', (c) => `{ anyPlayer(slug: "liam-millar") { ... on Player { ${c} } } }`, ['tierForSeason', 'playerTiers', 'tierInfo', 'cardTiers', 'seasonTiers', 'xyzTiers', 'u23Eligible', 'sorareRank']);
 
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
