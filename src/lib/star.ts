@@ -1,13 +1,16 @@
 import type { GenericPosition } from '@/domain/types';
 
-/** Carte d'une collection Star : nom et poste tels qu'affichés sur la carte Sorare. */
-export interface StarCard { name: string; pos: 'GK' | 'DF' | 'MD' | 'FW' }
+/** Carte d'une collection Star : nom et poste tels qu'affichés sur la carte Sorare ; slug si le nom Sorare du joueur diffère. */
+export interface StarCard { name: string; pos: 'GK' | 'DF' | 'MD' | 'FW'; slug?: string }
 export interface StarCollection { competition: string; name: string; cards: StarCard[] }
 
 const POS: Record<StarCard['pos'], GenericPosition> = { GK: 'Goalkeeper', DF: 'Defender', MD: 'Midfielder', FW: 'Forward' };
 
-/** « GK Yann Sommer; MD … » → cartes. */
-const list = (s: string): StarCard[] => s.split(';').map((x) => x.trim()).map((x) => ({ pos: x.slice(0, 2) as StarCard['pos'], name: x.slice(3) }));
+/** « GK Yann Sommer; MD … » → cartes (« Nom=slug » pour un joueur au nom différent chez Sorare). */
+const list = (s: string): StarCard[] => s.split(';').map((x) => x.trim()).map((x) => {
+  const [name, slug] = x.slice(3).split('=');
+  return { pos: x.slice(0, 2) as StarCard['pos'], name, ...(slug && { slug }) };
+});
 
 // shortcut: listes recopiées des captures de l'appli Sorare (saison 2026-27), à mettre à jour à la main si Sorare les change.
 export const STAR_COLLECTIONS: StarCollection[] = [
@@ -24,7 +27,7 @@ export const STAR_COLLECTIONS: StarCollection[] = [
     + 'MD Rodrigo Zalazar; FW Geny Catamo; FW Rafa Silva; MD Issa Doumbia; DF Alberto Costa; MD Victor Froholdt') },
   { competition: 'jupiler-pro-league', name: 'Jupiler Pro League', cards: list(
     'GK Yann Sommer; MD Adem Zorgane; DF Matte Smets; GK Colin Coosemans; MD Lukas Ambros; FW Guilherme Smith; FW Carlos Forbs; '
-    + 'FW Junya Ito; FW Matthieu Epolo; GK Mohamed Koné; DF Kevin Mac Allister; MD Lucca Brughmans; DF Brandon Mechele; '
+    + 'FW Junya Ito; FW Matthieu Epolo; GK Mohamed Koné; DF Kevin Mac Allister; GK Lucca Brughmans=lucca-kiaba-mounganga; DF Brandon Mechele; '
     + 'FW Mamadou Diakhon; GK Taishi Brandon Nozawa; DF Aiham Ousou; MD Hans Vanaken; MD Jeppe Erenbjerg; DF Kyriani Sabbe; '
     + 'FW Nicolò Tresoldi; MD Hugo Vetlesen; MD Bryan Heynen; GK Hervé Koffi; FW Jan Virgili; FW Rafiu Durosinmi; DF Joaquin Seys') },
   { competition: 'football-league-championship', name: 'Championship', cards: list(
@@ -41,7 +44,7 @@ export const STAR_COLLECTIONS: StarCollection[] = [
 
 export interface StarCandidate { slug: string; name: string; position: GenericPosition | null }
 
-const tokens = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/gi, 'o').replace(/æ/gi, 'ae')
+const tokens = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/gi, 'o').replace(/ß/g, 'ss').replace(/æ/gi, 'ae')
   .toLowerCase().split(/[^a-z]+/).filter(Boolean);
 
 /**
@@ -49,6 +52,7 @@ const tokens = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace
  * départagé par le poste de la carte ; null si introuvable ou ambigu.
  */
 export function matchCard<T extends StarCandidate>(card: StarCard, candidates: T[]): T | null {
+  if (card.slug) return candidates.find((c) => c.slug === card.slug) ?? null;
   const want = tokens(card.name);
   const key = want.join(' ');
   const exact = candidates.filter((c) => tokens(c.name).join(' ') === key);
@@ -63,11 +67,12 @@ export function matchCard<T extends StarCandidate>(card: StarCard, candidates: T
 
 /** Carte de la galerie Sorare de l'utilisateur (saison en cours). */
 export interface GalleryCard { slug: string; name: string; transferType: string | null }
-/** ok : carte obtenue en enchère ou en craft (validée) ; market : possédée mais achetée autrement (ne compte pas) ; missing : absente. */
+/** ok : carte obtenue auprès de Sorare ou en craft (validée) ; market : possédée mais achetée à un manager (ne compte pas) ; missing : absente. */
 export type StarStatus = 'ok' | 'market' | 'missing';
 
-// shortcut: types d'acquisition supposés d'après l'API Sorare (SHARDS, …AUCTION) ; ajouter les autres s'il en manque.
-const counts = (t: string | null) => t === 'SHARDS' || !!t?.includes('AUCTION');
+// Vérifié sur la galerie réelle : enchère, achat immédiat à Sorare et craft valident ; les ventes entre managers (SINGLE_SALE_OFFER,
+// SINGLE_BUY_OFFER, DIRECT_OFFER) non. shortcut: REWARD supposé valider (aucun exemple observé), à corriger si Sorare dit le contraire.
+const counts = (t: string | null) => t === 'SHARDS' || t === 'INSTANT_BUY' || t === 'REWARD' || !!t?.includes('AUCTION');
 
 /** État d'une carte Star : cartes du même joueur (slug du joueur suivi, à défaut nom) dans la galerie. */
 export function starStatus(card: StarCard, playerSlug: string | null, gallery: GalleryCard[]): StarStatus {
