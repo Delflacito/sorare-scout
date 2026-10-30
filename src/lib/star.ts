@@ -67,11 +67,11 @@ export function matchCard<T extends StarCandidate>(card: StarCard, candidates: T
 
 /** Carte de la galerie Sorare de l'utilisateur (saison en cours). */
 export interface GalleryCard { slug: string; name: string; transferType: string | null }
-/** ok : carte gagnée aux enchères ou craftée (validée) ; market : possédée mais obtenue autrement (ne compte pas) ; missing : absente. */
+/** ok : carte obtenue auprès de Sorare ou craftée (validée) ; market : possédée mais achetée à un manager (ne compte pas) ; missing : absente. */
 export type StarStatus = 'ok' | 'market' | 'missing';
 
-// Enchères et crafts valident. Sorare classe certaines enchères en INSTANT_BUY (Berghuis, Rosa, van Rooij : achetés aux enchères,
-// validés dans l'appli). Les ventes entre managers (SINGLE_SALE_OFFER, SINGLE_BUY_OFFER, DIRECT_OFFER) et les récompenses non.
+// Valident les cartes obtenues auprès de Sorare : enchère, achat immédiat (INSTANT_BUY) et craft (SHARDS). Les ventes entre
+// managers (SINGLE_SALE_OFFER, SINGLE_BUY_OFFER, DIRECT_OFFER, marché secondaire) et les récompenses (REWARD) non.
 const counts = (t: string | null) => t === 'SHARDS' || t === 'INSTANT_BUY' || !!t?.includes('AUCTION');
 
 /** État d'une carte Star : cartes du même joueur (slug du joueur suivi, à défaut nom) dans la galerie. */

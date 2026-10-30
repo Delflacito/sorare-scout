@@ -10,9 +10,9 @@ import { PSEUDO_KEY } from './SquadBuilder';
 export interface StarView { competition: string; name: string; cards: (StarCard & { player: StarPlayer | null })[] }
 
 const POS_FR: Record<StarCard['pos'], string> = { GK: 'Gardien', DF: 'Défenseur', MD: 'Milieu', FW: 'Attaquant' };
-const STATUS_FR: Record<StarStatus, string> = { ok: '✓ Validée', market: 'Achetée sur le marché', missing: 'À trouver' };
+const STATUS_FR: Record<StarStatus, string> = { ok: '✓ Validée', market: 'Marché secondaire', missing: 'À trouver' };
 
-/** Avancement des collections Star d'après la galerie Sorare : seules les cartes gagnées aux enchères ou craftées valident. */
+/** Avancement des collections Star d'après la galerie Sorare : seules les cartes obtenues aux enchères, en achat immédiat ou en craft valident. */
 export function StarTracker({ collections }: { collections: StarView[] }) {
   const [pseudo, setPseudo] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryCard[] | null>(null);
@@ -80,7 +80,7 @@ export function StarTracker({ collections }: { collections: StarView[] }) {
                         <div className="gw-match muted">{POS_FR[x.pos]}{x.player && ` · ${x.player.team}`}</div>
                       </div>
                       {s && <span className={`star-status ${s}`}
-                        title={s === 'market' ? 'Tu as la carte, mais seules les cartes gagnées aux enchères ou craftées valident la collection' : undefined}>{STATUS_FR[s]}</span>}
+                        title={s === 'market' ? 'Tu as la carte, mais une carte achetée à un autre manager ne valide pas la collection (seules comptent enchère, achat immédiat et craft)' : undefined}>{STATUS_FR[s]}</span>}
                     </li>
                   );
                 })}

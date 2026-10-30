@@ -34,12 +34,12 @@ describe('état d’une carte Star', () => {
     { slug: 'max-weiss', name: 'Max Weiß', transferType: 'INSTANT_BUY' },
     { slug: 'lucca-kiaba-mounganga', name: 'Lucca Kiaba Mounganga', transferType: 'ENGLISH_AUCTION' },
   ];
-  it('validée seulement si enchère ou craft, « marché » si possédée autrement, sinon manquante ; nom en repli', () => {
+  it('validée si enchère, achat immédiat ou craft, « marché » si possédée autrement, sinon manquante ; nom en repli', () => {
     expect(starStatus({ name: 'Yann Sommer', pos: 'GK' }, null, gallery)).toBe('ok'); // joueur pas suivi : par le nom
     expect(starStatus({ name: 'Matte Smets', pos: 'DF' }, 'smets', gallery)).toBe('ok');
     expect(starStatus({ name: 'Ricardo Horta', pos: 'FW' }, 'horta', gallery)).toBe('market');
     expect(starStatus({ name: 'Diogo Costa', pos: 'GK' }, 'diogo', gallery)).toBe('missing');
-    expect(starStatus({ name: 'Max Weiss', pos: 'GK' }, null, gallery)).toBe('ok'); // INSTANT_BUY : enchère Sorare ; ß = ss
+    expect(starStatus({ name: 'Max Weiss', pos: 'GK' }, null, gallery)).toBe('ok'); // achat immédiat à Sorare ; ß = ss
     expect(starStatus({ name: 'Lucca Brughmans', pos: 'GK', slug: 'lucca-kiaba-mounganga' }, null, gallery)).toBe('ok'); // nom différent
   });
 });
