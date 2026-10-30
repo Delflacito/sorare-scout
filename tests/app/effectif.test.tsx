@@ -114,6 +114,15 @@ describe('Mon effectif', () => {
     await waitFor(() => expect(screen.getByText(/Aucune carte dans ce championnat/)).toBeInTheDocument());
   });
 
+  it('effectif de plus de 200 joueurs : infos demandées par paquets, aucun joueur sans nom', async () => {
+    const many = Array.from({ length: 320 }, (_, i) => ({ slug: `p${String(i).padStart(3, '0')}`, competition: 'eredivisie', status: 'owned', purchasePrice: 1 }));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(many));
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'P319' })).toBeInTheDocument());
+    const asked = vi.mocked(global.fetch).mock.calls.map(([u]) => new URL(String(u), 'http://x').searchParams.get('slugs')?.split(',').length ?? 0);
+    expect(Math.max(...asked)).toBeLessThanOrEqual(200);
+  });
+
   it('cartes par poste (poste vide signalé, un clic pour filtrer) ; carte à acheter passée en « Acheté »', async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify([
       { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 0 }, // craftée

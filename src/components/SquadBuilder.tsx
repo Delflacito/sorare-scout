@@ -138,10 +138,14 @@ export function SquadBuilder({ competitions, teams }: {
   const slugsKey = [...new Set(entries.map((e) => e.slug))].sort().join(',');
   useEffect(() => {
     if (!slugsKey) return;
-    fetch(`/api/joueurs?slugs=${encodeURIComponent(slugsKey)}`)
-      .then((r) => r.json())
-      .then((rows: MarketPlayerView[]) => setInfo((m) => new Map([...m, ...rows.map((r) => [r.slug, r] as const)])))
-      .catch(() => {});
+    // Par paquets : l'API plafonne chaque demande à 200 joueurs (et l'URL doit rester courte).
+    const slugs = slugsKey.split(',');
+    for (let i = 0; i < slugs.length; i += 150) {
+      fetch(`/api/joueurs?slugs=${encodeURIComponent(slugs.slice(i, i + 150).join(','))}`)
+        .then((r) => r.json())
+        .then((rows: MarketPlayerView[]) => setInfo((m) => new Map([...m, ...rows.map((r) => [r.slug, r] as const)])))
+        .catch(() => {});
+    }
   }, [slugsKey]);
 
   // Joueurs du club choisi, à cocher.
