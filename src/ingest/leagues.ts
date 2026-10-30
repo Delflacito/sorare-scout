@@ -18,6 +18,14 @@ export const LEAGUES: League[] = [
   { key: 'laliga', name: 'LaLiga', sorareSlug: SORARE_COMPETITIONS.laliga },
   { key: 'serieA', name: 'Serie A', sorareSlug: SORARE_COMPETITIONS.serieA },
   { key: 'bundesliga', name: 'Bundesliga', sorareSlug: SORARE_COMPETITIONS.bundesliga },
+  // shortcut: la MLS se joue de février à décembre, mais seuls ses matchs depuis le 1er août sont importés (cf. seasonStart) ; suffisant pour L15.
+  { key: 'mls', name: 'MLS', sorareSlug: SORARE_COMPETITIONS.mls },
+  { key: 'championship', name: 'Championship', sorareSlug: SORARE_COMPETITIONS.championship },
+  { key: 'bundesliga2', name: '2. Bundesliga', sorareSlug: SORARE_COMPETITIONS.bundesliga2 },
+  { key: 'austrianBundesliga', name: 'Bundesliga (Autriche)', sorareSlug: SORARE_COMPETITIONS.austrianBundesliga },
+  { key: 'ligue2', name: 'Ligue 2', sorareSlug: SORARE_COMPETITIONS.ligue2 },
+  { key: 'hnl', name: 'HNL (Croatie)', sorareSlug: SORARE_COMPETITIONS.hnl },
+  { key: 'scottishPremiership', name: 'Premiership (Écosse)', sorareSlug: SORARE_COMPETITIONS.scottishPremiership },
 ];
 
 /** Début de la saison en cours : 1er août (UTC). Les matchs antérieurs ne sont pas importés. */

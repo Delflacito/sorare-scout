@@ -14,6 +14,13 @@ export const SORARE_COMPETITIONS = {
   laliga: 'laliga-es',
   serieA: 'serie-a-it',
   bundesliga: 'bundesliga-de',
+  mls: 'mlspa',
+  championship: 'football-league-championship',
+  bundesliga2: '2-bundesliga',
+  austrianBundesliga: 'austrian-bundesliga',
+  ligue2: 'ligue-2-fr',
+  hnl: '1-hnl',
+  scottishPremiership: 'premiership-gb-sct',
 } as const;
 
 export interface SorareClub { slug: string; name: string; shortName: string | null; pictureUrl: string | null; competitionSlug: string }
