@@ -67,12 +67,12 @@ export function matchCard<T extends StarCandidate>(card: StarCard, candidates: T
 
 /** Carte de la galerie Sorare de l'utilisateur (saison en cours). */
 export interface GalleryCard { slug: string; name: string; transferType: string | null }
-/** ok : carte obtenue auprès de Sorare ou en craft (validée) ; market : possédée mais achetée à un manager (ne compte pas) ; missing : absente. */
+/** ok : carte gagnée aux enchères ou craftée (validée) ; market : possédée mais obtenue autrement (ne compte pas) ; missing : absente. */
 export type StarStatus = 'ok' | 'market' | 'missing';
 
-// Vérifié sur la galerie réelle : enchère, achat immédiat à Sorare et craft valident ; les ventes entre managers (SINGLE_SALE_OFFER,
-// SINGLE_BUY_OFFER, DIRECT_OFFER) non. shortcut: REWARD supposé valider (aucun exemple observé), à corriger si Sorare dit le contraire.
-const counts = (t: string | null) => t === 'SHARDS' || t === 'INSTANT_BUY' || t === 'REWARD' || !!t?.includes('AUCTION');
+// Seules les enchères (ENGLISH_AUCTION…) et les crafts (SHARDS) valident, à la demande de l'utilisateur : tout achat sur un
+// marché (INSTANT_BUY, SINGLE_SALE_OFFER, SINGLE_BUY_OFFER, DIRECT_OFFER) ou récompense (REWARD) ne compte pas.
+const counts = (t: string | null) => t === 'SHARDS' || !!t?.includes('AUCTION');
 
 /** État d'une carte Star : cartes du même joueur (slug du joueur suivi, à défaut nom) dans la galerie. */
 export function starStatus(card: StarCard, playerSlug: string | null, gallery: GalleryCard[]): StarStatus {

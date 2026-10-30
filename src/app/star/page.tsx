@@ -17,7 +17,7 @@ export default async function StarPage() {
   return (
     <main>
       <h1>Collections Star</h1>
-      <p className="subtitle">Les cartes Limited de la saison à collectionner, championnat par championnat : une carte gagnée aux enchères, achetée à Sorare ou craftée est validée</p>
+      <p className="subtitle">Les cartes Limited de la saison à collectionner, championnat par championnat : seules les cartes gagnées aux enchères ou craftées sont validées</p>
       <StarTracker collections={collections} />
     </main>
   );
