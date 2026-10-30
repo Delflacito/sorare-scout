@@ -196,6 +196,8 @@ const toConceded = (r: postgres.Row): ConcededView => ({
   observations: r.observations, lowSample: r.low_sample,
 });
 
+export interface StarPlayer { slug: string; name: string; position: GenericPosition | null; pictureUrl: string | null; team: string; competition: string }
+
 export function createQueries(sql: postgres.Sql) {
   const SORT_SQL: Record<Sort, postgres.PendingQuery<postgres.Row[]>> = {
     // Joueur que Sorare annonce absent : en fin de classement par score potentiel.
@@ -710,6 +712,15 @@ export function createQueries(sql: postgres.Sql) {
     async saveSquad(pseudo: string, entries: SquadEntry[]): Promise<void> {
       await sql`insert into squads (pseudo, entries) values (${pseudo}, ${sql.json(entries as unknown as postgres.JSONValue)})
         on conflict (pseudo) do update set entries = excluded.entries, updated_at = now()`;
+    },
+
+    /** Joueurs suivis des championnats donnés (identité, club), pour retrouver les cartes des collections Star. */
+    async listPlayersIn(competitionSlugs: string[]): Promise<StarPlayer[]> {
+      const rows = await sql`
+        select p.sorare_slug, p.name, p.position, p.picture_url, t.name as team, c.slug as competition
+        from players p join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
+        where c.slug = any(${competitionSlugs})`;
+      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, position: r.position, pictureUrl: r.picture_url, team: r.team, competition: r.competition }));
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {

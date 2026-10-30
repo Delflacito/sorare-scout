@@ -11,6 +11,7 @@ export const SECTIONS = [
   { href: '/trading', label: 'Trading' },
   { href: '/marche', label: 'Marché' },
   { href: '/effectif', label: 'Mon effectif' },
+  { href: '/star', label: 'Star' },
 ] as const;
 
 /** Onglets principaux du site ; l'onglet de la page courante est mis en avant. */

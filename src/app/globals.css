@@ -549,3 +549,14 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
   .squad-remove { width: 32px; height: 32px; }
 }
 @media (max-width: 560px) { .squad .gw-controls .segmented { grid-template-columns: repeat(3, 1fr); } .squad .gw-controls .segmented button { padding: 0 6px; } }
+
+/* Collections Star */
+.star-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.star-head p { margin: 0; }
+.star-section { margin-top: 16px; scroll-margin-top: 16px; }
+.star-bar { height: 8px; border-radius: 999px; background: var(--neutral-bg); overflow: hidden; margin: -4px 0 12px; }
+.star-bar span { display: block; height: 100%; background: var(--good); }
+.gw-row.star-row:not(.is-owned) .avatar { opacity: .55; }
+.star-status { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.star-status.ok { color: var(--good); }
+.star-status.market { color: var(--warning); }

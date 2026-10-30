@@ -14,7 +14,7 @@ import { PlayerAvatar } from './Media';
 export interface SquadEntry { slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null; fromSorare?: boolean }
 
 export const STORAGE_KEY = 'sorare-scout:effectif:v1';
-const PSEUDO_KEY = 'sorare-scout:pseudo';
+export const PSEUDO_KEY = 'sorare-scout:pseudo';
 
 /**
  * Fusionne la galerie Sorare dans l'effectif : ses cartes deviennent possédées (prix saisi à la main conservé, sinon prix
