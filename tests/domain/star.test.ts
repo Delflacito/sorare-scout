@@ -39,7 +39,7 @@ describe('état d’une carte Star', () => {
     expect(starStatus({ name: 'Matte Smets', pos: 'DF' }, 'smets', gallery)).toBe('ok');
     expect(starStatus({ name: 'Ricardo Horta', pos: 'FW' }, 'horta', gallery)).toBe('market');
     expect(starStatus({ name: 'Diogo Costa', pos: 'GK' }, 'diogo', gallery)).toBe('missing');
-    expect(starStatus({ name: 'Max Weiss', pos: 'GK' }, null, gallery)).toBe('market'); // achat immédiat : ne compte pas ; ß = ss
+    expect(starStatus({ name: 'Max Weiss', pos: 'GK' }, null, gallery)).toBe('ok'); // INSTANT_BUY : enchère Sorare ; ß = ss
     expect(starStatus({ name: 'Lucca Brughmans', pos: 'GK', slug: 'lucca-kiaba-mounganga' }, null, gallery)).toBe('ok'); // nom différent
   });
 });

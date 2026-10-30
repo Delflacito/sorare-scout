@@ -70,9 +70,9 @@ export interface GalleryCard { slug: string; name: string; transferType: string 
 /** ok : carte gagnée aux enchères ou craftée (validée) ; market : possédée mais obtenue autrement (ne compte pas) ; missing : absente. */
 export type StarStatus = 'ok' | 'market' | 'missing';
 
-// Seules les enchères (ENGLISH_AUCTION…) et les crafts (SHARDS) valident, à la demande de l'utilisateur : tout achat sur un
-// marché (INSTANT_BUY, SINGLE_SALE_OFFER, SINGLE_BUY_OFFER, DIRECT_OFFER) ou récompense (REWARD) ne compte pas.
-const counts = (t: string | null) => t === 'SHARDS' || !!t?.includes('AUCTION');
+// Enchères et crafts valident. Sorare classe certaines enchères en INSTANT_BUY (Berghuis, Rosa, van Rooij : achetés aux enchères,
+// validés dans l'appli). Les ventes entre managers (SINGLE_SALE_OFFER, SINGLE_BUY_OFFER, DIRECT_OFFER) et les récompenses non.
+const counts = (t: string | null) => t === 'SHARDS' || t === 'INSTANT_BUY' || !!t?.includes('AUCTION');
 
 /** État d'une carte Star : cartes du même joueur (slug du joueur suivi, à défaut nom) dans la galerie. */
 export function starStatus(card: StarCard, playerSlug: string | null, gallery: GalleryCard[]): StarStatus {
