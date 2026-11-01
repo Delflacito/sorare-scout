@@ -9,7 +9,7 @@ const TOP = 16;
 const BOTTOM = 30;
 const LEFT = 60;
 const RIGHT = 16;
-const MIN_W = 300;
+const MIN_W = 240;
 
 const fmtDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
 
@@ -36,7 +36,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
     const ro = new ResizeObserver(([e]) => setWidth(Math.max(MIN_W, e.contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [cards]); // la zone du graphique n'existe pas quand il n'y a pas assez de ventes : on la rattache au changement de cartes
   if (series.season.length < 2 && series.classic.length < 2) return null;
   const points = series[cards];
   const season = cards === 'season';
@@ -79,7 +79,7 @@ export function ValueChart({ series, yy, subject = 'l’effectif' }: { series: V
           {change >= 0 ? '+' : '−'}{Math.abs(Math.round(change * 100))} %</strong>
       </p>
       <div ref={ref} className="chart-box" style={{ width: '100%' }} onMouseLeave={() => setHover(null)}>
-        <svg width={width} height={H} role="img"
+        <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
           aria-label={`${label} de ${subject} (${season ? `saison ${yy}` : 'Classic'}), de ${fmtEur(first.value)} le ${fmtDay(first.day)} à ${fmtEur(last.value)} aujourd’hui`}>
           {yTicks.map((v) => (
             <g key={v}>

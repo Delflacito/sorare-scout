@@ -10,7 +10,7 @@ const TOP = 16;
 const BOTTOM = 30;
 const LEFT = 52;
 const RIGHT = 16;
-const MIN_W = 320;
+const MIN_W = 240;
 /** Médiane glissante des ventes de la saison : tendance lisible malgré la dispersion des prix. */
 const ROLLING = 5;
 
@@ -73,7 +73,7 @@ export function SalesChart({ sales, season }: { sales: SaleView[]; season: numbe
       </div>
       <div ref={ref} className="chart-box" style={{ width: '100%' }}>
         {shown.length === 0 ? <p className="empty">Aucune vente pour ces cartes</p> : (
-          <svg width={width} height={H} role="img" aria-label={`${shown.length} dernières ventes, de ${fmtEur(Math.min(...shown.map((s) => s.eur)))} à ${fmtEur(Math.max(...shown.map((s) => s.eur)))}`}>
+          <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img" aria-label={`${shown.length} dernières ventes, de ${fmtEur(Math.min(...shown.map((s) => s.eur)))} à ${fmtEur(Math.max(...shown.map((s) => s.eur)))}`}>
             {yTicks.map((v) => (
               <g key={v}>
                 <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className={v === 0 ? 'axis' : 'grid'} />
