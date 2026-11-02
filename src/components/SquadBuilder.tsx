@@ -389,22 +389,27 @@ export function SquadBuilder({ competitions, teams }: {
         </>
       )}
 
-      <div className="squad-search">
-        <select value={club} onChange={(e) => setClub(e.target.value)} aria-label="Club">
-          <option value="">Ajouter une carte : choisir un club</option>
-          {teams.filter((t) => t.competitionSlug === league).map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}
-        </select>
+      <section className="card gw-section squad-add" aria-labelledby="ajouter-carte">
+        <h2 className="card-title" id="ajouter-carte">Ajouter une carte<span>choisis un club</span></h2>
+        <div className="club-grid" role="group" aria-label="Clubs">
+          {teams.filter((t) => t.competitionSlug === league).map((t) => (
+            <button key={t.slug} type="button" className="club-btn" aria-pressed={club === t.slug} onClick={() => setClub(club === t.slug ? '' : t.slug)}>
+              {t.name}
+            </button>
+          ))}
+        </div>
         {clubPlayers.length > 0 && (
-          <ul className="search-results" aria-label="Joueurs du club">
+          <ul className="gw-list squad-grid club-players" aria-label="Joueurs du club">
             {clubPlayers.map((p) => {
               const entry = inSquad(p.slug);
               return (
-                <li key={p.slug}>
-                  <span className="player-cell">
-                    <PlayerAvatar name={p.name} url={p.pictureUrl} size={28} />
-                    <span>{p.name}</span>
-                    <span className="muted small">{cardLabel(p.cardPositions)} · {p.price === null ? '—' : fmtEur(p.price)}</span>
-                  </span>
+                <li key={p.slug} className={`gw-row ${entry ? 'in-squad' : ''}`}>
+                  <PlayerAvatar name={p.name} url={p.pictureUrl} size={40} />
+                  <div className="gw-who">
+                    <div className="gw-name">{p.name}</div>
+                    <div className="gw-meta">{cardLabel(p.cardPositions)}</div>
+                  </div>
+                  <strong className="club-price">{p.price === null ? '—' : fmtEur(p.price)}</strong>
                   <span className="search-actions">
                     {entry ? <button type="button" className="secondary" onClick={() => remove(p.slug)}>{entry.status === 'owned' ? 'Dans mes cartes ✕' : 'À acheter ✕'}</button> : (
                       <>
@@ -418,7 +423,7 @@ export function SquadBuilder({ competitions, teams }: {
             })}
           </ul>
         )}
-      </div>
+      </section>
 
       <form className="squad-import squad-manual" onSubmit={addManual}>
         <input value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={80}

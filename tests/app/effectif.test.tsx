@@ -113,8 +113,10 @@ describe('Mon effectif', () => {
 
   it('club puis joueurs cochés, prix d’achat, totaux, enregistrement dans le navigateur', async () => {
     render(<SquadBuilder competitions={competitions} teams={teams} />);
-    expect(screen.getByRole('combobox', { name: 'Club' })).not.toHaveTextContent('PSG'); // clubs du championnat affiché
-    fireEvent.change(screen.getByRole('combobox', { name: 'Club' }), { target: { value: 'psv' } });
+    const clubs = screen.getByRole('group', { name: 'Clubs' });
+    expect(clubs).not.toHaveTextContent('PSG'); // clubs du championnat affiché
+    fireEvent.click(within(clubs).getByRole('button', { name: 'PSV' }));
+    expect(within(clubs).getByRole('button', { name: 'PSV' })).toHaveAttribute('aria-pressed', 'true');
     const list = await screen.findByRole('list', { name: 'Joueurs du club' });
     fireEvent.click(within(list).getByRole('button', { name: 'J’ai XAVI' }));
     const input = await screen.findByRole('textbox', { name: 'Prix d’achat de XAVI' });

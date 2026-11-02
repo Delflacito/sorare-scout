@@ -656,3 +656,14 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
   .squad-grid .gw-name a, .squad-grid .gw-name { font-size: 13px; }
   .squad-grid .squad-money strong { font-size: 15px; }
 }
+/* Ajout d'une carte : clubs en boutons, joueurs du club en cartes. */
+.club-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.club-btn { min-height: 44px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
+.club-btn:hover { border-color: var(--control-border); }
+.club-btn[aria-pressed='true'] { background: var(--text); border-color: var(--text); color: var(--surface); }
+.club-players { margin-top: 12px; }
+.club-players .club-price { font-size: 15px; font-variant-numeric: tabular-nums; }
+.club-players .search-actions { flex-direction: column; width: 100%; gap: 4px; }
+.club-players .search-actions button { width: 100%; min-height: 36px; padding: 4px 6px; font-size: 12.5px; }
+.gw-list.club-players > .in-squad { border-color: var(--accent); }
+@media (max-width: 560px) { .club-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
