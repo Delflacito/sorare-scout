@@ -9,22 +9,26 @@ describe('ROI', () => {
     expect(roiGroupOf(null)).toBeNull();
   });
 
-  it('ROI brut (streaks + reventes) et avec la valeur actuelle des cartes', () => {
+  it('streaks comptés par palier selon le barème du championnat ; ROI brut et avec la valeur des cartes', () => {
     const owned = { cards: 3, invested: 100, unknownPurchase: 0, value: 80, unpriced: 0 };
-    const t = roiTotals(owned, {
-      streaks: [{ level: 'Palier 1', count: 3, eur: 30 }, { level: 'Palier 2', count: 1, eur: 20 }],
-      essence: 500,
-      sold: [{ name: 'X', bought: 25, sold: 40 }],
+    // Eredivisie : 2 × 320 pts (500 essence), 3 × 360 pts (3 €), 1 × 410 pts (25 €)
+    const t = roiTotals('eredivisie', owned, { streaks: { 320: 2, 360: 3, 410: 1 }, sold: [{ name: 'X', bought: 25, sold: 40 }] });
+    expect(t).toEqual({
+      invested: 125, streakCount: 6, streaks: 34, essence: 1000, resales: 40, gains: 74, value: 80,
+      roiGross: 74 / 125 - 1, roiWithValue: 154 / 125 - 1,
     });
-    expect(t).toEqual({ invested: 125, streaks: 50, resales: 40, gains: 90, value: 80, roiGross: 90 / 125 - 1, roiWithValue: 170 / 125 - 1 });
-    expect(roiTotals({ ...owned, invested: 0 }, { streaks: [], essence: 0, sold: [] }).roiGross).toBeNull();
+    // Contender : le palier 360 rapporte de l'essence, pas d'euros
+    expect(roiTotals('contender', owned, { streaks: { 360: 2 }, sold: [] })).toMatchObject({ streaks: 0, essence: 2000 });
+    expect(roiTotals('eredivisie', { ...owned, invested: 0 }, { streaks: {}, sold: [] }).roiGross).toBeNull();
   });
 
   it('saisies vérifiées avant enregistrement', () => {
-    const ok = { eredivisie: { streaks: [{ level: 'P1', count: 2, eur: 10 }], essence: 3, sold: [] } };
+    const ok = { eredivisie: { streaks: { 320: 2, 460: 1 }, sold: [] } };
     expect(parseRoi(ok)).toEqual(ok);
     expect(parseRoi({ inconnu: ok.eredivisie })).toBeNull();
-    expect(parseRoi({ eredivisie: { ...ok.eredivisie, essence: -1 } })).toBeNull();
+    expect(parseRoi({ eredivisie: { ...ok.eredivisie, streaks: { 550: 1 } } })).toBeNull(); // palier inexistant en Eredivisie
+    expect(parseRoi({ eredivisie: { ...ok.eredivisie, streaks: { 320: 1.5 } } })).toBeNull();
+    expect(parseRoi({ eredivisie: { streaks: [], essence: 0, sold: [] } })).toBeNull(); // ancien format
     expect(parseRoi({ eredivisie: { ...ok.eredivisie, sold: [{ name: 'X', bought: '3', sold: 1 }] } })).toBeNull();
     expect(parseRoi([])).toBeNull();
   });

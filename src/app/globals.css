@@ -574,3 +574,5 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .roi-num input { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
 .roi-add { min-height: 40px; padding: 0 12px; border: 1px dashed var(--control-border); border-radius: 8px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .roi-add:hover { background: var(--neutral-bg); }
+.roi-tier { flex: 1 1 160px; font-size: 14px; color: var(--muted); }
+.roi-tier strong { color: var(--text); font-variant-numeric: tabular-nums; }

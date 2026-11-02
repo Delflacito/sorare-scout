@@ -47,10 +47,11 @@ export async function GET(req: NextRequest) {
     if (c.purchaseEur === null) o.unknownPurchase += 1;
     if (value === null) o.unpriced += 1; else o.value += value;
   }
-  return NextResponse.json({ owned, manual: manual ?? {} });
+  // Saisies d'un ancien format (ou abîmées) ignorées plutôt que de casser la page.
+  return NextResponse.json({ owned, manual: (manual && parseRoi(manual)) ?? {} });
 }
 
-/** Enregistre les saisies (streaks, essence, cartes revendues) de ce pseudo. */
+/** Enregistre les saisies (streaks par palier, cartes revendues) de ce pseudo. */
 export async function PUT(req: NextRequest) {
   const pseudo = pseudoOf(req);
   if (!pseudo) return NextResponse.json({ error: 'Pseudo Sorare invalide' }, { status: 400 });

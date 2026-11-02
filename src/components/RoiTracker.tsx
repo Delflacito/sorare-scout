@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { fmtChange, fmtEur } from '@/lib/format';
-import { ROI_GROUPS, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned } from '@/lib/roi';
+import { ROI_GROUPS, STREAK_TIERS, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned } from '@/lib/roi';
 import { PSEUDO_KEY } from './SquadBuilder';
 
 const toNum = (v: string) => { const n = Number(v.replace(',', '.')); return Number.isFinite(n) && n >= 0 ? n : 0; };
@@ -29,12 +29,10 @@ function NumInput({ value, onChange, label, suffix }: { value: number; onChange:
   );
 }
 
-function GroupCard({ name, detail, owned, manual, onChange }: {
-  name: string; detail?: string; owned: RoiOwned; manual: RoiManual; onChange: (m: RoiManual) => void;
+function GroupCard({ group, name, detail, owned, manual, onChange }: {
+  group: RoiGroup; name: string; detail?: string; owned: RoiOwned; manual: RoiManual; onChange: (m: RoiManual) => void;
 }) {
-  const t = roiTotals(owned, manual);
-  const setStreak = (i: number, s: Partial<RoiManual['streaks'][number]>) =>
-    onChange({ ...manual, streaks: manual.streaks.map((x, j) => (j === i ? { ...x, ...s } : x)) });
+  const t = roiTotals(group, owned, manual);
   const setSold = (i: number, s: Partial<RoiManual['sold'][number]>) =>
     onChange({ ...manual, sold: manual.sold.map((x, j) => (j === i ? { ...x, ...s } : x)) });
   return (
@@ -56,32 +54,24 @@ function GroupCard({ name, detail, owned, manual, onChange }: {
       )}
 
       <h3 className="roi-sub">Streaks par palier</h3>
-      {manual.streaks.length > 0 && (
-        <ul className="roi-rows" aria-label={`Streaks ${name}`}>
-          {/* Clé liée au nombre de lignes : après un retrait, les champs repartent des bonnes valeurs. */}
-          {manual.streaks.map((s, i) => (
-            <li key={`${i}/${manual.streaks.length}`}>
-              <input className="roi-text" aria-label="Palier" value={s.level} maxLength={80} placeholder="Palier"
-                onChange={(e) => setStreak(i, { level: e.target.value })} />
-              <NumInput label={`Nombre de streaks ${s.level}`} value={s.count} onChange={(n) => setStreak(i, { count: Math.round(n) })} suffix="×" />
-              <NumInput label={`Gain total ${s.level}`} value={s.eur} onChange={(n) => setStreak(i, { eur: n })} suffix="€" />
-              <button type="button" className="link-btn" aria-label={`Retirer le palier ${s.level}`}
-                onClick={() => onChange({ ...manual, streaks: manual.streaks.filter((_, j) => j !== i) })}>✕</button>
+      <ul className="roi-rows" aria-label={`Streaks ${name}`}>
+        {STREAK_TIERS[group].map((tier) => {
+          const reward = tier.eur ? fmtEur(tier.eur) : `${tier.essence} essence`;
+          return (
+            <li key={tier.score}>
+              <span className="roi-tier"><strong>{tier.score} pts</strong> · {reward}</span>
+              <NumInput label={`Streaks à ${tier.score} points`} value={manual.streaks[tier.score] ?? 0} suffix="×"
+                onChange={(n) => onChange({ ...manual, streaks: { ...manual.streaks, [tier.score]: Math.round(n) } })} />
             </li>
-          ))}
-        </ul>
-      )}
-      <button type="button" className="roi-add" onClick={() => onChange({ ...manual, streaks: [...manual.streaks, { level: `Palier ${manual.streaks.length + 1}`, count: 0, eur: 0 }] })}>
-        + Ajouter un palier
-      </button>
-      {manual.streaks.length > 0 && <p className="note">{manual.streaks.reduce((n, s) => n + s.count, 0)} streaks au total</p>}
-
-      <h3 className="roi-sub">Essence</h3>
-      <NumInput label={`Essence ${name}`} value={manual.essence} onChange={(n) => onChange({ ...manual, essence: n })} suffix="unités (hors ROI)" />
+          );
+        })}
+      </ul>
+      <p className="note">{t.streakCount} streak{t.streakCount > 1 ? 's' : ''} : {fmtEur(t.streaks)} et {t.essence.toLocaleString('fr-FR')} essence (l’essence ne compte pas dans le ROI)</p>
 
       <h3 className="roi-sub">Cartes revendues</h3>
       {manual.sold.length > 0 && (
         <ul className="roi-rows" aria-label={`Cartes revendues ${name}`}>
+          {/* Clé liée au nombre de lignes : après un retrait, les champs repartent des bonnes valeurs. */}
           {manual.sold.map((s, i) => (
             <li key={`${i}/${manual.sold.length}`}>
               <input className="roi-text" aria-label="Joueur" value={s.name} maxLength={80} placeholder="Joueur"
@@ -140,7 +130,7 @@ export function RoiTracker() {
   if (error) return <p className="empty cold">{error}</p>;
   if (!owned) return <p className="empty" aria-live="polite">Lecture de ta galerie Sorare…</p>;
 
-  const all = ROI_GROUPS.map((g) => roiTotals(owned[g.key], manual[g.key] ?? emptyManual()));
+  const all = ROI_GROUPS.map((g) => roiTotals(g.key, owned[g.key], manual[g.key] ?? emptyManual()));
   const sum = (f: (t: (typeof all)[number]) => number) => all.reduce((n, t) => n + f(t), 0);
   const invested = sum((t) => t.invested);
   const ratio = (x: number) => (invested > 0 ? x / invested - 1 : null);
@@ -149,7 +139,7 @@ export function RoiTracker() {
     <>
       <div className="tiles roi-summary">
         <Tile label="Investi au total"><span className="tile-value">{fmtEur(invested)}</span></Tile>
-        <Tile label="Gains au total" hint="Streaks + reventes"><span className="tile-value">{fmtEur(sum((t) => t.gains))}</span></Tile>
+        <Tile label="Gains au total" hint={`Streaks + reventes · ${sum((t) => t.essence).toLocaleString('fr-FR')} essence en plus`}><span className="tile-value">{fmtEur(sum((t) => t.gains))}</span></Tile>
         <Tile label="ROI brut"><Roi r={ratio(sum((t) => t.gains))} /></Tile>
         <Tile label="ROI avec valeur des cartes"><Roi r={ratio(sum((t) => t.gains + t.value))} /></Tile>
       </div>
@@ -158,7 +148,7 @@ export function RoiTracker() {
         {saved === 'saving' ? ' Enregistrement…' : saved === 'saved' ? ' Saisies enregistrées.' : saved === 'error' ? ' Échec de l’enregistrement, réessaie.' : ''}
       </p>
       {ROI_GROUPS.map((g) => (
-        <GroupCard key={g.key} name={g.name} detail={'detail' in g ? g.detail : undefined}
+        <GroupCard key={g.key} group={g.key} name={g.name} detail={'detail' in g ? g.detail : undefined}
           owned={owned[g.key]} manual={manual[g.key] ?? emptyManual()} onChange={(m) => update(g.key, m)} />
       ))}
     </>

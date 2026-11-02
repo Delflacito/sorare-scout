@@ -1,4 +1,4 @@
--- Saisies de la page ROI d'un manager (streaks, essence, cartes revendues), par championnat, rattachées à son pseudo Sorare.
+-- Saisies de la page ROI d'un manager (streaks par palier, cartes revendues), par championnat, rattachées à son pseudo Sorare.
 create table roi (
   pseudo text primary key,
   data jsonb not null default '{}',
