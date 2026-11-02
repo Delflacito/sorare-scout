@@ -699,3 +699,9 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .roi-breakeven ul { margin: 0; padding-left: 18px; }
 .roi-breakeven.ok { color: var(--good); font-weight: 600; }
 .roi-history { margin-top: 16px; }
+/* Préparer ma streak */
+.streak-days { display: grid; gap: 12px; margin-top: 12px; }
+.streak-fixtures { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.streak-fixtures > li + li { padding-top: 10px; border-top: 1px solid var(--border); }
+.streak-mine { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.streak-mine li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-left: 10px; border-left: 3px solid var(--accent); }

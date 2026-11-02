@@ -64,6 +64,11 @@ export interface ClubSchedule {
   slug: string; name: string; pictureUrl: string | null;
   games: { date: string; opponent: string; opponentSlug: string; isHome: boolean; opponentRating: number | null }[];
 }
+/** Un match à venir et les cartes possédées de ses deux clubs (score potentiel s'il s'agit de leur prochain match). */
+export interface StreakFixture {
+  id: number; date: string; home: string; away: string;
+  mine: { slug: string; name: string; team: string; positions: GenericPosition[]; projected: number | null; startRate: number | null }[];
+}
 /** projected : meilleurs scores potentiels ; boost : plus gros gains par rapport au niveau habituel. */
 export type GameWeekSort = 'projected' | 'boost';
 /** minStartRate : part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
@@ -322,6 +327,30 @@ export function createQueries(sql: postgres.Sql) {
         opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
         projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
         cardPositions: r.card_positions,
+      }));
+    },
+
+    /** Matchs de championnat des `days` prochains jours, avec les cartes possédées (slugs) de chaque club. */
+    async getStreakPlan(competition: string, slugs: string[], days: number): Promise<StreakFixture[]> {
+      const fixtures = await sql`
+        select f.id, f.date, f.home_team_id, f.away_team_id, h.name as home, a.name as away
+        from fixtures f join competitions c on c.id = f.competition_id and c.slug = ${competition}
+        join teams h on h.id = f.home_team_id join teams a on a.id = f.away_team_id
+        where f.status = 'scheduled' and f.date > now() and f.date < now() + make_interval(days => ${days})
+        order by f.date, f.id`;
+      const players = slugs.length ? await sql`
+        select p.sorare_slug, p.name, p.team_id, t.name as team, coalesce(p.card_positions, array[p.position]) as positions,
+          s.next_fixture_id, s.next_projected, s.start_rate5
+        from players p join teams t on t.id = p.team_id left join player_summary s on s.player_id = p.id
+        where p.sorare_slug = any(${slugs})` : [];
+      return fixtures.map((f) => ({
+        id: f.id, date: (f.date as Date).toISOString(), home: f.home, away: f.away,
+        mine: players.filter((p) => p.team_id === f.home_team_id || p.team_id === f.away_team_id)
+          .map((p) => ({
+            slug: p.sorare_slug, name: p.name, team: p.team, positions: p.positions,
+            projected: p.next_fixture_id === f.id ? p.next_projected : null, startRate: p.start_rate5,
+          }))
+          .sort((a, b) => (b.projected ?? -1) - (a.projected ?? -1)),
       }));
     },
 

@@ -13,6 +13,7 @@ export const SECTIONS = [
   { href: '/effectif', label: 'Mon effectif' },
   { href: '/star', label: 'Star' },
   { href: '/roi', label: 'ROI' },
+  { href: '/streak', label: 'Streak' },
 ] as const;
 
 /** Onglets principaux du site ; l'onglet de la page courante est mis en avant. */
