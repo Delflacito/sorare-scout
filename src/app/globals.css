@@ -563,16 +563,55 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .star-status.market { color: var(--warning); }
 
 /* ROI */
-.roi-summary { margin-bottom: 8px; }
-.roi-group { margin-top: 16px; }
-.roi-sub { margin: 16px 0 6px; font-size: 15px; font-weight: 650; }
-.roi-rows { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
-.roi-rows li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
-.roi-text, .roi-num input { min-height: 40px; padding: 6px 10px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
-.roi-text { flex: 1 1 160px; min-width: 0; }
-.roi-num { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
-.roi-num input { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
-.roi-add { min-height: 40px; padding: 0 12px; border: 1px dashed var(--control-border); border-radius: 8px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.roi-total { display: grid; gap: 10px; }
+.roi-total-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.roi-total-head strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.roi-bar { position: relative; display: flex; height: 10px; border-radius: 999px; background: var(--neutral-bg); overflow: visible; }
+.roi-bar > span:first-child { border-radius: 999px 0 0 999px; }
+.roi-bar-gains { display: inline-block; background: var(--good); }
+.roi-bar-value { display: inline-block; background: var(--accent); }
+.roi-bar span { height: 100%; }
+.roi-bar-even { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); }
+.roi-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 0; font-size: 12px; color: var(--muted); }
+.roi-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.roi-legend .roi-bar-even { position: static; width: 2px; height: 12px; margin: 0; }
+.roi-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.roi-badge { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 10px; border-radius: 999px; background: var(--neutral-bg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.roi-badge span { font-weight: 500; font-size: 12px; color: var(--muted); }
+.roi-badge.hot { background: var(--hot-bg); } .roi-badge.cold { background: var(--cold-bg); color: var(--cold); }
+.roi-sort { margin: 16px 0 10px; }
+.roi-sort .chip { font: inherit; cursor: pointer; }
+.roi-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.roi-item { padding: 0; overflow: hidden; }
+.roi-item-head { position: relative; display: grid; gap: 8px; width: 100%; padding: 14px 44px 14px 16px; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.roi-item-head:hover { background: var(--bg); }
+.roi-item-name { font-size: 17px; font-weight: 700; }
+.roi-item-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.roi-item-figs { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.roi-chevron { position: absolute; top: 14px; right: 16px; color: var(--muted); }
+.roi-detail { padding: 0 16px 16px; border-top: 1px solid var(--border); }
+.roi-figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 12px 0; }
+.roi-figures div { padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.roi-figures dt { font-size: 12px; color: var(--muted); }
+.roi-figures dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.roi-sub { display: flex; gap: 8px; align-items: baseline; margin: 16px 0 8px; font-size: 15px; font-weight: 650; }
+.roi-sub span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.roi-tiers { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.roi-tiers li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.roi-tiers li.has { border-color: var(--good); }
+.roi-tier { display: grid; font-size: 13px; }
+.roi-tier strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.roi-eur { color: var(--good); font-weight: 600; } .roi-ess { color: var(--muted); }
+.roi-stepper { display: inline-flex; align-items: center; border: 1px solid var(--control-border); border-radius: 10px; overflow: hidden; }
+.roi-stepper button { width: 44px; height: 44px; border: none; background: var(--neutral-bg); color: var(--text); font-size: 20px; cursor: pointer; }
+.roi-stepper button:disabled { opacity: .4; cursor: default; }
+.roi-stepper input { width: 48px; height: 44px; border: none; background: var(--surface); color: var(--text); font: inherit; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.roi-rows { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+.roi-rows li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; }
+.roi-text, .roi-num input { min-height: 44px; padding: 6px 10px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.roi-text { flex: 1 1 100%; min-width: 0; }
+.roi-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.roi-num { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.roi-num input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+.roi-add { min-height: 44px; padding: 0 14px; border: 1px dashed var(--control-border); border-radius: 10px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .roi-add:hover { background: var(--neutral-bg); }
-.roi-tier { flex: 1 1 160px; font-size: 14px; color: var(--muted); }
-.roi-tier strong { color: var(--text); font-variant-numeric: tabular-nums; }

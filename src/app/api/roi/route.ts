@@ -13,8 +13,8 @@ const pseudoOf = (req: NextRequest) => {
 };
 
 /**
- * Cartes Limited possédées (toutes saisons) par championnat du club actuel : prix d'achat réel (craft = 0) et valeur
- * actuelle (prix de référence pour la saison en cours, plancher Classic sinon), plus les saisies enregistrées.
+ * Cartes Limited de la saison en cours possédées, par championnat du club actuel : prix d'achat réel (craft = 0, récompense
+ * non comptée) et valeur actuelle (prix de référence), plus les saisies enregistrées. Les Classic sont exclues, à la demande.
  */
 export async function GET(req: NextRequest) {
   const pseudo = pseudoOf(req);
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   }
   if (!cards) return NextResponse.json({ error: `Aucun manager Sorare « ${pseudo} »` }, { status: 404 });
   const season = new Date(seasonStart()).getUTCFullYear();
-  const mine = cards.flatMap((c) => { const g = roiGroupOf(c.leagueSlug); return g ? [{ ...c, group: g }] : []; });
+  const mine = cards.flatMap((c) => { const g = c.seasonYear === season ? roiGroupOf(c.leagueSlug) : null; return g ? [{ ...c, group: g }] : []; });
   const queries = getQueries();
   const [market, manual] = await Promise.all([
     mine.length ? queries.getMarketPlayers({ slugs: [...new Set(mine.map((c) => c.playerSlug))] }) : [],
@@ -40,8 +40,7 @@ export async function GET(req: NextRequest) {
   for (const c of mine) {
     const o = owned[c.group];
     const p = bySlug.get(c.playerSlug);
-    // shortcut: une carte Classic n'est valorisée que si son plancher est connu (le marché suivi est surtout celui de la saison).
-    const value = c.seasonYear === season ? (p?.price ?? p?.floorInSeason ?? null) : (p?.floorClassic ?? null);
+    const value = p?.price ?? p?.floorInSeason ?? null;
     o.cards += 1;
     o.invested += c.purchaseEur ?? 0;
     if (c.purchaseEur === null) o.unknownPurchase += 1;

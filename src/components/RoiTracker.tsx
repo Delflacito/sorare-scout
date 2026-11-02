@@ -3,81 +3,114 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { fmtChange, fmtEur } from '@/lib/format';
-import { ROI_GROUPS, STREAK_TIERS, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned } from '@/lib/roi';
+import {
+  ROI_GROUPS, STREAK_TIERS, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned, type RoiTotals,
+} from '@/lib/roi';
 import { PSEUDO_KEY } from './SquadBuilder';
 
 const toNum = (v: string) => { const n = Number(v.replace(',', '.')); return Number.isFinite(n) && n >= 0 ? n : 0; };
+const tone = (r: number | null) => (r === null ? '' : r > 0 ? 'hot' : r < 0 ? 'cold' : '');
 
-function Roi({ r }: { r: number | null }) {
-  if (r === null) return <span className="tile-value">—</span>;
-  return <span className={`tile-value ${r > 0 ? 'hot' : r < 0 ? 'cold' : ''}`}>{fmtChange(r)}</span>;
-}
+const SORTS = [
+  { key: 'roiWithValue', label: 'ROI avec cartes' },
+  { key: 'roiGross', label: 'ROI brut' },
+  { key: 'invested', label: 'Investi' },
+  { key: 'gains', label: 'Gains' },
+] as const;
+type SortKey = (typeof SORTS)[number]['key'];
 
-function Tile({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
-  return <div className="tile"><div className="tile-label">{label}</div>{children}{hint && <div className="tile-hint">{hint}</div>}</div>;
-}
-
-/** Champ numérique : la saisie reste libre (virgule, champ vide) et n'est convertie qu'au moment de l'enregistrer. */
-function NumInput({ value, onChange, label, suffix }: { value: number; onChange: (n: number) => void; label: string; suffix?: string }) {
-  const [text, setText] = useState(value ? String(value) : '');
+/** Barre « remboursé » : gains puis valeur des cartes, rapportés à l'investi (le trait marque l'équilibre). */
+function PaybackBar({ t }: { t: RoiTotals }) {
+  const scale = Math.max(t.invested, t.gains + t.value) || 1;
+  const pct = (x: number) => `${(x / scale) * 100}%`;
   return (
-    <span className="roi-num">
-      <input inputMode="decimal" aria-label={label} value={text} placeholder="0"
-        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />
-      {suffix}
+    <div className="roi-bar" role="img"
+      aria-label={`Gains ${fmtEur(t.gains)} et cartes ${fmtEur(t.value)} pour ${fmtEur(t.invested)} investis`}>
+      <span className="roi-bar-gains" style={{ width: pct(t.gains) }} />
+      <span className="roi-bar-value" style={{ width: pct(t.value) }} />
+      {t.invested > 0 && <i className="roi-bar-even" style={{ left: pct(t.invested) }} />}
+    </div>
+  );
+}
+
+function Badge({ label, r }: { label: string; r: number | null }) {
+  return <span className={`roi-badge ${tone(r)}`}><span>{label}</span> {r === null ? '—' : fmtChange(r)}</span>;
+}
+
+/** Compteur tactile : − / + et saisie directe du nombre. */
+function Stepper({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  return (
+    <span className="roi-stepper">
+      <button type="button" aria-label={`${label} : un de moins`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>
+      <input inputMode="numeric" aria-label={label} value={text} onChange={(e) => setText(e.target.value)}
+        onBlur={() => onChange(Math.round(toNum(text)))} onFocus={(e) => e.target.select()} />
+      <button type="button" aria-label={`${label} : un de plus`} onClick={() => onChange(value + 1)}>+</button>
     </span>
   );
 }
 
-function GroupCard({ group, name, detail, owned, manual, onChange }: {
-  group: RoiGroup; name: string; detail?: string; owned: RoiOwned; manual: RoiManual; onChange: (m: RoiManual) => void;
+/** Champ en euros : la saisie reste libre (virgule, champ vide) et n'est convertie qu'en quittant le champ. */
+function EurInput({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  const [text, setText] = useState(value ? String(value) : '');
+  return (
+    <span className="roi-num">
+      <input inputMode="decimal" aria-label={label} value={text} placeholder="0"
+        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />€
+    </span>
+  );
+}
+
+function Detail({ group, owned, manual, t, onChange }: {
+  group: RoiGroup; owned: RoiOwned; manual: RoiManual; t: RoiTotals; onChange: (m: RoiManual) => void;
 }) {
-  const t = roiTotals(group, owned, manual);
   const setSold = (i: number, s: Partial<RoiManual['sold'][number]>) =>
     onChange({ ...manual, sold: manual.sold.map((x, j) => (j === i ? { ...x, ...s } : x)) });
   return (
-    <section className="card roi-group" aria-label={name}>
-      <h2 className="card-title">{name}<span>{owned.cards} carte{owned.cards > 1 ? 's' : ''} possédée{owned.cards > 1 ? 's' : ''}{detail && ` · ${detail}`}</span></h2>
-      <div className="tiles">
-        <Tile label="Investi" hint={`${fmtEur(owned.invested)} en galerie${manual.sold.length ? ` + ${fmtEur(t.invested - owned.invested)} revendues` : ''}`}>
-          <span className="tile-value">{fmtEur(t.invested)}</span>
-        </Tile>
-        <Tile label="Gains" hint={`Streaks ${fmtEur(t.streaks)} · reventes ${fmtEur(t.resales)}`}><span className="tile-value">{fmtEur(t.gains)}</span></Tile>
-        <Tile label="ROI brut" hint="Streaks + reventes face à l’investi"><Roi r={t.roiGross} /></Tile>
-        <Tile label="ROI avec valeur des cartes" hint={`Cartes possédées : ${fmtEur(t.value)} aujourd’hui`}><Roi r={t.roiWithValue} /></Tile>
-      </div>
+    <div className="roi-detail">
+      <dl className="roi-figures">
+        <div><dt>Investi</dt><dd>{fmtEur(t.invested)}</dd></div>
+        <div><dt>Streaks</dt><dd>{fmtEur(t.streaks)}</dd></div>
+        <div><dt>Reventes</dt><dd>{fmtEur(t.resales)}</dd></div>
+        <div><dt>Cartes aujourd’hui</dt><dd>{fmtEur(t.value)}</dd></div>
+        <div><dt>Essence</dt><dd>{t.essence.toLocaleString('fr-FR')}</dd></div>
+      </dl>
       {(owned.unknownPurchase > 0 || owned.unpriced > 0) && (
         <p className="note">
-          {owned.unknownPurchase > 0 && `${owned.unknownPurchase} carte${owned.unknownPurchase > 1 ? 's' : ''} sans prix d’achat connu (récompense, échange) comptée${owned.unknownPurchase > 1 ? 's' : ''} 0 €. `}
-          {owned.unpriced > 0 && `${owned.unpriced} carte${owned.unpriced > 1 ? 's' : ''} sans prix actuel (Classic ou joueur non suivi), exclue${owned.unpriced > 1 ? 's' : ''} de la valeur.`}
+          {owned.cards} cartes de la saison en galerie.
+          {owned.unknownPurchase > 0 && ` ${owned.unknownPurchase} sans prix d’achat connu (récompense, échange) : comptées 0 €.`}
+          {owned.unpriced > 0 && ` ${owned.unpriced} sans prix actuel (joueur non suivi) : hors valeur.`}
         </p>
       )}
 
-      <h3 className="roi-sub">Streaks par palier</h3>
-      <ul className="roi-rows" aria-label={`Streaks ${name}`}>
+      <h3 className="roi-sub">Streaks atteints <span>{t.streakCount}</span></h3>
+      <ul className="roi-tiers" aria-label="Streaks par palier">
         {STREAK_TIERS[group].map((tier) => {
-          const reward = tier.eur ? fmtEur(tier.eur) : `${tier.essence} essence`;
+          const n = manual.streaks[tier.score] ?? 0;
           return (
-            <li key={tier.score}>
-              <span className="roi-tier"><strong>{tier.score} pts</strong> · {reward}</span>
-              <NumInput label={`Streaks à ${tier.score} points`} value={manual.streaks[tier.score] ?? 0} suffix="×"
-                onChange={(n) => onChange({ ...manual, streaks: { ...manual.streaks, [tier.score]: Math.round(n) } })} />
+            <li key={tier.score} className={n > 0 ? 'has' : ''}>
+              <span className="roi-tier">
+                <strong>{tier.score} pts</strong>
+                <span className={tier.eur ? 'roi-eur' : 'roi-ess'}>{tier.eur ? fmtEur(tier.eur) : `${tier.essence} essence`}</span>
+              </span>
+              <Stepper label={`Streaks à ${tier.score} points`} value={n}
+                onChange={(v) => onChange({ ...manual, streaks: { ...manual.streaks, [tier.score]: Math.max(0, v) } })} />
             </li>
           );
         })}
       </ul>
-      <p className="note">{t.streakCount} streak{t.streakCount > 1 ? 's' : ''} : {fmtEur(t.streaks)} et {t.essence.toLocaleString('fr-FR')} essence (l’essence ne compte pas dans le ROI)</p>
 
-      <h3 className="roi-sub">Cartes revendues</h3>
+      <h3 className="roi-sub">Cartes revendues <span>{manual.sold.length}</span></h3>
       {manual.sold.length > 0 && (
-        <ul className="roi-rows" aria-label={`Cartes revendues ${name}`}>
+        <ul className="roi-rows" aria-label="Cartes revendues">
           {/* Clé liée au nombre de lignes : après un retrait, les champs repartent des bonnes valeurs. */}
           {manual.sold.map((s, i) => (
             <li key={`${i}/${manual.sold.length}`}>
               <input className="roi-text" aria-label="Joueur" value={s.name} maxLength={80} placeholder="Joueur"
                 onChange={(e) => setSold(i, { name: e.target.value })} />
-              <NumInput label={`Prix d’achat ${s.name}`} value={s.bought} onChange={(n) => setSold(i, { bought: n })} suffix="€ achat" />
-              <NumInput label={`Prix de revente ${s.name}`} value={s.sold} onChange={(n) => setSold(i, { sold: n })} suffix="€ revente" />
+              <label className="roi-field">Achat <EurInput label={`Prix d’achat ${s.name}`} value={s.bought} onChange={(n) => setSold(i, { bought: n })} /></label>
+              <label className="roi-field">Revente <EurInput label={`Prix de revente ${s.name}`} value={s.sold} onChange={(n) => setSold(i, { sold: n })} /></label>
               <button type="button" className="link-btn" aria-label={`Retirer ${s.name || 'cette carte'}`}
                 onClick={() => onChange({ ...manual, sold: manual.sold.filter((_, j) => j !== i) })}>✕</button>
             </li>
@@ -87,17 +120,19 @@ function GroupCard({ group, name, detail, owned, manual, onChange }: {
       <button type="button" className="roi-add" onClick={() => onChange({ ...manual, sold: [...manual.sold, { name: '', bought: 0, sold: 0 }] })}>
         + Ajouter une carte revendue
       </button>
-    </section>
+    </div>
   );
 }
 
-/** ROI par championnat : galerie Sorare (investi, valeur) + saisies enregistrées sur le serveur (streaks, essence, reventes). */
+/** ROI par championnat : galerie Sorare (investi, valeur) + saisies enregistrées sur le serveur (streaks, reventes). */
 export function RoiTracker() {
   const [pseudo, setPseudo] = useState<string | null>(null);
   const [owned, setOwned] = useState<Record<RoiGroup, RoiOwned> | null>(null);
   const [manual, setManual] = useState<RoiData>({});
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [sort, setSort] = useState<SortKey>('roiWithValue');
+  const [open, setOpen] = useState<RoiGroup | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -130,27 +165,65 @@ export function RoiTracker() {
   if (error) return <p className="empty cold">{error}</p>;
   if (!owned) return <p className="empty" aria-live="polite">Lecture de ta galerie Sorare…</p>;
 
-  const all = ROI_GROUPS.map((g) => roiTotals(g.key, owned[g.key], manual[g.key] ?? emptyManual()));
-  const sum = (f: (t: (typeof all)[number]) => number) => all.reduce((n, t) => n + f(t), 0);
-  const invested = sum((t) => t.invested);
+  const rows = ROI_GROUPS.map((g) => {
+    const m = manual[g.key] ?? emptyManual();
+    return { ...g, m, t: roiTotals(g.key, owned[g.key], m) };
+  });
+  const sorted = [...rows].sort((a, b) => (b.t[sort] ?? -Infinity) - (a.t[sort] ?? -Infinity));
+  const invested = rows.reduce((n, r) => n + r.t.invested, 0);
+  const gains = rows.reduce((n, r) => n + r.t.gains, 0);
+  const value = rows.reduce((n, r) => n + r.t.value, 0);
   const ratio = (x: number) => (invested > 0 ? x / invested - 1 : null);
+  const total: RoiTotals = {
+    invested, gains, value, streaks: 0, streakCount: 0, essence: 0, resales: 0, roiGross: ratio(gains), roiWithValue: ratio(gains + value),
+  };
 
   return (
     <>
-      <div className="tiles roi-summary">
-        <Tile label="Investi au total"><span className="tile-value">{fmtEur(invested)}</span></Tile>
-        <Tile label="Gains au total" hint={`Streaks + reventes · ${sum((t) => t.essence).toLocaleString('fr-FR')} essence en plus`}><span className="tile-value">{fmtEur(sum((t) => t.gains))}</span></Tile>
-        <Tile label="ROI brut"><Roi r={ratio(sum((t) => t.gains))} /></Tile>
-        <Tile label="ROI avec valeur des cartes"><Roi r={ratio(sum((t) => t.gains + t.value))} /></Tile>
+      <section className="card roi-total" aria-label="Tous championnats">
+        <div className="roi-total-head">
+          <div><span className="tile-label">Investi</span><strong>{fmtEur(invested)}</strong></div>
+          <div><span className="tile-label">Gains</span><strong>{fmtEur(gains)}</strong></div>
+          <div><span className="tile-label">Cartes</span><strong>{fmtEur(value)}</strong></div>
+        </div>
+        <PaybackBar t={total} />
+        <div className="roi-badges"><Badge label="Brut" r={total.roiGross} /><Badge label="Avec cartes" r={total.roiWithValue} /></div>
+        <p className="roi-legend"><i className="roi-bar-gains" /> gains <i className="roi-bar-value" /> valeur des cartes <i className="roi-bar-even" /> investi</p>
+      </section>
+
+      <div className="roi-sort chip-row" role="group" aria-label="Trier par">
+        {SORTS.map((s) => (
+          <button key={s.key} type="button" className="chip" aria-pressed={sort === s.key}
+            onClick={() => setSort(s.key)}>{s.label}</button>
+        ))}
       </div>
+
+      <ul className="roi-list" aria-label="Championnats">
+        {sorted.map((r) => {
+          const isOpen = open === r.key;
+          return (
+            <li key={r.key} className={`card roi-item ${isOpen ? 'open' : ''}`}>
+              <button type="button" className="roi-item-head" aria-expanded={isOpen} aria-controls={`roi-${r.key}`}
+                onClick={() => setOpen(isOpen ? null : r.key)}>
+                <span className="roi-item-name">{r.name}{'detail' in r && <small>{r.detail}</small>}</span>
+                <span className="roi-item-figs">{fmtEur(r.t.invested)} investis · {fmtEur(r.t.gains)} gagnés</span>
+                <PaybackBar t={r.t} />
+                <span className="roi-badges"><Badge label="Brut" r={r.t.roiGross} /><Badge label="Avec cartes" r={r.t.roiWithValue} /></span>
+                <span className="roi-chevron" aria-hidden="true">{isOpen ? '▴' : '▾'}</span>
+              </button>
+              {isOpen && (
+                <div id={`roi-${r.key}`}>
+                  <Detail group={r.key} owned={owned[r.key]} manual={r.m} t={r.t} onChange={(m) => update(r.key, m)} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       <p className="note" aria-live="polite">
-        Galerie de {pseudo}. Les cartes sont rangées selon le club actuel du joueur.
+        Galerie de {pseudo} · cartes de la saison seulement (pas les Classic), rangées selon le club actuel du joueur · l’essence ne compte pas dans le ROI.
         {saved === 'saving' ? ' Enregistrement…' : saved === 'saved' ? ' Saisies enregistrées.' : saved === 'error' ? ' Échec de l’enregistrement, réessaie.' : ''}
       </p>
-      {ROI_GROUPS.map((g) => (
-        <GroupCard key={g.key} group={g.key} name={g.name} detail={'detail' in g ? g.detail : undefined}
-          owned={owned[g.key]} manual={manual[g.key] ?? emptyManual()} onChange={(m) => update(g.key, m)} />
-      ))}
     </>
   );
 }
