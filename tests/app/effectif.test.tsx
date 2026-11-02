@@ -139,6 +139,22 @@ describe('Mon effectif', () => {
     expect(Math.max(...asked)).toBeLessThanOrEqual(200);
   });
 
+  it('tuiles recalculées selon le club filtré', async () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 10 },
+      { slug: 'b', competition: 'eredivisie', status: 'owned', purchasePrice: 5 },
+    ]));
+    global.fetch = vi.fn(async (url: string | URL | Request) => {
+      const slugs = new URL(String(url), 'http://x').searchParams.get('slugs')?.split(',') ?? [];
+      return new Response(JSON.stringify(slugs.map((x) => ({ ...player(x, 30), team: x === 'a' ? 'PSV' : 'Ajax' }))));
+    }) as unknown as typeof fetch;
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    await waitFor(() => expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('15 €'));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrer par club' }), { target: { value: 'Ajax' } });
+    expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('5,00 €');
+    expect(screen.getByText('Valeur actuelle').nextSibling).toHaveTextContent('30 €');
+  });
+
   it('joueur absent de la liste ajouté par son nom, affiché sans lien', async () => {
     render(<SquadBuilder competitions={competitions} teams={teams} />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Nom d’un joueur absent de la liste' }), { target: { value: 'Stije Resink' } });

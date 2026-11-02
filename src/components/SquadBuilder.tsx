@@ -194,12 +194,13 @@ export function SquadBuilder({ competitions, teams }: {
   }, [club]);
 
   const leagueEntries = entries.filter((e) => e.competition === league);
-  const totals = useMemo(() => squadTotals(leagueEntries, info), [leagueEntries, info]);
   const allTotals = useMemo(() => squadTotals(entries, info), [entries, info]);
   const posOf = (e: SquadEntry) => info.get(e.slug)?.cardPositions[0];
   const owned = leagueEntries.filter((e) => e.status === 'owned');
   const visible = (e: SquadEntry) => (!position || info.get(e.slug)?.cardPositions.includes(position))
     && (!clubFilter || info.get(e.slug)?.team === clubFilter);
+  // Les tuiles suivent les filtres (club, poste) : coût, valeur et potentiel des seules cartes affichées.
+  const totals = squadTotals(leagueEntries.filter(visible), info);
   const priceOf = (e: SquadEntry) => info.get(e.slug)?.price ?? 0;
   const sortKey = (e: SquadEntry): [number, number] => {
     if (sort === 'valeur') return [0, -priceOf(e)];
