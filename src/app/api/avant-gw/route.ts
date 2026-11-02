@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const pseudo = req.nextUrl.searchParams.get('user')?.trim().toLowerCase() ?? '';
   if (!PSEUDO.test(pseudo)) return NextResponse.json({ error: 'Pseudo Sorare invalide' }, { status: 400 });
   const queries = getQueries();
-  const [squad, fixtures] = await Promise.all([queries.getSquad(pseudo), queries.getGameWeekFixtures()]);
+  // Journée de chaque championnat séparément : leurs fenêtres de 4 jours ne commencent pas le même jour.
+  const [squad, competitions] = await Promise.all([queries.getSquad(pseudo), queries.listCompetitions()]);
+  const fixtures = (await Promise.all(competitions.map((c) => queries.getGameWeekFixtures(c.slug)))).flat();
   const slugs = [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))];
   const owned = await queries.getOwnedStatus(slugs, fixtures.map((f) => f.id));
   const kickoffs = new Map<string, string>();
