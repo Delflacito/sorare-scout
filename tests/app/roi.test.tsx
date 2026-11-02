@@ -33,6 +33,16 @@ describe('page ROI', () => {
     expect(screen.getByText('ROI avec la valeur des cartes').nextSibling).toHaveTextContent('−26 %'); // (50 + 210 − 350) / 350
     await waitFor(() => expect(puts.at(-1)).toEqual({ eredivisie: { streaks: { 410: 2 }, sold: [] } }));
 
+    // leaderboard : chaque gain s'ajoute au total
+    const lbEur = screen.getByRole('textbox', { name: 'Euros à ajouter' });
+    fireEvent.change(lbEur, { target: { value: '7,5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter au total euros' }));
+    fireEvent.change(lbEur, { target: { value: '2.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter au total euros' }));
+    expect(screen.getByLabelText('Euros total')).toHaveTextContent('10 €');
+    expect(lbEur).toHaveValue('');
+    await waitFor(() => expect(puts.at(-1)).toMatchObject({ eredivisie: { leaderboard: { eur: 10, essence: 0 } } }));
+
     // carte revendue : saisie dépliée, puis repliée en une ligne après « OK »
     fireEvent.click(screen.getByRole('button', { name: '+ Ajouter une carte revendue' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Joueur' }), { target: { value: 'Pepi' } });

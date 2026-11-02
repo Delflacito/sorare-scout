@@ -54,14 +54,35 @@ function Stepper({ value, onChange, label }: { value: number; onChange: (n: numb
   );
 }
 
-/** Champ numérique (euros par défaut) : la saisie reste libre (virgule, champ vide) et n'est convertie qu'en quittant le champ. */
-function EurInput({ value, onChange, label, unit = '€' }: { value: number; onChange: (n: number) => void; label: string; unit?: string }) {
+/** Champ en euros : la saisie reste libre (virgule, champ vide) et n'est convertie qu'en quittant le champ. */
+function EurInput({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
   const [text, setText] = useState(value ? String(value) : '');
   return (
     <span className="roi-num">
       <input inputMode="decimal" aria-label={label} value={text} placeholder="0"
-        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />{unit}
+        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />€
     </span>
+  );
+}
+
+/** Total cumulé + case « ajouter » : le gain du jour s'ajoute au total (négatif pour corriger, jamais sous 0). */
+function AddToTotal({ label, total, format, integer, onChange }: {
+  label: string; total: number; format: (n: number) => string; integer?: boolean; onChange: (n: number) => void;
+}) {
+  const [text, setText] = useState('');
+  const add = () => {
+    const n = Number(text.replace(',', '.').replace('−', '-'));
+    if (!text.trim() || !Number.isFinite(n)) return;
+    const next = Math.max(0, total + n);
+    onChange(integer ? Math.round(next) : Math.round(next * 100) / 100);
+    setText('');
+  };
+  return (
+    <form className="roi-addtotal" onSubmit={(e) => { e.preventDefault(); add(); }}>
+      <div><span className="tile-label">{label} · total</span><strong aria-label={`${label} total`}>{format(total)}</strong></div>
+      <input inputMode="decimal" aria-label={`${label} à ajouter`} placeholder="+ ajouter" value={text} onChange={(e) => setText(e.target.value)} />
+      <button type="submit" className="roi-ok" aria-label={`Ajouter au total ${label.toLowerCase()}`}>Ajouter</button>
+    </form>
   );
 }
 
@@ -111,10 +132,10 @@ function Detail({ group, owned, manual, t, onChange }: {
 
       <h3 className="roi-sub">Leaderboard</h3>
       <div className="roi-lb">
-        <label className="roi-field">Gagné <EurInput label="Euros gagnés au leaderboard" value={manual.leaderboard?.eur ?? 0}
-          onChange={(n) => onChange({ ...manual, leaderboard: { essence: manual.leaderboard?.essence ?? 0, eur: n } })} /></label>
-        <label className="roi-field">Essence <EurInput label="Essence gagnée au leaderboard" unit="" value={manual.leaderboard?.essence ?? 0}
-          onChange={(n) => onChange({ ...manual, leaderboard: { eur: manual.leaderboard?.eur ?? 0, essence: Math.round(n) } })} /></label>
+        <AddToTotal label="Euros" total={manual.leaderboard?.eur ?? 0} format={fmtEur}
+          onChange={(n) => onChange({ ...manual, leaderboard: { essence: manual.leaderboard?.essence ?? 0, eur: n } })} />
+        <AddToTotal label="Essence" total={manual.leaderboard?.essence ?? 0} format={(n) => n.toLocaleString('fr-FR')} integer
+          onChange={(n) => onChange({ ...manual, leaderboard: { eur: manual.leaderboard?.eur ?? 0, essence: n } })} />
       </div>
 
       <h3 className="roi-sub">Cartes revendues <span>{manual.sold.length}</span></h3>
