@@ -82,9 +82,11 @@ export interface ExchangeRates { usdToEur: number; gbpToEur: number; weiToEur: n
 /** dealType : type de vente selon Sorare (TokenAuction pour une enchère…), null s'il n'est pas renseigné. */
 /**
  * Carte Limited d'un utilisateur ; purchaseEur : prix payé, 0 pour une carte craftée, null si reçue autrement (récompense, échange…) ;
- * transferType : mode d'acquisition selon Sorare (SHARDS pour un craft…).
+ * transferType : mode d'acquisition selon Sorare (SHARDS pour un craft…) ; leagueSlug : championnat du club actuel du joueur.
  */
-export interface SorareUserCard { playerSlug: string; playerName: string; seasonYear: number | null; purchaseEur: number | null; transferType: string | null }
+export interface SorareUserCard {
+  playerSlug: string; playerName: string; seasonYear: number | null; purchaseEur: number | null; transferType: string | null; leagueSlug: string | null;
+}
 export interface SorareSale { date: string; eur: number; seasonYear: number | null; auction: boolean; dealType: string | null }
 /** Marché Limited d'un joueur (prix en euros). */
 export interface SorarePlayerMarket {
@@ -300,7 +302,7 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
     /** Cartes Limited de la galerie d'un utilisateur (toutes les pages) ; null si le pseudo n'existe pas. */
     async userCards(userSlug: string, rates: ExchangeRates): Promise<SorareUserCard[] | null> {
       type Page = { user: { cards: { pageInfo: { hasNextPage: boolean; endCursor: string | null };
-        nodes: { seasonYear: number | null; anyPlayer: { slug: string; displayName: string } | null; ownershipHistory: { transferType: string | null; amounts: RawAmounts | null }[] }[] } } | null };
+        nodes: { seasonYear: number | null; anyPlayer: { slug: string; displayName: string; activeClub?: { domesticLeague?: { slug: string } | null } | null } | null; ownershipHistory: { transferType: string | null; amounts: RawAmounts | null }[] }[] } } | null };
       const cards: SorareUserCard[] = [];
       for (let after: string | null = null; ;) {
         const d: Page = await query<Page>(USER_CARDS_QUERY, { slug: userSlug, after, first: apiKey ? 50 : 8 });
@@ -310,7 +312,8 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
           // Carte craftée (avec des fragments) : rien payé.
           const purchaseEur = last?.transferType === 'SHARDS' ? 0 : toEuros(last?.amounts, rates);
           if (n.anyPlayer) {
-            cards.push({ playerSlug: n.anyPlayer.slug, playerName: n.anyPlayer.displayName, seasonYear: n.seasonYear, purchaseEur, transferType: last?.transferType ?? null });
+            cards.push({ playerSlug: n.anyPlayer.slug, playerName: n.anyPlayer.displayName, seasonYear: n.seasonYear, purchaseEur, transferType: last?.transferType ?? null,
+              leagueSlug: n.anyPlayer.activeClub?.domesticLeague?.slug ?? null });
           }
         }
         if (!d.user.cards.pageInfo.hasNextPage) return cards;

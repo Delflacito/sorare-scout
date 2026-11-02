@@ -1,6 +1,7 @@
 import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
+import type { RoiData } from '@/lib/roi';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
 
@@ -721,6 +722,17 @@ export function createQueries(sql: postgres.Sql) {
         from players p join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
         where c.slug = any(${competitionSlugs})`;
       return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, position: r.position, pictureUrl: r.picture_url, team: r.team, competition: r.competition }));
+    },
+
+    /** Saisies de la page ROI pour un pseudo Sorare ; null s'il n'y en a pas. */
+    async getRoi(pseudo: string): Promise<RoiData | null> {
+      const [r] = await sql`select data from roi where pseudo = ${pseudo}`;
+      return r ? (r.data as RoiData) : null;
+    },
+
+    async saveRoi(pseudo: string, data: RoiData): Promise<void> {
+      await sql`insert into roi (pseudo, data) values (${pseudo}, ${sql.json(data as unknown as postgres.JSONValue)})
+        on conflict (pseudo) do update set data = excluded.data, updated_at = now()`;
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
