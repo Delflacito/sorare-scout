@@ -128,3 +128,15 @@ export function concededOverall(obs: ConcededObs[], teamFixtures: Record<string,
     return { teamId, window, average, leagueAverage, index: leagueAverage === 0 ? null : average / leagueAverage, observations: scores.length };
   });
 }
+
+/** Seuils de régularité affichés (points Sorare). */
+export const REGULARITY_THRESHOLDS = [40, 50, 60] as const;
+
+/**
+ * Régularité : part des n derniers matchs joués au-dessus de chaque seuil. Pour une streak, un joueur souvent à 50
+ * vaut mieux qu'un joueur à 80 une fois sur trois. null sans match joué.
+ */
+export function regularity(scores: number[], thresholds: readonly number[] = REGULARITY_THRESHOLDS): { threshold: number; rate: number }[] | null {
+  if (!scores.length) return null;
+  return thresholds.map((t) => ({ threshold: t, rate: scores.filter((s) => s >= t).length / scores.length }));
+}

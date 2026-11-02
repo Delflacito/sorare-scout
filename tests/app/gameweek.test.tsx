@@ -8,6 +8,10 @@ const getRoundMatchups = vi.fn<(ids: number[]) => Promise<RoundMatchup[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
   getQueries: () => ({
+    getSchedule: async () => [
+      { slug: 'om', name: 'OM', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'PSG', opponentSlug: 'psg', isHome: false, opponentRating: 90 }] },
+      { slug: 'psg', name: 'PSG', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'OM', opponentSlug: 'om', isHome: true, opponentRating: 20 }] },
+    ],
     getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }],
     getSquad: async () => [{ slug: 'gk', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 1 }, { slug: 'x', competition: 'ligue-1-fr', status: 'target', purchasePrice: 1 }],
   }),
@@ -128,5 +132,14 @@ describe('/journee', () => {
     render(await Journee(params({ tri: 'ST' })));
     expect(teams()).toEqual(['c', 'a', 'b']);
     expect(screen.getByRole('link', { name: 'BU' })).toHaveAttribute('href', '/journee?tri=ST');
+  });
+
+  it('/journee : calendrier des prochaines journées, calendrier le plus facile en premier', async () => {
+    getGameWeekFixtures.mockReset().mockResolvedValue([fixture]);
+    getRoundMatchups.mockReset().mockResolvedValue([]);
+    render(await Journee(params({ competition: 'ligue-1-fr' })));
+    const rows = within(screen.getByRole('table', { name: 'Calendrier des prochaines journées' })).getAllByRole('row').slice(1);
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringMatching(/^PSG20OM/), expect.stringMatching(/^OM90@ PSG/)]);
+    expect(within(rows[0]).getAllByRole('cell')[2]).toHaveClass('hot');
   });
 });

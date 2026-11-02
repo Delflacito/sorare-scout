@@ -1,4 +1,4 @@
-import { lastN, playingTime, scoreBreakdown, concededByPosition, concededOverall, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
+import { lastN, playingTime, regularity, scoreBreakdown, concededByPosition, concededOverall, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
 
 const tg = (id: string, day: number, teamId = 'A'): TeamGame => ({ fixtureId: id, date: `2026-10-${String(day).padStart(2, '0')}T20:00:00Z`, teamId });
 const pg = (id: string, score: number, extra: Partial<PlayerGame> = {}): PlayerGame => ({
@@ -94,5 +94,12 @@ describe('concededOverall', () => {
   it('fenêtre des N derniers matchs', () => {
     const rows = concededOverall([ob('T', 'old', 'ST', 100), ob('T', 'new', 'ST', 50)], { T: ['new', 'old'] }, 1);
     expect(rows[0].average).toBe(50);
+  });
+});
+
+describe('régularité', () => {
+  it('part des matchs au-dessus de 40, 50 et 60 points', () => {
+    expect(regularity([30, 45, 55, 65])).toEqual([{ threshold: 40, rate: 0.75 }, { threshold: 50, rate: 0.5 }, { threshold: 60, rate: 0.25 }]);
+    expect(regularity([])).toBeNull();
   });
 });

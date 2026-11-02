@@ -686,3 +686,6 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .issue-tag { display: inline-block; min-width: 82px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; text-align: center; }
 .issue-tag.bad { background: var(--critical-bg); color: var(--critical); }
 .issue-tag.warn { background: var(--warning-bg); color: var(--warning); }
+.matrix.schedule td.cell { text-align: left; white-space: nowrap; }
+.sched-opp { display: block; font-weight: 600; }
+.regularity-value { font-size: 22px; font-weight: 700; margin: 4px 0; }

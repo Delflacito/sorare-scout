@@ -59,6 +59,11 @@ export interface RoundMatchup {
   opponentRating: number | null;
   byPosition: Partial<Record<DetailedPosition, { average: number | null; index: number | null; observations: number }>>;
 }
+/** Les prochains matchs de championnat d'un club, avec la note défensive de chaque adversaire (1–100, 100 = le plus fort). */
+export interface ClubSchedule {
+  slug: string; name: string; pictureUrl: string | null;
+  games: { date: string; opponent: string; opponentSlug: string; isHome: boolean; opponentRating: number | null }[];
+}
 /** projected : meilleurs scores potentiels ; boost : plus gros gains par rapport au niveau habituel. */
 export type GameWeekSort = 'projected' | 'boost';
 /** minStartRate : part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
@@ -315,6 +320,30 @@ export function createQueries(sql: postgres.Sql) {
         projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
         cardPositions: r.card_positions,
       }));
+    },
+
+    /** Les n prochains matchs de championnat de chaque club d'un championnat. */
+    async getSchedule(competition: string, n: number): Promise<ClubSchedule[]> {
+      const rows = await sql`
+        select * from (
+          select t.sorare_slug, t.name, t.picture_url, f.date, s.is_home, o.name as opponent, o.sorare_slug as opponent_slug, co.rating,
+            row_number() over (partition by t.id order by f.date) as rn
+          from fixtures f
+          join competitions c on c.id = f.competition_id and c.slug = ${competition}
+          cross join lateral (values (f.home_team_id, f.away_team_id, true), (f.away_team_id, f.home_team_id, false)) s(team_id, opponent_id, is_home)
+          join teams t on t.id = s.team_id
+          join teams o on o.id = s.opponent_id
+          left join team_conceded_overall co on co.team_id = s.opponent_id and co.window_size = 10
+          where f.status = 'scheduled' and f.date > now()
+        ) x where rn <= ${n}
+        order by name, date`;
+      const clubs = new Map<string, ClubSchedule>();
+      for (const r of rows) {
+        const c: ClubSchedule = clubs.get(r.sorare_slug) ?? { slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, games: [] };
+        c.games.push({ date: (r.date as Date).toISOString(), opponent: r.opponent, opponentSlug: r.opponent_slug, isHome: r.is_home, opponentRating: r.rating });
+        clubs.set(r.sorare_slug, c);
+      }
+      return [...clubs.values()];
     },
 
     /** Pour chaque équipe de la journée : ce que son adversaire concède à chaque poste. */

@@ -8,6 +8,7 @@ import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { ScorePill } from '@/components/ScorePill';
+import { regularity } from '@/domain/metrics';
 import { MiniPitch } from '@/components/MiniPitch';
 import { MarketCard } from '@/components/MarketCard';
 import { SalesChart } from '@/components/SalesChart';
@@ -160,6 +161,27 @@ function FormCard({ player, games }: { player: PlayerDetail; games: PlayerGameVi
               style={{ height: `${g.status === 'absent' ? 3 : Math.max(4, Math.round(g.score / 100 * 22))}px` }} />
           ))}
         </span>
+      </div>
+    </section>
+  );
+}
+
+/** Régularité : part des 15 derniers matchs joués au-dessus de 40, 50 et 60 points (ce qui compte pour une streak). */
+function RegularityCard({ games }: { games: PlayerGameView[] }) {
+  const played = games.filter((g) => g.status !== 'absent').slice(0, 15);
+  const r = regularity(played.map((g) => g.score));
+  if (!r) return null;
+  return (
+    <section className="card" aria-label="Régularité">
+      <h2 className="card-title">Régularité <span>{played.length} derniers matchs joués</span></h2>
+      <div className="card-cols">
+        {r.map(({ threshold, rate }) => (
+          <div key={threshold} className="card-col">
+            <div className="card-col-label">≥ {threshold} pts</div>
+            <div className="regularity-value">{fmtPct(rate)}</div>
+            <div className="card-col-sub">{Math.round(rate * played.length)}/{played.length}</div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -347,6 +369,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           {s ? (
             <div className="cards">
               <FormCard player={player} games={games} />
+              <RegularityCard games={games} />
               <MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} />
             </div>
           ) : (
