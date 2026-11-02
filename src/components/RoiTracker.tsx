@@ -19,17 +19,20 @@ const SORTS = [
 ] as const;
 type SortKey = (typeof SORTS)[number]['key'];
 
-/** Barre « remboursé » : gains puis valeur des cartes, rapportés à l'investi (le trait marque l'équilibre). */
-function PaybackBar({ t }: { t: RoiTotals }) {
-  const scale = Math.max(t.invested, t.gains + t.value) || 1;
-  const pct = (x: number) => `${(x / scale) * 100}%`;
+const isRoi = (k: SortKey) => k === 'roiWithValue' || k === 'roiGross';
+
+/**
+ * Barre de classement : pour un ROI, barre divergente centrée sur 0 % (bleu au-dessus, rouge en dessous) ;
+ * pour un montant, barre depuis 0. La valeur est écrite à côté, la couleur ne porte que le sens.
+ */
+function RankBar({ v, max, roi }: { v: number | null; max: number; roi: boolean }) {
+  if (v === null) return <span className="roi-rank-bar" />;
+  const w = `${(Math.abs(v) / (max || 1)) * (roi ? 50 : 100)}%`;
+  const style = roi ? (v >= 0 ? { left: '50%', width: w } : { right: '50%', width: w }) : { left: 0, width: w };
   return (
-    <div className="roi-bar" role="img"
-      aria-label={`Gains ${fmtEur(t.gains)} et cartes ${fmtEur(t.value)} pour ${fmtEur(t.invested)} investis`}>
-      <span className="roi-bar-gains" style={{ width: pct(t.gains) }} />
-      <span className="roi-bar-value" style={{ width: pct(t.value) }} />
-      {t.invested > 0 && <i className="roi-bar-even" style={{ left: pct(t.invested) }} />}
-    </div>
+    <span className={`roi-rank-bar ${roi ? 'diverging' : ''}`} aria-hidden="true">
+      <span className={roi ? (v >= 0 ? 'pos' : 'neg') : 'mag'} style={style} />
+    </span>
   );
 }
 
@@ -69,6 +72,7 @@ function Detail({ group, owned, manual, t, onChange }: {
     onChange({ ...manual, sold: manual.sold.map((x, j) => (j === i ? { ...x, ...s } : x)) });
   return (
     <div className="roi-detail">
+      <div className="roi-badges"><Badge label="ROI brut" r={t.roiGross} /><Badge label="ROI avec cartes" r={t.roiWithValue} /></div>
       <dl className="roi-figures">
         <div><dt>Investi</dt><dd>{fmtEur(t.invested)}</dd></div>
         <div><dt>Streaks</dt><dd>{fmtEur(t.streaks)}</dd></div>
@@ -170,27 +174,31 @@ export function RoiTracker() {
     return { ...g, m, t: roiTotals(g.key, owned[g.key], m) };
   });
   const sorted = [...rows].sort((a, b) => (b.t[sort] ?? -Infinity) - (a.t[sort] ?? -Infinity));
+  const max = Math.max(...rows.map((r) => Math.abs(r.t[sort] ?? 0)));
+  const metricText = (t: RoiTotals) => (t[sort] === null ? '—' : isRoi(sort) ? fmtChange(t[sort]!) : fmtEur(t[sort]!));
   const invested = rows.reduce((n, r) => n + r.t.invested, 0);
   const gains = rows.reduce((n, r) => n + r.t.gains, 0);
   const value = rows.reduce((n, r) => n + r.t.value, 0);
   const ratio = (x: number) => (invested > 0 ? x / invested - 1 : null);
-  const total: RoiTotals = {
-    invested, gains, value, streaks: 0, streakCount: 0, essence: 0, resales: 0, roiGross: ratio(gains), roiWithValue: ratio(gains + value),
-  };
+  const total = { roiGross: ratio(gains), roiWithValue: ratio(gains + value) };
 
   return (
     <>
-      <section className="card roi-total" aria-label="Tous championnats">
-        <div className="roi-total-head">
-          <div><span className="tile-label">Investi</span><strong>{fmtEur(invested)}</strong></div>
-          <div><span className="tile-label">Gains</span><strong>{fmtEur(gains)}</strong></div>
-          <div><span className="tile-label">Cartes</span><strong>{fmtEur(value)}</strong></div>
+      <section className="roi-total" aria-label="Tous championnats">
+        <div className="roi-hero">
+          <span className="tile-label">ROI avec la valeur des cartes</span>
+          <strong>{total.roiWithValue === null ? '—' : fmtChange(total.roiWithValue)}</strong>
+          <span className="tile-hint">(gains + cartes − investi) / investi, tous championnats</span>
         </div>
-        <PaybackBar t={total} />
-        <div className="roi-badges"><Badge label="Brut" r={total.roiGross} /><Badge label="Avec cartes" r={total.roiWithValue} /></div>
-        <p className="roi-legend"><i className="roi-bar-gains" /> gains <i className="roi-bar-value" /> valeur des cartes <i className="roi-bar-even" /> investi</p>
+        <div className="roi-kpis">
+          <div className="tile"><div className="tile-label">Investi</div><div className="roi-kpi">{fmtEur(invested)}</div></div>
+          <div className="tile"><div className="tile-label">Gains</div><div className="roi-kpi">{fmtEur(gains)}</div><div className="tile-hint">streaks + reventes</div></div>
+          <div className="tile"><div className="tile-label">Valeur des cartes</div><div className="roi-kpi">{fmtEur(value)}</div></div>
+          <div className="tile"><div className="tile-label">ROI brut</div><div className="roi-kpi">{total.roiGross === null ? '—' : fmtChange(total.roiGross)}</div></div>
+        </div>
       </section>
 
+      <h2 className="roi-rank-title">Classement des championnats</h2>
       <div className="roi-sort chip-row" role="group" aria-label="Trier par">
         {SORTS.map((s) => (
           <button key={s.key} type="button" className="chip" aria-pressed={sort === s.key}
@@ -204,11 +212,11 @@ export function RoiTracker() {
           return (
             <li key={r.key} className={`card roi-item ${isOpen ? 'open' : ''}`}>
               <button type="button" className="roi-item-head" aria-expanded={isOpen} aria-controls={`roi-${r.key}`}
+                aria-label={`${r.name} : ${metricText(r.t)}, ${fmtEur(r.t.invested)} investis, ${fmtEur(r.t.gains)} gagnés`}
                 onClick={() => setOpen(isOpen ? null : r.key)}>
                 <span className="roi-item-name">{r.name}{'detail' in r && <small>{r.detail}</small>}</span>
-                <span className="roi-item-figs">{fmtEur(r.t.invested)} investis · {fmtEur(r.t.gains)} gagnés</span>
-                <PaybackBar t={r.t} />
-                <span className="roi-badges"><Badge label="Brut" r={r.t.roiGross} /><Badge label="Avec cartes" r={r.t.roiWithValue} /></span>
+                <span className="roi-item-value">{metricText(r.t)}</span>
+                <RankBar v={r.t[sort]} max={max} roi={isRoi(sort)} />
                 <span className="roi-chevron" aria-hidden="true">{isOpen ? '▴' : '▾'}</span>
               </button>
               {isOpen && (

@@ -22,13 +22,15 @@ describe('page ROI', () => {
     expect(names()[1]).toMatch(/^Primeira/);
     fireEvent.click(screen.getByRole('button', { name: 'Investi' }));
     expect(names().at(-1)).toMatch(/^Ligue 1/);
+    fireEvent.click(screen.getByRole('button', { name: 'ROI avec cartes' }));
 
     fireEvent.click(within(list).getByRole('button', { name: /^Eredivisie/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Streaks à 410 points : un de plus' })); // 25 € chacun
     fireEvent.click(screen.getByRole('button', { name: 'Streaks à 410 points : un de plus' }));
     const ere = within(list).getByRole('button', { name: /^Eredivisie/ });
-    await waitFor(() => expect(ere).toHaveTextContent('Brut −50 %'));
-    expect(ere).toHaveTextContent('Avec cartes +10 %');
+    await waitFor(() => expect(ere).toHaveTextContent('+10 %')); // ROI avec cartes : (50 + 60 − 100) / 100
+    expect(screen.getByText('ROI brut', { selector: '.roi-badge span' }).parentElement).toHaveTextContent('−50 %');
+    expect(screen.getByText('ROI avec la valeur des cartes').nextSibling).toHaveTextContent('−26 %'); // (50 + 210 − 350) / 350
     await waitFor(() => expect(puts.at(-1)).toEqual({ eredivisie: { streaks: { 410: 2 }, sold: [] } }));
   });
 });

@@ -563,18 +563,29 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .star-status.market { color: var(--warning); }
 
 /* ROI */
-.roi-total { display: grid; gap: 10px; }
-.roi-total-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.roi-total-head strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-.roi-bar { position: relative; display: flex; height: 10px; border-radius: 999px; background: var(--neutral-bg); overflow: visible; }
-.roi-bar > span:first-child { border-radius: 999px 0 0 999px; }
-.roi-bar-gains { display: inline-block; background: var(--good); }
-.roi-bar-value { display: inline-block; background: var(--accent); }
-.roi-bar span { height: 100%; }
-.roi-bar-even { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); }
-.roi-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 0; font-size: 12px; color: var(--muted); }
-.roi-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
-.roi-legend .roi-bar-even { position: static; width: 2px; height: 12px; margin: 0; }
+/* Paire divergente validée (dataviz, CVD) : bleu = au-dessus de 0, rouge = en dessous. */
+:root { --div-pos: #6a85f5; --div-neg: #ef5a70; }
+:root[data-theme='light'] { --div-pos: #2f5bea; --div-neg: #b91c1c; }
+.roi-total { display: grid; gap: 10px; margin-bottom: 8px; }
+.roi-hero { display: grid; gap: 2px; }
+.roi-hero strong { font-size: 52px; font-weight: 700; line-height: 1.05; }
+.roi-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.roi-kpi { font-size: 22px; font-weight: 650; line-height: 1.25; }
+.roi-rank-title { margin: 20px 0 8px; font-size: 18px; }
+.roi-item-head { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name value' 'bar bar';
+  gap: 8px 12px; align-items: baseline; width: 100%; padding: 14px 40px 14px 16px; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.roi-item-name { grid-area: name; font-size: 17px; font-weight: 700; }
+.roi-item-value { grid-area: value; font-size: 20px; font-weight: 700; }
+.roi-rank-bar { grid-area: bar; position: relative; display: block; height: 12px; }
+.roi-rank-bar.diverging::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--axis); }
+.roi-rank-bar > span { position: absolute; top: 0; bottom: 0; }
+.roi-rank-bar .pos { background: var(--div-pos); border-radius: 0 4px 4px 0; }
+.roi-rank-bar .neg { background: var(--div-neg); border-radius: 4px 0 0 4px; }
+.roi-rank-bar .mag { background: var(--div-pos); border-radius: 0 4px 4px 0; }
+@media (min-width: 720px) {
+  .roi-item-head { grid-template-columns: 200px minmax(0, 1fr) 90px; grid-template-areas: 'name bar value'; align-items: center; }
+  .roi-item-value { text-align: right; }
+}
 .roi-badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .roi-badge { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 10px; border-radius: 999px; background: var(--neutral-bg); font-weight: 700; font-variant-numeric: tabular-nums; }
 .roi-badge span { font-weight: 500; font-size: 12px; color: var(--muted); }
@@ -583,11 +594,8 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .roi-sort .chip { font: inherit; cursor: pointer; }
 .roi-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .roi-item { padding: 0; overflow: hidden; }
-.roi-item-head { position: relative; display: grid; gap: 8px; width: 100%; padding: 14px 44px 14px 16px; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .roi-item-head:hover { background: var(--bg); }
-.roi-item-name { font-size: 17px; font-weight: 700; }
 .roi-item-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
-.roi-item-figs { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .roi-chevron { position: absolute; top: 14px; right: 16px; color: var(--muted); }
 .roi-detail { padding: 0 16px 16px; border-top: 1px solid var(--border); }
 .roi-figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 12px 0; }
