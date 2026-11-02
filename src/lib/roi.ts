@@ -122,3 +122,24 @@ export function roiTotals(group: RoiGroup, owned: RoiOwned, m: RoiManual): RoiTo
   const ratio = (x: number) => (invested > 0 ? x / invested - 1 : null);
   return { invested, streakCount, streaks, leaderboard, essence, resales, gains, value: owned.value, roiGross: ratio(gains), roiWithValue: ratio(gains + owned.value) };
 }
+
+/** Bilan d'une semaine, tous championnats (week : lundi de la semaine, AAAA-MM-JJ). */
+export interface RoiWeek { week: string; invested: number; gains: number; value: number }
+
+/** Lundi (UTC) de la semaine d'une date. */
+export function weekOf(d: Date): string {
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7)));
+  return monday.toISOString().slice(0, 10);
+}
+
+/** Historique avec le bilan de cette semaine (remplace celui déjà noté pour la même semaine) ; deux ans au plus. */
+export function upsertWeek(history: RoiWeek[], entry: RoiWeek): RoiWeek[] {
+  return [...history.filter((h) => h.week !== entry.week), entry].sort((a, b) => a.week.localeCompare(b.week)).slice(-104);
+}
+
+/** Streaks d'un palier en euros qu'il faut encore gagner pour couvrir l'investi (hors valeur des cartes) ; vide si c'est fait. */
+export function breakEven(group: RoiGroup, t: RoiTotals): { score: number; eur: number; count: number }[] {
+  const remaining = t.invested - t.gains;
+  if (remaining <= 0) return [];
+  return STREAK_TIERS[group].filter((x) => x.eur).map((x) => ({ score: x.score, eur: x.eur!, count: Math.ceil(remaining / x.eur!) }));
+}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { StarPlayer } from '@/db/queries';
 import { starStatus, type GalleryCard, type StarCard, type StarStatus } from '@/lib/star';
 import { PlayerAvatar } from './Media';
+import { fmtEur } from '@/lib/format';
 import { PSEUDO_KEY } from './SquadBuilder';
 
 export interface StarView { competition: string; name: string; cards: (StarCard & { player: StarPlayer | null })[] }
@@ -61,13 +62,23 @@ export function StarTracker({ collections }: { collections: StarView[] }) {
       </nav>
       {collections.map((c) => {
         const got = okCount(c.cards);
-        const shown = missingOnly ? c.cards.filter((x) => status(x) !== 'ok') : c.cards;
+        const missing = gallery ? c.cards.filter((x) => status(x) !== 'ok') : [];
+        const cost = missing.reduce((t, x) => t + (x.player?.floor ?? 0), 0);
+        const unpriced = missing.filter((x) => x.player?.floor == null).length;
+        // Seulement les manquantes : les moins chères d'abord (sans prix en vente à la fin).
+        const shown = missingOnly ? [...missing].sort((a, b) => (a.player?.floor ?? Infinity) - (b.player?.floor ?? Infinity)) : c.cards;
         return (
           <section key={c.competition} id={`star-${c.competition}`} className="card gw-section star-section" aria-labelledby={`star-t-${c.competition}`}>
             <h2 className="card-title" id={`star-t-${c.competition}`}>{c.name}<span>{gallery ? `${got} / ` : ''}{c.cards.length}</span></h2>
             <div className="star-bar" role="progressbar" aria-label={`Avancement ${c.name}`} aria-valuemin={0} aria-valuemax={c.cards.length} aria-valuenow={got}>
               <span style={{ width: `${(got / c.cards.length) * 100}%` }} />
             </div>
+            {missing.length > 0 && (
+              <p className="star-cost">
+                Coût pour compléter : <strong>{fmtEur(cost)}</strong>
+                {unpriced > 0 && <span className="muted"> + {unpriced} carte{unpriced > 1 ? 's' : ''} sans prix en vente</span>}
+              </p>
+            )}
             {shown.length === 0 ? <p className="empty">Collection complète</p> : (
               <ul className="gw-list" aria-label={c.name}>
                 {shown.map((x) => {
@@ -79,6 +90,15 @@ export function StarTracker({ collections }: { collections: StarView[] }) {
                         <div className="gw-name">{x.player ? <Link href={`/joueurs/${x.player.slug}`}>{x.name}</Link> : x.name}</div>
                         <div className="gw-match muted">{POS_FR[x.pos]}{x.player && ` · ${x.player.team}`}</div>
                       </div>
+                      {s && s !== 'ok' && (
+                        <span className="star-buy">
+                          <strong>{x.player?.floor == null ? '—' : fmtEur(x.player.floor)}</strong>
+                          {(x.player?.slug ?? x.slug) && (
+                            <a href={`https://sorare.com/football/players/${x.player?.slug ?? x.slug}`} target="_blank" rel="noopener noreferrer"
+                              aria-label={`Acheter ${x.name} sur Sorare (nouvel onglet)`}>Acheter ↗</a>
+                          )}
+                        </span>
+                      )}
                       {s && <span className={`star-status ${s}`}
                         title={s === 'market' ? 'Tu as la carte, mais une carte achetée à un autre manager ne valide pas la collection (seules comptent enchère, achat immédiat et craft)' : undefined}>{STATUS_FR[s]}</span>}
                     </li>

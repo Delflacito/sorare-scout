@@ -1,4 +1,4 @@
-import { parseRoi, roiGroupOf, roiTotals } from '@/lib/roi';
+import { breakEven, parseRoi, roiGroupOf, roiTotals, upsertWeek, weekOf } from '@/lib/roi';
 
 describe('ROI', () => {
   it('championnats regroupés, Contender compris', () => {
@@ -37,5 +37,22 @@ describe('ROI', () => {
     const lb = { eredivisie: { ...ok.eredivisie, leaderboard: { eur: 12.5, essence: 300 } } };
     expect(parseRoi(lb)).toEqual(lb);
     expect(parseRoi({ eredivisie: { ...ok.eredivisie, leaderboard: { eur: -1, essence: 0 } } })).toBeNull();
+  });
+
+  it('historique : une entrée par semaine (lundi), remplacée dans la même semaine', () => {
+    expect(weekOf(new Date('2026-11-05T10:00:00Z'))).toBe('2026-11-02'); // jeudi → lundi
+    expect(weekOf(new Date('2026-11-08T23:00:00Z'))).toBe('2026-11-02'); // dimanche
+    const h = upsertWeek([{ week: '2026-10-26', invested: 10, gains: 1, value: 9 }], { week: '2026-11-02', invested: 10, gains: 2, value: 9 });
+    expect(upsertWeek(h, { week: '2026-11-02', invested: 12, gains: 3, value: 9 }).map((w) => [w.week, w.gains])).toEqual([['2026-10-26', 1], ['2026-11-02', 3]]);
+  });
+
+  it('seuil de rentabilité : streaks en euros restant à gagner pour couvrir l’investi', () => {
+    const owned = { cards: 1, invested: 120, unknownPurchase: 0, value: 0, unpriced: 0 };
+    const t = roiTotals('eredivisie', owned, { streaks: { 410: 1 }, sold: [] }); // reste 95 €
+    expect(breakEven('eredivisie', t)).toEqual([
+      { score: 360, eur: 3, count: 32 }, { score: 380, eur: 5, count: 19 }, { score: 410, eur: 25, count: 4 },
+      { score: 440, eur: 100, count: 1 }, { score: 460, eur: 1000, count: 1 },
+    ]);
+    expect(breakEven('eredivisie', roiTotals('eredivisie', owned, { streaks: { 440: 2 }, sold: [] }))).toEqual([]);
   });
 });

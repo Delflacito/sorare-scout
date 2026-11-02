@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getQueries } from '@/db/queries';
 import { seasonStart } from '@/ingest/leagues';
-import { ROI_GROUPS, parseRoi, roiGroupOf, type RoiGroup, type RoiOwned } from '@/lib/roi';
+import { ROI_GROUPS, emptyManual, parseRoi, roiGroupOf, roiTotals, upsertWeek, weekOf, type RoiGroup, type RoiOwned } from '@/lib/roi';
 import { PSEUDO } from '@/lib/squad';
 import { createSorareClient } from '@/sources/sorare';
 
@@ -31,9 +31,10 @@ export async function GET(req: NextRequest) {
   const season = new Date(seasonStart()).getUTCFullYear();
   const mine = cards.flatMap((c) => { const g = c.seasonYear === season ? roiGroupOf(c.leagueSlug) : null; return g ? [{ ...c, group: g }] : []; });
   const queries = getQueries();
-  const [market, manual] = await Promise.all([
+  const [market, manual, history] = await Promise.all([
     mine.length ? queries.getMarketPlayers({ slugs: [...new Set(mine.map((c) => c.playerSlug))] }) : [],
     queries.getRoi(pseudo),
+    queries.getRoiHistory(pseudo),
   ]);
   const bySlug = new Map(market.map((p) => [p.slug, p]));
   const owned = Object.fromEntries(ROI_GROUPS.map((g) => [g.key, { cards: 0, invested: 0, unknownPurchase: 0, value: 0, unpriced: 0 }])) as Record<RoiGroup, RoiOwned>;
@@ -47,7 +48,13 @@ export async function GET(req: NextRequest) {
     if (value === null) o.unpriced += 1; else o.value += value;
   }
   // Saisies d'un ancien format (ou abîmées) ignorées plutôt que de casser la page.
-  return NextResponse.json({ owned, manual: (manual && parseRoi(manual)) ?? {} });
+  const data = (manual && parseRoi(manual)) ?? {};
+  // Bilan de la semaine noté à chaque visite : l'historique montre la progression semaine après semaine.
+  const totals = ROI_GROUPS.map((g) => roiTotals(g.key, owned[g.key], data[g.key] ?? emptyManual()));
+  const sum = (f: (t: (typeof totals)[number]) => number) => Math.round(totals.reduce((n, t) => n + f(t), 0) * 100) / 100;
+  const next = upsertWeek(history, { week: weekOf(new Date()), invested: sum((t) => t.invested), gains: sum((t) => t.gains), value: sum((t) => t.value) });
+  await queries.saveRoiHistory(pseudo, next);
+  return NextResponse.json({ owned, manual: data, history: next });
 }
 
 /** Enregistre les saisies (streaks par palier, cartes revendues) de ce pseudo. */

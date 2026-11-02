@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { fmtChange, fmtEur } from '@/lib/format';
 import {
-  ROI_GROUPS, STREAK_TIERS, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned, type RoiTotals,
+  ROI_GROUPS, STREAK_TIERS, breakEven, emptyManual, roiTotals, type RoiData, type RoiGroup, type RoiManual, type RoiOwned, type RoiTotals, type RoiWeek,
 } from '@/lib/roi';
 import { PSEUDO_KEY } from './SquadBuilder';
 
@@ -86,6 +86,45 @@ function AddToTotal({ label, total, format, integer, onChange }: {
   );
 }
 
+/** Seuil de rentabilité : combien de streaks d'un palier il faut encore pour couvrir l'investi (sans compter la valeur des cartes). */
+function BreakEven({ group, t }: { group: RoiGroup; t: RoiTotals }) {
+  const need = breakEven(group, t);
+  if (!t.invested) return null;
+  if (!need.length) return <p className="roi-breakeven ok">✓ Investi remboursé par les gains : tout le reste est du bénéfice.</p>;
+  return (
+    <div className="roi-breakeven">
+      <p>Pour rentrer dans tes frais, il te reste <strong>{fmtEur(t.invested - t.gains)}</strong> à gagner, soit au choix :</p>
+      <ul>{need.map((x) => <li key={x.score}><strong>{x.count}</strong> streak{x.count > 1 ? 's' : ''} à {x.score} pts <span className="muted">({fmtEur(x.eur)})</span></li>)}</ul>
+    </div>
+  );
+}
+
+/** Une ligne par semaine : investi, gains, valeur des cartes et ROI, pour suivre la progression. */
+function History({ weeks }: { weeks: RoiWeek[] }) {
+  if (!weeks.length) return null;
+  const ratio = (w: RoiWeek, x: number) => (w.invested > 0 ? fmtChange(x / w.invested - 1) : '—');
+  const fmtWeek = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return (
+    <section className="card roi-history" aria-labelledby="roi-history">
+      <h2 className="card-title" id="roi-history">ROI semaine par semaine<span>noté à chaque visite</span></h2>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Semaine du</th><th scope="col" className="num">Investi</th><th scope="col" className="num">Gains</th>
+            <th scope="col" className="num">Cartes</th><th scope="col" className="num">ROI brut</th><th scope="col" className="num">Avec cartes</th></tr></thead>
+          <tbody>
+            {[...weeks].reverse().map((w) => (
+              <tr key={w.week}>
+                <td>{fmtWeek(w.week)}</td><td className="num">{fmtEur(w.invested)}</td><td className="num">{fmtEur(w.gains)}</td>
+                <td className="num">{fmtEur(w.value)}</td><td className="num">{ratio(w, w.gains)}</td><td className="num">{ratio(w, w.gains + w.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function Detail({ group, owned, manual, t, onChange }: {
   group: RoiGroup; owned: RoiOwned; manual: RoiManual; t: RoiTotals; onChange: (m: RoiManual) => void;
 }) {
@@ -105,6 +144,7 @@ function Detail({ group, owned, manual, t, onChange }: {
         <div><dt>Cartes aujourd’hui</dt><dd>{fmtEur(t.value)}</dd></div>
         <div><dt>Essence</dt><dd>{t.essence.toLocaleString('fr-FR')}</dd></div>
       </dl>
+      <BreakEven group={group} t={t} />
       {(owned.unknownPurchase > 0 || owned.unpriced > 0) && (
         <p className="note">
           {owned.cards} cartes de la saison en galerie.
@@ -171,6 +211,7 @@ function Detail({ group, owned, manual, t, onChange }: {
 export function RoiTracker() {
   const [pseudo, setPseudo] = useState<string | null>(null);
   const [owned, setOwned] = useState<Record<RoiGroup, RoiOwned> | null>(null);
+  const [history, setHistory] = useState<RoiWeek[]>([]);
   const [manual, setManual] = useState<RoiData>({});
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -188,6 +229,7 @@ export function RoiTracker() {
       if (!r.ok) throw new Error(b.error ?? 'Galerie indisponible');
       setOwned(b.owned);
       setManual(b.manual);
+      setHistory(b.history ?? []);
     }).catch((e: Error) => setError(e.message));
   }, []);
 
@@ -267,6 +309,7 @@ export function RoiTracker() {
           );
         })}
       </ul>
+      <History weeks={history} />
       <p className="note" aria-live="polite">
         Galerie de {pseudo} · cartes de la saison seulement (pas les Classic), rangées selon le club actuel du joueur · l’essence ne compte pas dans le ROI.
         {saved === 'saving' ? ' Enregistrement…' : saved === 'saved' ? ' Saisies enregistrées.' : saved === 'error' ? ' Échec de l’enregistrement, réessaie.' : ''}

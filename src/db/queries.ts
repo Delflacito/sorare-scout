@@ -1,7 +1,7 @@
 import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
-import type { RoiData } from '@/lib/roi';
+import type { RoiData, RoiWeek } from '@/lib/roi';
 import type { OwnedStatus } from '@/lib/beforeGw';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
@@ -206,7 +206,10 @@ const toConceded = (r: postgres.Row): ConcededView => ({
   observations: r.observations, lowSample: r.low_sample,
 });
 
-export interface StarPlayer { slug: string; name: string; position: GenericPosition | null; pictureUrl: string | null; team: string; competition: string }
+/** floor : carte Limited de la saison la moins chère en vente (null s'il n'y en a pas). */
+export interface StarPlayer {
+  slug: string; name: string; position: GenericPosition | null; pictureUrl: string | null; team: string; competition: string; floor: number | null;
+}
 
 export function createQueries(sql: postgres.Sql) {
   const SORT_SQL: Record<Sort, postgres.PendingQuery<postgres.Row[]>> = {
@@ -752,10 +755,12 @@ export function createQueries(sql: postgres.Sql) {
     /** Joueurs suivis des championnats donnés (identité, club), pour retrouver les cartes des collections Star. */
     async listPlayersIn(competitionSlugs: string[]): Promise<StarPlayer[]> {
       const rows = await sql`
-        select p.sorare_slug, p.name, p.position, p.picture_url, t.name as team, c.slug as competition
+        select p.sorare_slug, p.name, p.position, p.picture_url, t.name as team, c.slug as competition, p.floor_in_season
         from players p join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
         where c.slug = any(${competitionSlugs})`;
-      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, position: r.position, pictureUrl: r.picture_url, team: r.team, competition: r.competition }));
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, position: r.position, pictureUrl: r.picture_url, team: r.team, competition: r.competition, floor: r.floor_in_season,
+      }));
     },
 
     /** Cartes possédées avant la Game Week : statut, titularisations, et si leur club joue l'un des matchs donnés. */
@@ -780,6 +785,16 @@ export function createQueries(sql: postgres.Sql) {
     async getRoi(pseudo: string): Promise<RoiData | null> {
       const [r] = await sql`select data from roi where pseudo = ${pseudo}`;
       return r ? (r.data as RoiData) : null;
+    },
+
+    async getRoiHistory(pseudo: string): Promise<RoiWeek[]> {
+      const [r] = await sql`select history from roi where pseudo = ${pseudo}`;
+      return r ? (r.history as RoiWeek[]) : [];
+    },
+
+    async saveRoiHistory(pseudo: string, history: RoiWeek[]): Promise<void> {
+      await sql`insert into roi (pseudo, history) values (${pseudo}, ${sql.json(history as unknown as postgres.JSONValue)})
+        on conflict (pseudo) do update set history = excluded.history`;
     },
 
     async saveRoi(pseudo: string, data: RoiData): Promise<void> {

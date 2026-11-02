@@ -689,3 +689,13 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .matrix.schedule td.cell { text-align: left; white-space: nowrap; }
 .sched-opp { display: block; font-weight: 600; }
 .regularity-value { font-size: 22px; font-weight: 700; margin: 4px 0; }
+.star-cost { margin: -4px 0 10px; font-size: 14px; }
+.star-buy { display: grid; justify-items: end; gap: 2px; font-size: 13px; font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
+.star-buy a { font-weight: 600; }
+.gw-row.star-row { grid-template-columns: 40px minmax(0, 1fr) auto auto; }
+@media (max-width: 560px) { .gw-row.star-row { grid-template-columns: 36px minmax(0, 1fr) auto auto; } }
+.roi-breakeven { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 14px; }
+.roi-breakeven p { margin: 0 0 4px; }
+.roi-breakeven ul { margin: 0; padding-left: 18px; }
+.roi-breakeven.ok { color: var(--good); font-weight: 600; }
+.roi-history { margin-top: 16px; }
