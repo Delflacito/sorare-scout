@@ -14,9 +14,12 @@ describe('ROI', () => {
     // Eredivisie : 2 × 320 pts (500 essence), 3 × 360 pts (3 €), 1 × 410 pts (25 €)
     const t = roiTotals('eredivisie', owned, { streaks: { 320: 2, 360: 3, 410: 1 }, sold: [{ name: 'X', bought: 25, sold: 40 }] });
     expect(t).toEqual({
-      invested: 125, streakCount: 6, streaks: 34, essence: 1000, resales: 40, gains: 74, value: 80,
+      invested: 125, streakCount: 6, streaks: 34, leaderboard: 0, essence: 1000, resales: 40, gains: 74, value: 80,
       roiGross: 74 / 125 - 1, roiWithValue: 154 / 125 - 1,
     });
+    // Leaderboard : ses euros s'ajoutent aux gains, son essence à celle des streaks
+    expect(roiTotals('eredivisie', owned, { streaks: { 320: 1 }, leaderboard: { eur: 15, essence: 200 }, sold: [] }))
+      .toMatchObject({ leaderboard: 15, gains: 15, essence: 700 });
     // Contender : le palier 360 rapporte de l'essence, pas d'euros
     expect(roiTotals('contender', owned, { streaks: { 360: 2 }, sold: [] })).toMatchObject({ streaks: 0, essence: 2000 });
     expect(roiTotals('eredivisie', { ...owned, invested: 0 }, { streaks: {}, sold: [] }).roiGross).toBeNull();
@@ -31,5 +34,8 @@ describe('ROI', () => {
     expect(parseRoi({ eredivisie: { streaks: [], essence: 0, sold: [] } })).toBeNull(); // ancien format
     expect(parseRoi({ eredivisie: { ...ok.eredivisie, sold: [{ name: 'X', bought: '3', sold: 1 }] } })).toBeNull();
     expect(parseRoi([])).toBeNull();
+    const lb = { eredivisie: { ...ok.eredivisie, leaderboard: { eur: 12.5, essence: 300 } } };
+    expect(parseRoi(lb)).toEqual(lb);
+    expect(parseRoi({ eredivisie: { ...ok.eredivisie, leaderboard: { eur: -1, essence: 0 } } })).toBeNull();
   });
 });

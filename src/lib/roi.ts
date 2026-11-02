@@ -40,9 +40,10 @@ export const STREAK_TIERS: Record<RoiGroup, StreakTier[]> = {
   ],
 };
 
-/** Saisies du manager pour un championnat : nombre de streaks par palier (clé = score), cartes déjà revendues. */
+/** Saisies du manager pour un championnat : streaks par palier (clé = score), gains de leaderboard, cartes revendues. */
 export interface RoiManual {
   streaks: Record<string, number>;
+  leaderboard?: { eur: number; essence: number };
   sold: { name: string; bought: number; sold: number }[];
 }
 export type RoiData = Partial<Record<RoiGroup, RoiManual>>;
@@ -63,8 +64,11 @@ export function parseRoi(x: unknown): RoiData | null {
     const streaks = m.streaks as Record<string, unknown>;
     if (!Object.entries(streaks).every(([score, n]) => tiers.includes(score) && num(n) && Number.isInteger(n))) return null;
     if (!m.sold.every((s) => s && text(s.name) && num(s.bought) && num(s.sold))) return null;
+    const lb = m.leaderboard as Record<string, unknown> | undefined;
+    if (lb !== undefined && (!lb || typeof lb !== 'object' || !num(lb.eur) || !num(lb.essence))) return null;
     out[k as RoiGroup] = {
       streaks: streaks as Record<string, number>,
+      ...(lb && { leaderboard: { eur: lb.eur as number, essence: lb.essence as number } }),
       sold: m.sold.map((s) => ({ name: s.name, bought: s.bought, sold: s.sold })),
     };
   }
@@ -75,8 +79,8 @@ export function parseRoi(x: unknown): RoiData | null {
 export interface RoiOwned { cards: number; invested: number; unknownPurchase: number; value: number; unpriced: number }
 
 export interface RoiTotals {
-  invested: number; streakCount: number; streaks: number; essence: number; resales: number; gains: number; value: number;
-  /** (gains − investi) / investi : ce que streaks et reventes ont déjà remboursé. */
+  invested: number; streakCount: number; streaks: number; leaderboard: number; essence: number; resales: number; gains: number; value: number;
+  /** (gains − investi) / investi : ce que streaks, leaderboard et reventes ont déjà remboursé. */
   roiGross: number | null;
   /** (gains + valeur actuelle des cartes − investi) / investi. */
   roiWithValue: number | null;
@@ -88,9 +92,10 @@ export function roiTotals(group: RoiGroup, owned: RoiOwned, m: RoiManual): RoiTo
   const tiers = STREAK_TIERS[group];
   const streakCount = tiers.reduce((n, t) => n + count(t), 0);
   const streaks = tiers.reduce((n, t) => n + count(t) * (t.eur ?? 0), 0);
-  const essence = tiers.reduce((n, t) => n + count(t) * (t.essence ?? 0), 0);
+  const leaderboard = m.leaderboard?.eur ?? 0;
+  const essence = tiers.reduce((n, t) => n + count(t) * (t.essence ?? 0), 0) + (m.leaderboard?.essence ?? 0);
   const resales = m.sold.reduce((t, s) => t + s.sold, 0);
-  const gains = streaks + resales;
+  const gains = streaks + leaderboard + resales;
   const ratio = (x: number) => (invested > 0 ? x / invested - 1 : null);
-  return { invested, streakCount, streaks, essence, resales, gains, value: owned.value, roiGross: ratio(gains), roiWithValue: ratio(gains + owned.value) };
+  return { invested, streakCount, streaks, leaderboard, essence, resales, gains, value: owned.value, roiGross: ratio(gains), roiWithValue: ratio(gains + owned.value) };
 }

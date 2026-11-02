@@ -54,13 +54,13 @@ function Stepper({ value, onChange, label }: { value: number; onChange: (n: numb
   );
 }
 
-/** Champ en euros : la saisie reste libre (virgule, champ vide) et n'est convertie qu'en quittant le champ. */
-function EurInput({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+/** Champ numérique (euros par défaut) : la saisie reste libre (virgule, champ vide) et n'est convertie qu'en quittant le champ. */
+function EurInput({ value, onChange, label, unit = '€' }: { value: number; onChange: (n: number) => void; label: string; unit?: string }) {
   const [text, setText] = useState(value ? String(value) : '');
   return (
     <span className="roi-num">
       <input inputMode="decimal" aria-label={label} value={text} placeholder="0"
-        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />€
+        onChange={(e) => setText(e.target.value)} onBlur={() => onChange(toNum(text))} />{unit}
     </span>
   );
 }
@@ -76,6 +76,7 @@ function Detail({ group, owned, manual, t, onChange }: {
       <dl className="roi-figures">
         <div><dt>Investi</dt><dd>{fmtEur(t.invested)}</dd></div>
         <div><dt>Streaks</dt><dd>{fmtEur(t.streaks)}</dd></div>
+        <div><dt>Leaderboard</dt><dd>{fmtEur(t.leaderboard)}</dd></div>
         <div><dt>Reventes</dt><dd>{fmtEur(t.resales)}</dd></div>
         <div><dt>Cartes aujourd’hui</dt><dd>{fmtEur(t.value)}</dd></div>
         <div><dt>Essence</dt><dd>{t.essence.toLocaleString('fr-FR')}</dd></div>
@@ -105,6 +106,14 @@ function Detail({ group, owned, manual, t, onChange }: {
         })}
       </ul>
 
+      <h3 className="roi-sub">Leaderboard</h3>
+      <div className="roi-lb">
+        <label className="roi-field">Gagné <EurInput label="Euros gagnés au leaderboard" value={manual.leaderboard?.eur ?? 0}
+          onChange={(n) => onChange({ ...manual, leaderboard: { essence: manual.leaderboard?.essence ?? 0, eur: n } })} /></label>
+        <label className="roi-field">Essence <EurInput label="Essence gagnée au leaderboard" unit="" value={manual.leaderboard?.essence ?? 0}
+          onChange={(n) => onChange({ ...manual, leaderboard: { eur: manual.leaderboard?.eur ?? 0, essence: Math.round(n) } })} /></label>
+      </div>
+
       <h3 className="roi-sub">Cartes revendues <span>{manual.sold.length}</span></h3>
       {manual.sold.length > 0 && (
         <ul className="roi-rows" aria-label="Cartes revendues">
@@ -128,7 +137,7 @@ function Detail({ group, owned, manual, t, onChange }: {
   );
 }
 
-/** ROI par championnat : galerie Sorare (investi, valeur) + saisies enregistrées sur le serveur (streaks, reventes). */
+/** ROI par championnat : galerie Sorare (investi, valeur) + saisies enregistrées sur le serveur (streaks, leaderboard, reventes). */
 export function RoiTracker() {
   const [pseudo, setPseudo] = useState<string | null>(null);
   const [owned, setOwned] = useState<Record<RoiGroup, RoiOwned> | null>(null);
@@ -192,7 +201,7 @@ export function RoiTracker() {
         </div>
         <div className="roi-kpis">
           <div className="tile"><div className="tile-label">Investi</div><div className="roi-kpi">{fmtEur(invested)}</div></div>
-          <div className="tile"><div className="tile-label">Gains</div><div className="roi-kpi">{fmtEur(gains)}</div><div className="tile-hint">streaks + reventes</div></div>
+          <div className="tile"><div className="tile-label">Gains</div><div className="roi-kpi">{fmtEur(gains)}</div><div className="tile-hint">streaks + leaderboard + reventes</div></div>
           <div className="tile"><div className="tile-label">Valeur des cartes</div><div className="roi-kpi">{fmtEur(value)}</div></div>
           <div className="tile"><div className="tile-label">ROI brut</div><div className="roi-kpi">{total.roiGross === null ? '—' : fmtChange(total.roiGross)}</div></div>
         </div>

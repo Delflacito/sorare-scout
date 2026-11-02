@@ -623,3 +623,4 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .roi-num input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
 .roi-add { min-height: 44px; padding: 0 14px; border: 1px dashed var(--control-border); border-radius: 10px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .roi-add:hover { background: var(--neutral-bg); }
+.roi-lb { display: flex; flex-wrap: wrap; gap: 8px 16px; }
