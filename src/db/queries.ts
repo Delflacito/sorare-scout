@@ -2,6 +2,7 @@ import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
 import type { RoiData } from '@/lib/roi';
+import type { OwnedStatus } from '@/lib/beforeGw';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
 
@@ -61,7 +62,10 @@ export interface RoundMatchup {
 /** projected : meilleurs scores potentiels ; boost : plus gros gains par rapport au niveau habituel. */
 export type GameWeekSort = 'projected' | 'boost';
 /** minStartRate : part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
-export interface GameWeekFilters { competition?: string; position?: GenericPosition; minStartRate: number; limit: number; sort?: GameWeekSort }
+/** slugs : seulement ces joueurs (les cartes possédées). */
+export interface GameWeekFilters {
+  competition?: string; position?: GenericPosition; minStartRate: number; limit: number; sort?: GameWeekSort; slugs?: string[];
+}
 
 /** Joueur indisponible : blessé ou suspendu. */
 const UNAVAILABLE = 'p.injury_kind is not null or p.injury_end is not null or p.suspension_reason is not null or p.suspension_end is not null';
@@ -301,6 +305,7 @@ export function createQueries(sql: postgres.Sql) {
             and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
             ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
             ${f.position ? sql`and g.position = ${f.position}` : sql``}
+            ${f.slugs ? sql`and p.sorare_slug = any(${f.slugs})` : sql``}
         ) x where rank <= ${f.limit}
         order by array_position(array['Goalkeeper','Defender','Midfielder','Forward'], position), rank`;
       return rows.map((r) => ({
@@ -722,6 +727,24 @@ export function createQueries(sql: postgres.Sql) {
         from players p join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id
         where c.slug = any(${competitionSlugs})`;
       return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, position: r.position, pictureUrl: r.picture_url, team: r.team, competition: r.competition }));
+    },
+
+    /** Cartes possédées avant la Game Week : statut, titularisations, et si leur club joue l'un des matchs donnés. */
+    async getOwnedStatus(slugs: string[], fixtureIds: number[]): Promise<OwnedStatus[]> {
+      if (!slugs.length) return [];
+      const rows = await sql`
+        select p.sorare_slug, p.name, t.name as team, c.slug as competition, c.name as competition_name, p.playing_status,
+          coalesce(p.injury_kind, case when p.injury_end is not null then 'blessure' end) as injury,
+          coalesce(p.suspension_reason, case when p.suspension_end is not null then 'suspension' end) as suspension,
+          s.start_rate5,
+          exists (select 1 from fixtures f where f.id = any(${fixtureIds}) and t.id in (f.home_team_id, f.away_team_id)) as plays
+        from players p join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id and c.is_league
+        left join player_summary s on s.player_id = p.id
+        where p.sorare_slug = any(${slugs})`;
+      return rows.map((r) => ({
+        slug: r.sorare_slug, name: r.name, team: r.team, competition: r.competition, competitionName: r.competition_name,
+        playingStatus: r.playing_status, injury: r.injury, suspension: r.suspension, startRate: r.start_rate5, playsThisGw: r.plays,
+      }));
     },
 
     /** Saisies de la page ROI pour un pseudo Sorare ; null s'il n'y en a pas. */

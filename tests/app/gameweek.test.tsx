@@ -7,7 +7,10 @@ const getGameWeekPlayers = vi.fn<(ids: number[], f: unknown) => Promise<GameWeek
 const getRoundMatchups = vi.fn<(ids: number[]) => Promise<RoundMatchup[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
-  getQueries: () => ({ getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }] }),
+  getQueries: () => ({
+    getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }],
+    getSquad: async () => [{ slug: 'gk', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 1 }, { slug: 'x', competition: 'ligue-1-fr', status: 'target', purchasePrice: 1 }],
+  }),
 }));
 
 const { default: GameWeek } = await import('@/app/game-week/page');
@@ -59,6 +62,20 @@ describe('/game-week', () => {
     const team = screen.getByRole('region', { name: 'Équipe type de la journée' });
     expect(within(team).getAllByRole('link').map((l) => l.textContent)).toEqual(['gk', 'd2', 'm1', 'f1', 'd1']);
     expect(within(team).getByText('315')).toBeInTheDocument();
+  });
+
+  it('mes cartes et palier visé : équipe composée avec les cartes possédées, marge ou manque face au palier', async () => {
+    getGameWeekPlayers.mockResolvedValue([
+      player('gk', 'Goalkeeper', 50), player('d1', 'Defender', 60), player('m1', 'Midfielder', 55), player('f1', 'Forward', 80), player('f2', 'Forward', 70),
+    ]);
+    render(await GameWeek(params({ competition: 'ligue-1-fr', cartes: 'delflacito', palier: '360' })));
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: 'ligue-1-fr', minStartRate: 0.6, limit: 50, sort: 'projected', slugs: ['gk'] });
+    expect(screen.getByRole('region', { name: 'Ta meilleure équipe' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Palier 360 pts (5 €) : il manque 45 pts'); // 315 points potentiels
+    const paliers = screen.getByRole('navigation', { name: 'Palier de streak visé' });
+    expect(within(paliers).getByRole('link', { name: '360 · 5 €' })).toHaveAttribute('aria-current', 'page');
+    expect(within(paliers).getByRole('link', { name: '320 · 500 essence' }))
+      .toHaveAttribute('href', '/game-week?competition=ligue-1-fr&palier=320&cartes=delflacito');
   });
 
   it('championnats et seuil de titularisation en pastilles', async () => {

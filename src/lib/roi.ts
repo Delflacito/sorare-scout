@@ -40,6 +40,29 @@ export const STREAK_TIERS: Record<RoiGroup, StreakTier[]> = {
   ],
 };
 
+const BIG: StreakTier[] = [ // LaLiga et Bundesliga
+  { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 420, eur: 50 }, { score: 440, eur: 300 },
+  { score: 470, eur: 1500 }, { score: 550, eur: 8000 },
+];
+const LEAGUE_TIERS: Record<string, StreakTier[]> = {
+  'premier-league-gb-eng': [
+    { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 400, eur: 50 }, { score: 430, eur: 400 },
+    { score: 450, eur: 2000 }, { score: 550, eur: 10000 },
+  ],
+  'laliga-es': BIG,
+  'bundesliga-de': BIG,
+  // Écosse et Championship : même barème que Contender.
+  'premiership-gb-sct': STREAK_TIERS.contender,
+  'football-league-championship': STREAK_TIERS.contender,
+};
+
+/** Barème des streaks d'un championnat (slug Sorare) ; null s'il n'est pas connu (MLS…). */
+export function streakTiersOf(competitionSlug: string | undefined): StreakTier[] | null {
+  if (!competitionSlug) return null;
+  const g = roiGroupOf(competitionSlug);
+  return g ? STREAK_TIERS[g] : LEAGUE_TIERS[competitionSlug] ?? null;
+}
+
 /** Saisies du manager pour un championnat : streaks par palier (clé = score), gains de leaderboard, cartes revendues. */
 export interface RoiManual {
   streaks: Record<string, number>;

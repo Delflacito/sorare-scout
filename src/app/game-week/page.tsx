@@ -7,6 +7,9 @@ import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
 import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
+import { MyCardsToggle } from '@/components/MyCards';
+import { streakTiersOf, type StreakTier } from '@/lib/roi';
+import { PSEUDO } from '@/lib/squad';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,16 +96,30 @@ function lineup(all: GameWeekPlayer[], sort: GameWeekSort): { slot: string; p: G
   return team;
 }
 
-function Lineup({ players, sort }: { players: GameWeekPlayer[]; sort: GameWeekSort }) {
+const reward = (t: StreakTier) => (t.eur ? `${t.eur} €` : `${t.essence} essence`);
+
+/** Le total potentiel de l'équipe face au palier de streak visé : atteint (avec la marge) ou ce qu'il manque. */
+function TargetLine({ total, tier, full }: { total: number; tier: StreakTier; full: boolean }) {
+  const gap = Math.round(total - tier.score);
+  return (
+    <p className={`gw-target ${gap >= 0 ? 'ok' : 'ko'}`} role="status">
+      Palier {tier.score} pts ({reward(tier)}) : {gap >= 0 ? <><strong>atteint</strong>, {gap} pts de marge</> : <><strong>il manque {-gap} pts</strong></>}
+      {!full && ' · équipe incomplète'}
+    </p>
+  );
+}
+
+function Lineup({ players, sort, mine, tier }: { players: GameWeekPlayer[]; sort: GameWeekSort; mine: boolean; tier: StreakTier | null }) {
   const team = lineup(players, sort);
   if (!team.length) return null;
   const total = team.reduce((t, x) => t + x.p.projected, 0);
   return (
     <section className="gw-lineup" aria-labelledby="gw-lineup-title">
       <div className="gw-lineup-head">
-        <h2 id="gw-lineup-title">{sort === 'boost' ? 'Le 5 des plus gros boosts' : 'Équipe type de la journée'}</h2>
+        <h2 id="gw-lineup-title">{mine ? 'Ta meilleure équipe' : sort === 'boost' ? 'Le 5 des plus gros boosts' : 'Équipe type de la journée'}</h2>
         <span className="gw-total">Total potentiel <strong>{Math.round(total)}</strong></span>
       </div>
+      {tier && <TargetLine total={total} tier={tier} full={team.length === 5} />}
       <ul className="gw-lineup-grid">
         {team.map(({ slot, p }) => (
           <li key={p.slug} className="gw-slot">
@@ -124,16 +141,26 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   // Par défaut : titulaires au moins 3 fois sur les 5 derniers matchs.
   const titu = startRateParam(one(p.titu), 60);
   const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
-  const href = (o: { competition?: string; titu?: number; vue?: GameWeekSort }) => {
-    const next = { competition, titu, vue: sort, ...o };
+  const cartesRaw = one(p.cartes)?.toLowerCase();
+  const cartes = cartesRaw && PSEUDO.test(cartesRaw) ? cartesRaw : undefined;
+  const tiers = streakTiersOf(competition);
+  const tier = tiers?.find((t) => t.score === Number(one(p.palier))) ?? null;
+  const href = (o: { competition?: string; titu?: number; vue?: GameWeekSort; cartes?: string | null; palier?: number | null }) => {
+    const next = { competition, titu, vue: sort, cartes, palier: tier?.score, ...o };
     const qs = new URLSearchParams(Object.entries({
       competition: next.competition, titu: next.titu === 60 ? undefined : String(next.titu), vue: next.vue === 'boost' ? 'boost' : undefined,
+      palier: next.palier && next.competition === competition ? String(next.palier) : undefined, cartes: next.cartes ?? undefined,
     }).filter(([, v]) => v) as [string, string][]);
     return `/game-week${qs.size ? `?${qs}` : ''}`;
   };
   const queries = getQueries();
-  const [fixtures, competitions] = await Promise.all([queries.getGameWeekFixtures(competition), queries.listCompetitions()]);
-  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id), { competition, minStartRate: titu / 100, limit: PER_POSITION, sort });
+  const [fixtures, competitions, squad] = await Promise.all([
+    queries.getGameWeekFixtures(competition), queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null,
+  ]);
+  // Mes cartes : seulement les joueurs possédés (toutes leurs lignes, pour composer l'équipe avec ce qu'on a).
+  const owned = cartes ? [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))] : undefined;
+  const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id),
+    { competition, minStartRate: titu / 100, limit: owned ? 50 : PER_POSITION, sort, slugs: owned });
 
   return (
     <main className="gw">
@@ -153,6 +180,7 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
           ))}
         </nav>
         <div className="gw-controls">
+          <MyCardsToggle href={href({ cartes: null })} active={!!cartes} />
           <nav className="segmented" aria-label="Classement">
             <Link href={href({ vue: 'projected' })} aria-current={sort === 'projected' ? 'page' : undefined}>Meilleurs scores</Link>
             <Link href={href({ vue: 'boost' })} aria-current={sort === 'boost' ? 'page' : undefined}>Plus gros boosts</Link>
@@ -164,6 +192,15 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
             <Link key={n} href={href({ titu: n })} aria-current={titu === n ? 'page' : undefined}>{startRateLabel(n)}</Link>
           ))}
         </nav>
+        {tiers ? (
+          <nav className="chip-row sort-row" aria-label="Palier de streak visé">
+            <span className="muted">Palier visé</span>
+            <Link href={href({ palier: null })} aria-current={tier ? undefined : 'page'}>Aucun</Link>
+            {tiers.map((t) => (
+              <Link key={t.score} href={href({ palier: t.score })} aria-current={tier?.score === t.score ? 'page' : undefined}>{t.score} · {reward(t)}</Link>
+            ))}
+          </nav>
+        ) : <p className="muted small">Choisis un championnat pour viser un palier de streak.</p>}
         <details className="gw-help">
           <summary>Comment lire ce classement</summary>
           {sort === 'boost'
@@ -176,7 +213,8 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
 
       {fixtures.length > 0 && (
         <>
-          <Lineup players={players} sort={sort} />
+          {cartes && players.length === 0 && <p className="empty">Aucune de tes cartes ne joue cette journée avec ces filtres (essaie « Titulaire : Tous »).</p>}
+          <Lineup players={players} sort={sort} mine={!!cartes} tier={tier} />
           <div className="gw-grid">
             {SECTIONS.map(([pos, title]) => (
               <PositionCard key={pos} title={title} players={players.filter((x) => x.position === pos)} />

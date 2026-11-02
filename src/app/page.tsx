@@ -3,6 +3,7 @@ import { getQueries, type GameWeekPlayer, type TradingRow } from '@/db/queries';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { Venue } from '@/components/Venue';
+import { BeforeGw } from '@/components/BeforeGw';
 import { fmtChange, fmtEur, roundLabel } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,8 @@ export default async function Home() {
           {fixtures.length ? <>Prochaine journée : <strong>{roundLabel(fixtures)}</strong></> : 'Aucune journée programmée pour le moment'}
         </p>
       </section>
+
+      <BeforeGw />
 
       <div className="home-shortcuts">
         {SHORTCUTS.map((s) => (

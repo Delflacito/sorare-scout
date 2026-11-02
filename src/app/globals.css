@@ -674,3 +674,15 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .league-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .league-btn[aria-current='page'] { background: var(--text); border-color: var(--text); color: var(--surface); }
 .league-btn[aria-current='page'] .tab-count { background: var(--surface); color: var(--text); }
+.gw-target { margin: -4px 0 12px; font-size: 14px; }
+.gw-target.ok strong { color: var(--good); } .gw-target.ko strong { color: var(--cold); }
+/* Accueil : à faire avant la GW */
+.before-gw { margin-bottom: 16px; }
+.before-gw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.before-gw-head { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+.before-gw-issues { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.before-gw-issues li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.before-gw .ok { margin: 4px 0 0; color: var(--good); }
+.issue-tag { display: inline-block; min-width: 82px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; text-align: center; }
+.issue-tag.bad { background: var(--critical-bg); color: var(--critical); }
+.issue-tag.warn { background: var(--warning-bg); color: var(--warning); }
