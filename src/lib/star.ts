@@ -44,7 +44,7 @@ export const STAR_COLLECTIONS: StarCollection[] = [
 
 export interface StarCandidate { slug: string; name: string; position: GenericPosition | null }
 
-const tokens = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/gi, 'o').replace(/ß/g, 'ss').replace(/æ/gi, 'ae')
+export const tokens = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/gi, 'o').replace(/ß/g, 'ss').replace(/æ/gi, 'ae')
   .toLowerCase().split(/[^a-z]+/).filter(Boolean);
 
 /**

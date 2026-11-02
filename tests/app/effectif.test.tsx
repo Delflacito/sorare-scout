@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { SquadBuilder, STORAGE_KEY, mergeImport, squadTotals, type SquadEntry } from '@/components/SquadBuilder';
+import { SquadBuilder, STORAGE_KEY, mergeImport, resolveManual, squadTotals, type SquadEntry } from '@/components/SquadBuilder';
 import { parseSquad } from '@/lib/squad';
 import type { MarketPlayerView } from '@/db/queries';
 
@@ -82,6 +82,22 @@ describe('effectif enregistré en ligne', () => {
   });
 });
 
+describe('ajout manuel d’un joueur non suivi', () => {
+  const manual: SquadEntry = { slug: 'manuel:resink', name: 'Resink', competition: 'eredivisie', status: 'owned', purchasePrice: 4 };
+  it('remplacé par le joueur dès qu’il est suivi (prix gardé), retiré s’il est déjà là, gardé si le nom est ambigu', () => {
+    const found = new Map([['Resink', [{ slug: 'stije-resink', name: 'Stije Resink' }, { slug: 'x', name: 'Bob Resinkova' }]]]);
+    expect(resolveManual([manual], found)).toEqual([{ slug: 'stije-resink', competition: 'eredivisie', status: 'owned', purchasePrice: 4 }]);
+    const already: SquadEntry = { slug: 'stije-resink', competition: 'eredivisie', status: 'owned', purchasePrice: 5, fromSorare: true };
+    expect(resolveManual([manual, already], found)).toEqual([already]);
+    expect(resolveManual([manual], new Map([['Resink', [{ slug: 'a', name: 'A Resink' }, { slug: 'b', name: 'B Resink' }]]]))).toEqual([manual]);
+    expect(resolveManual([manual], new Map())).toEqual([manual]);
+  });
+  it('enregistrement : le nom est gardé', () => {
+    expect(parseSquad([manual])).toEqual([manual]);
+    expect(parseSquad([{ ...manual, name: 'x'.repeat(81) }])).toBeNull();
+  });
+});
+
 describe('Mon effectif', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -121,6 +137,18 @@ describe('Mon effectif', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'P319' })).toBeInTheDocument());
     const asked = vi.mocked(global.fetch).mock.calls.map(([u]) => new URL(String(u), 'http://x').searchParams.get('slugs')?.split(',').length ?? 0);
     expect(Math.max(...asked)).toBeLessThanOrEqual(200);
+  });
+
+  it('joueur absent de la liste ajouté par son nom, affiché sans lien', async () => {
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom d’un joueur absent de la liste' }), { target: { value: 'Stije Resink' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter à mes cartes' }));
+    const mine = await screen.findByRole('list', { name: 'Mes cartes' });
+    expect(within(mine).getByText('Stije Resink')).toBeInTheDocument();
+    expect(within(mine).queryByRole('link')).not.toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toEqual([
+      { slug: 'manuel:stije-resink', name: 'Stije Resink', competition: 'eredivisie', status: 'owned', purchasePrice: null },
+    ]);
   });
 
   it('cartes par poste (poste vide signalé, un clic pour filtrer) ; carte à acheter passée en « Acheté »', async () => {

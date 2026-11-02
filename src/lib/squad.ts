@@ -11,6 +11,8 @@ export function parseSquad(x: unknown): SquadEntry[] | null {
     && typeof e.competition === 'string' && e.competition.length <= 120
     && (e.status === 'owned' || e.status === 'target')
     && (e.purchasePrice === null || (typeof e.purchasePrice === 'number' && Number.isFinite(e.purchasePrice) && e.purchasePrice >= 0))
-    && (e.fromSorare === undefined || typeof e.fromSorare === 'boolean'));
-  return ok ? x.map(({ slug, competition, status, purchasePrice, fromSorare }) => ({ slug, competition, status, purchasePrice, ...(fromSorare ? { fromSorare } : {}) })) : null;
+    && (e.fromSorare === undefined || typeof e.fromSorare === 'boolean')
+    && (e.name === undefined || (typeof e.name === 'string' && e.name.length <= 80)));
+  return ok ? x.map(({ slug, competition, status, purchasePrice, fromSorare, name }) =>
+    ({ slug, competition, status, purchasePrice, ...(fromSorare ? { fromSorare } : {}), ...(name ? { name } : {}) })) : null;
 }

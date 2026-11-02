@@ -6,12 +6,36 @@ import type { MarketPlayerView } from '@/db/queries';
 import { cardLabel, type GenericPosition } from '@/domain/types';
 import { fmtChange, fmtEur } from '@/lib/format';
 import { PlayerAvatar } from './Media';
+import { tokens } from '@/lib/star';
 
 /**
  * Carte de l'effectif : possédée (avec son prix d'achat) ou envisagée (prix d'achat prévu, à défaut le prix actuel) ;
  * fromSorare : importée de la galerie Sorare (retirée à la mise à jour suivante si elle n'y est plus).
  */
-export interface SquadEntry { slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null; fromSorare?: boolean }
+export interface SquadEntry {
+  slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null; fromSorare?: boolean;
+  /** Ajout à la main d'un joueur que le site ne suit pas encore (slug « manuel:… ») : remplacé dès que le joueur apparaît. */
+  name?: string;
+}
+
+export const MANUAL = 'manuel:';
+const isManual = (e: SquadEntry) => e.slug.startsWith(MANUAL);
+
+/**
+ * Remplace chaque ajout manuel dont le nom correspond désormais à un seul joueur suivi par ce joueur (même statut, même prix) ;
+ * l'ajout est simplement retiré si ce joueur est déjà dans l'effectif.
+ */
+export function resolveManual(entries: SquadEntry[], found: Map<string, { slug: string; name: string }[]>): SquadEntry[] {
+  return entries.flatMap((e) => {
+    if (!isManual(e) || !e.name) return [e];
+    const want = tokens(e.name);
+    const hits = (found.get(e.name) ?? []).filter((p) => { const have = tokens(p.name); return want.every((t) => have.includes(t)); });
+    if (hits.length !== 1) return [e];
+    if (entries.some((x) => x.slug === hits[0].slug && x.competition === e.competition)) return [];
+    const { name: _, ...rest } = e;
+    return [{ ...rest, slug: hits[0].slug }];
+  });
+}
 
 export const STORAGE_KEY = 'sorare-scout:effectif:v1';
 export const PSEUDO_KEY = 'sorare-scout:pseudo';
@@ -135,7 +159,7 @@ export function SquadBuilder({ competitions, teams }: {
   }, [entries, syncedPseudo]);
 
   // Prix à jour des cartes de l'effectif.
-  const slugsKey = [...new Set(entries.map((e) => e.slug))].sort().join(',');
+  const slugsKey = [...new Set(entries.filter((e) => !isManual(e)).map((e) => e.slug))].sort().join(',');
   useEffect(() => {
     if (!slugsKey) return;
     // Par paquets : l'API plafonne chaque demande à 200 joueurs (et l'URL doit rester courte).
@@ -147,6 +171,21 @@ export function SquadBuilder({ competitions, teams }: {
         .catch(() => {});
     }
   }, [slugsKey]);
+
+  // Ajouts manuels : dès que le joueur est suivi par le site (sous ce nom), il remplace l'ajout.
+  const manualKey = [...new Set(entries.filter(isManual).map((e) => e.name ?? ''))].filter(Boolean).sort().join('|');
+  useEffect(() => {
+    if (!manualKey) return;
+    const names = manualKey.split('|');
+    Promise.all(names.map((n) => {
+      const q = [...tokens(n)].sort((a, b) => b.length - a.length)[0] ?? n; // le mot le plus long (le nom de famille, d'ordinaire)
+      return fetch(`/api/joueurs?q=${encodeURIComponent(q)}`).then((r) => r.json() as Promise<MarketPlayerView[]>).then((rows) => [n, rows] as const);
+    })).then((res) => {
+      const found = new Map(res);
+      for (const rows of found.values()) setInfo((m) => new Map([...m, ...rows.map((r) => [r.slug, r] as const)]));
+      setEntries((es) => resolveManual(es, found));
+    }).catch(() => {});
+  }, [manualKey]);
 
   // Joueurs du club choisi, à cocher.
   useEffect(() => {
@@ -184,6 +223,17 @@ export function SquadBuilder({ competitions, teams }: {
     setEntries((es) => es.map((e) => (e.slug === slug && e.competition === league ? { ...e, ...patch } : e)));
   const remove = (slug: string) => setEntries((es) => es.filter((e) => !(e.slug === slug && e.competition === league)));
   const count = (slug: string) => entries.filter((e) => e.competition === slug).length;
+  const [manualName, setManualName] = useState('');
+  const addManual = (ev: React.FormEvent) => {
+    ev.preventDefault();
+    const name = manualName.trim();
+    const key = tokens(name).join('-');
+    if (!key) return;
+    setEntries((es) => [...es.filter((e) => !(e.slug === MANUAL + key && e.competition === league)),
+      { slug: MANUAL + key, name, competition: league, status: 'owned', purchasePrice: null }]);
+    setManualName('');
+  };
+  const nameOf = (e: SquadEntry) => info.get(e.slug)?.name ?? e.name ?? e.slug;
   const importFromSorare = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setImporting(true);
@@ -279,14 +329,14 @@ export function SquadBuilder({ competitions, teams }: {
                   const diff = p?.price != null ? p.price - (paid ?? p.price) : null;
                   return (
                     <li key={e.slug} className="gw-row no-rank squad-row">
-                      <PlayerAvatar name={p?.name ?? e.slug} url={p?.pictureUrl ?? null} size={40} />
+                      <PlayerAvatar name={nameOf(e)} url={p?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
-                        <div className="gw-name"><Link href={`/joueurs/${e.slug}?onglet=marche`}>{p?.name ?? e.slug}</Link></div>
-                        <div className="gw-meta">{p?.team ?? ''}{p?.cardPositions.length ? ` · ${cardLabel(p.cardPositions)}` : ''}
+                        <div className="gw-name">{isManual(e) ? nameOf(e) : <Link href={`/joueurs/${e.slug}?onglet=marche`}>{nameOf(e)}</Link>}</div>
+                        <div className="gw-meta">{isManual(e) ? 'Ajout manuel · pas encore suivi par le site' : p?.team ?? ''}{p?.cardPositions.length ? ` · ${cardLabel(p.cardPositions)}` : ''}
                           {p?.potentialGain != null && <span className={p.potentialGain > 0 ? 'hot' : p.potentialGain < 0 ? 'cold' : ''}> · GW {fmtChange(p.potentialGain)}</span>}
                         </div>
                         <label className="squad-paid">Acheté
-                          <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${p?.name ?? e.slug}`}
+                          <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${nameOf(e)}`}
                             defaultValue={paid ?? ''} placeholder="?" onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value) })} /> €
                         </label>
                       </div>
@@ -296,7 +346,7 @@ export function SquadBuilder({ competitions, teams }: {
                           {paid === null || diff === null ? 'prix d’achat ?' : `${diff >= 0 ? '+' : '−'}${fmtEur(Math.abs(diff))}`}
                         </span>
                       </div>
-                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${p?.name ?? e.slug}`} onClick={() => remove(e.slug)}>✕</button>
+                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${nameOf(e)}`} onClick={() => remove(e.slug)}>✕</button>
                     </li>
                   );
                 })}
@@ -368,6 +418,12 @@ export function SquadBuilder({ competitions, teams }: {
           </ul>
         )}
       </div>
+
+      <form className="squad-import squad-manual" onSubmit={addManual}>
+        <input value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={80}
+          placeholder="Joueur absent de la liste : son nom" aria-label="Nom d’un joueur absent de la liste" />
+        <button type="submit" disabled={!tokens(manualName).length}>Ajouter à mes cartes</button>
+      </form>
 
       {entries.length > leagueEntries.length && (
         <p className="note">
