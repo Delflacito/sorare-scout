@@ -70,6 +70,9 @@ function Detail({ group, owned, manual, t, onChange }: {
 }) {
   const setSold = (i: number, s: Partial<RoiManual['sold'][number]>) =>
     onChange({ ...manual, sold: manual.sold.map((x, j) => (j === i ? { ...x, ...s } : x)) });
+  // Une seule carte revendue dépliée à la fois (celle qu'on saisit) ; les autres tiennent sur une ligne.
+  const [editing, setEditing] = useState<number | null>(null);
+  const remove = (i: number) => { setEditing(null); onChange({ ...manual, sold: manual.sold.filter((_, j) => j !== i) }); };
   return (
     <div className="roi-detail">
       <div className="roi-badges"><Badge label="ROI brut" r={t.roiGross} /><Badge label="ROI avec cartes" r={t.roiWithValue} /></div>
@@ -118,19 +121,25 @@ function Detail({ group, owned, manual, t, onChange }: {
       {manual.sold.length > 0 && (
         <ul className="roi-rows" aria-label="Cartes revendues">
           {/* Clé liée au nombre de lignes : après un retrait, les champs repartent des bonnes valeurs. */}
-          {manual.sold.map((s, i) => (
-            <li key={`${i}/${manual.sold.length}`}>
-              <input className="roi-text" aria-label="Joueur" value={s.name} maxLength={80} placeholder="Joueur"
+          {manual.sold.map((s, i) => (editing === i ? (
+            <li key={`${i}/${manual.sold.length}`} className="roi-sold-edit">
+              <input className="roi-text" aria-label="Joueur" value={s.name} maxLength={80} placeholder="Joueur" autoFocus={!s.name}
                 onChange={(e) => setSold(i, { name: e.target.value })} />
               <label className="roi-field">Achat <EurInput label={`Prix d’achat ${s.name}`} value={s.bought} onChange={(n) => setSold(i, { bought: n })} /></label>
               <label className="roi-field">Revente <EurInput label={`Prix de revente ${s.name}`} value={s.sold} onChange={(n) => setSold(i, { sold: n })} /></label>
-              <button type="button" className="link-btn" aria-label={`Retirer ${s.name || 'cette carte'}`}
-                onClick={() => onChange({ ...manual, sold: manual.sold.filter((_, j) => j !== i) })}>✕</button>
+              <button type="button" className="roi-ok" onClick={() => setEditing(null)}>OK</button>
             </li>
-          ))}
+          ) : (
+            <li key={`${i}/${manual.sold.length}`} className="roi-sold">
+              <span className="roi-sold-name">{s.name || 'Sans nom'}</span>
+              <span className="roi-sold-figs">{fmtEur(s.bought)} → {fmtEur(s.sold)} <strong>({s.sold - s.bought >= 0 ? '+' : '−'}{fmtEur(Math.abs(s.sold - s.bought))})</strong></span>
+              <button type="button" className="link-btn" aria-label={`Modifier ${s.name || 'cette carte'}`} onClick={() => setEditing(i)}>✎</button>
+              <button type="button" className="link-btn" aria-label={`Retirer ${s.name || 'cette carte'}`} onClick={() => remove(i)}>✕</button>
+            </li>
+          )))}
         </ul>
       )}
-      <button type="button" className="roi-add" onClick={() => onChange({ ...manual, sold: [...manual.sold, { name: '', bought: 0, sold: 0 }] })}>
+      <button type="button" className="roi-add" onClick={() => { setEditing(manual.sold.length); onChange({ ...manual, sold: [...manual.sold, { name: '', bought: 0, sold: 0 }] }); }}>
         + Ajouter une carte revendue
       </button>
     </div>

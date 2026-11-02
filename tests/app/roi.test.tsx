@@ -32,5 +32,21 @@ describe('page ROI', () => {
     expect(screen.getByText('ROI brut', { selector: '.roi-badge span' }).parentElement).toHaveTextContent('−50 %');
     expect(screen.getByText('ROI avec la valeur des cartes').nextSibling).toHaveTextContent('−26 %'); // (50 + 210 − 350) / 350
     await waitFor(() => expect(puts.at(-1)).toEqual({ eredivisie: { streaks: { 410: 2 }, sold: [] } }));
+
+    // carte revendue : saisie dépliée, puis repliée en une ligne après « OK »
+    fireEvent.click(screen.getByRole('button', { name: '+ Ajouter une carte revendue' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Joueur' }), { target: { value: 'Pepi' } });
+    const bought = screen.getByRole('textbox', { name: 'Prix d’achat Pepi' });
+    fireEvent.change(bought, { target: { value: '12' } });
+    fireEvent.blur(bought);
+    const sold = screen.getByRole('textbox', { name: 'Prix de revente Pepi' });
+    fireEvent.change(sold, { target: { value: '20' } });
+    fireEvent.blur(sold);
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+    const resold = screen.getByRole('list', { name: 'Cartes revendues' });
+    expect(within(resold).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(resold).getByRole('listitem')).toHaveTextContent('Pepi12 € → 20 € (+8,00 €)');
+    fireEvent.click(within(resold).getByRole('button', { name: 'Modifier Pepi' }));
+    expect(within(resold).getByRole('textbox', { name: 'Joueur' })).toHaveValue('Pepi');
   });
 });
