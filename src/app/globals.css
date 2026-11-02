@@ -667,3 +667,10 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .club-players .search-actions button { width: 100%; min-height: 36px; padding: 4px 6px; font-size: 12.5px; }
 .gw-list.club-players > .in-squad { border-color: var(--accent); }
 @media (max-width: 560px) { .club-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Choix du championnat (Mon effectif) */
+.league-picker { display: grid; gap: 8px; margin: 4px 0 14px; }
+.league-picker details summary { min-height: 40px; display: flex; align-items: center; color: var(--muted); font-weight: 600; cursor: pointer; }
+.league-picker details .club-grid { margin-top: 6px; }
+.league-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.league-btn[aria-current='page'] { background: var(--text); border-color: var(--text); color: var(--surface); }
+.league-btn[aria-current='page'] .tab-count { background: var(--surface); color: var(--text); }

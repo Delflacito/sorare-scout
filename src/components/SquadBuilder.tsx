@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { MarketPlayerView } from '@/db/queries';
-import { cardLabel, type GenericPosition } from '@/domain/types';
+import { GENERIC_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { fmtChange, fmtEur } from '@/lib/format';
 import { PlayerAvatar } from './Media';
 import { tokens } from '@/lib/star';
@@ -103,6 +103,9 @@ async function loadServer(pseudo: string): Promise<SquadEntry[] | null> {
   if (!res.ok) throw new Error('lecture impossible');
   return (await res.json()).entries;
 }
+
+/** Postes de la carte en initiales (G, D, M, A) : les cartes de l'effectif restent compactes. */
+const posShort = (ps: GenericPosition[]) => ps.map((p) => GENERIC_LABEL_FR[p][0]).join('/');
 
 const POSITIONS: [GenericPosition, string][] = [['Goalkeeper', 'Gardiens'], ['Defender', 'Défenseurs'], ['Midfielder', 'Milieux'], ['Forward', 'Attaquants']];
 const ORDER = POSITIONS.map(([p]) => p);
@@ -224,6 +227,14 @@ export function SquadBuilder({ competitions, teams }: {
     setEntries((es) => es.map((e) => (e.slug === slug && e.competition === league ? { ...e, ...patch } : e)));
   const remove = (slug: string) => setEntries((es) => es.filter((e) => !(e.slug === slug && e.competition === league)));
   const count = (slug: string) => entries.filter((e) => e.competition === slug).length;
+  const withCards = competitions.filter((c) => count(c.slug) > 0).sort((a, b) => count(b.slug) - count(a.slug));
+  const withoutCards = competitions.filter((c) => count(c.slug) === 0);
+  const leagueBtn = (c: { slug: string; name: string }) => (
+    <button key={c.slug} type="button" className="club-btn league-btn" aria-current={league === c.slug ? 'page' : undefined}
+      onClick={() => { setLeague(c.slug); setClub(''); setClubFilter(''); setPosition(''); }}>
+      {c.name}{count(c.slug) > 0 && <span className="tab-count">{count(c.slug)}</span>}
+    </button>
+  );
   const [manualName, setManualName] = useState('');
   const addManual = (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -267,12 +278,15 @@ export function SquadBuilder({ competitions, teams }: {
         </button>
         {importMessage && <span className="muted small" role="status">{importMessage}</span>}
       </form>
-      <nav className="tabs" aria-label="Championnats">
-        {competitions.map((c) => (
-          <button key={c.slug} type="button" className="tab-btn" aria-current={league === c.slug ? 'page' : undefined} onClick={() => { setLeague(c.slug); setClub(''); setClubFilter(''); }}>
-            {c.name}{count(c.slug) > 0 && <span className="tab-count">{count(c.slug)}</span>}
-          </button>
-        ))}
+      {/* Championnats en boutons : ceux où il y a des cartes d'abord (les plus fournis en tête), les autres repliés. */}
+      <nav className="league-picker" aria-label="Championnats">
+        <div className="club-grid">{withCards.map(leagueBtn)}</div>
+        {withoutCards.length > 0 && (
+          <details open={withCards.length === 0 || withoutCards.some((c) => c.slug === league)}>
+            <summary>Autres championnats ({withoutCards.length})</summary>
+            <div className="club-grid">{withoutCards.map(leagueBtn)}</div>
+          </details>
+        )}
       </nav>
 
       <div className="summary-tiles">
@@ -333,8 +347,7 @@ export function SquadBuilder({ competitions, teams }: {
                       <PlayerAvatar name={nameOf(e)} url={p?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
                         <div className="gw-name">{isManual(e) ? nameOf(e) : <Link href={`/joueurs/${e.slug}?onglet=marche`}>{nameOf(e)}</Link>}</div>
-                        <div className="gw-meta">{isManual(e) ? 'Ajout manuel · pas encore suivi par le site' : p?.team ?? ''}{p?.cardPositions.length ? ` · ${cardLabel(p.cardPositions)}` : ''}
-                          {p?.potentialGain != null && <span className={p.potentialGain > 0 ? 'hot' : p.potentialGain < 0 ? 'cold' : ''}> · GW {fmtChange(p.potentialGain)}</span>}
+                        <div className="gw-meta">{isManual(e) ? 'Ajout manuel · pas encore suivi par le site' : p?.team ?? ''}{p?.cardPositions.length ? ` · ${posShort(p.cardPositions)}` : ''}
                         </div>
                         <label className="squad-paid">Acheté
                           <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${nameOf(e)}`}
@@ -366,8 +379,7 @@ export function SquadBuilder({ competitions, teams }: {
                       <PlayerAvatar name={p?.name ?? e.slug} url={p?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
                         <div className="gw-name"><Link href={`/joueurs/${e.slug}?onglet=marche`}>{p?.name ?? e.slug}</Link></div>
-                        <div className="gw-meta">{p?.team ?? ''}{p?.cardPositions.length ? ` · ${cardLabel(p.cardPositions)}` : ''}
-                          {p?.potentialGain != null && <span className={p.potentialGain > 0 ? 'hot' : p.potentialGain < 0 ? 'cold' : ''}> · GW {fmtChange(p.potentialGain)}</span>}
+                        <div className="gw-meta">{p?.team ?? ''}{p?.cardPositions.length ? ` · ${posShort(p.cardPositions)}` : ''}
                         </div>
                         <label className="squad-paid">Prix visé
                           <input key={`${e.slug}-${e.purchasePrice}`} className="price-input" inputMode="decimal" aria-label={`Prix visé pour ${p?.name ?? e.slug}`}
@@ -407,7 +419,7 @@ export function SquadBuilder({ competitions, teams }: {
                   <PlayerAvatar name={p.name} url={p.pictureUrl} size={40} />
                   <div className="gw-who">
                     <div className="gw-name">{p.name}</div>
-                    <div className="gw-meta">{cardLabel(p.cardPositions)}</div>
+                    <div className="gw-meta">{posShort(p.cardPositions)}</div>
                   </div>
                   <strong className="club-price">{p.price === null ? '—' : fmtEur(p.price)}</strong>
                   <span className="search-actions">
