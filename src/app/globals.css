@@ -632,3 +632,27 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .roi-addtotal { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto; gap: 8px; align-items: center; padding: 8px 8px 8px 12px; border: 1px solid var(--border); border-radius: 10px; }
 .roi-addtotal strong { display: block; font-size: 18px; }
 .roi-addtotal input { min-height: 44px; width: 100%; padding: 6px 10px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; text-align: right; }
+
+/* Mon effectif : cartes joueur, 3 par ligne (aussi sur téléphone, en version compacte). */
+.gw-list.squad-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gw-list.squad-grid > .gw-row { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px 10px; text-align: center;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+.gw-list.squad-grid > .gw-row + .gw-row { border-top: 1px solid var(--border); }
+.gw-list.squad-grid > .row-target { border-style: dashed; }
+.squad-grid .gw-who { width: 100%; justify-items: center; }
+.squad-grid .gw-name { justify-content: center; max-width: 100%; }
+.squad-grid .gw-name a, .squad-grid .gw-name { font-size: 14px; line-height: 1.2; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.squad-grid .gw-meta { justify-content: center; font-size: 11.5px; line-height: 1.3; }
+.squad-grid .squad-money { justify-items: center; gap: 2px; }
+.squad-grid .squad-money strong { font-size: 17px; }
+.squad-grid .squad-paid { flex-wrap: wrap; justify-content: center; gap: 2px 4px; font-size: 12px; }
+.squad-grid .squad-paid .price-input { width: 64px; text-align: center; }
+.squad-grid .squad-remove { position: absolute; top: 2px; right: 2px; width: 30px; height: 30px; font-size: 13px; }
+.squad-grid .squad-bought { min-height: 36px; margin-top: 2px; }
+@media (max-width: 560px) {
+  .gw-list.squad-grid { gap: 6px; }
+  .gw-list.squad-grid > .gw-row { padding: 10px 4px 8px; }
+  .squad-grid .avatar { width: 44px !important; height: 44px !important; }
+  .squad-grid .gw-name a, .squad-grid .gw-name { font-size: 13px; }
+  .squad-grid .squad-money strong { font-size: 15px; }
+}

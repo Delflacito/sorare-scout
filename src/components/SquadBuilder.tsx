@@ -323,7 +323,7 @@ export function SquadBuilder({ competitions, teams }: {
           <section className="card gw-section" aria-labelledby="mes-cartes">
             <h2 className="card-title" id="mes-cartes">Mes cartes<span>{shownOwned.length}</span></h2>
             {shownOwned.length === 0 ? <p className="empty">Aucune carte pour ce filtre</p> : (
-              <ul className="gw-list" aria-label="Mes cartes">
+              <ul className="gw-list squad-grid" aria-label="Mes cartes">
                 {shownOwned.map((e) => {
                   const p = info.get(e.slug);
                   const paid = e.purchasePrice;
@@ -358,7 +358,7 @@ export function SquadBuilder({ competitions, teams }: {
           {shownTargets.length > 0 && (
             <section className="card gw-section" aria-labelledby="a-acheter">
               <h2 className="card-title" id="a-acheter">À acheter<span>{shownTargets.length}</span></h2>
-              <ul className="gw-list" aria-label="À acheter">
+              <ul className="gw-list squad-grid" aria-label="À acheter">
                 {shownTargets.map((e) => {
                   const p = info.get(e.slug);
                   return (
