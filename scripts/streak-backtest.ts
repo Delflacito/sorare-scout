@@ -65,8 +65,12 @@ const fixtures = (await sql`
   id: r.id as number, date: r.date as Date, home: r.home_team_id as number, away: r.away_team_id as number, league: competitionGroup(r.slug as string),
 })).filter((f) => LEAGUES[f.league]);
 const scores = new Map<string, number>(); // `${fixture}:${player}` → score
-for (const a of await sql`select a.fixture_id, a.player_id, a.sorare_score from appearances a join fixtures f on f.id = a.fixture_id
-  where f.status = 'played' and f.date >= '2026-08-01'`) scores.set(`${a.fixture_id}:${a.player_id}`, a.sorare_score as number);
+const played = new Set<string>(); // `${fixture}:${player}` des joueurs entrés en jeu
+for (const a of await sql`select a.fixture_id, a.player_id, a.sorare_score, a.minutes from appearances a join fixtures f on f.id = a.fixture_id
+  where f.status = 'played' and f.date >= '2026-08-01'`) {
+  scores.set(`${a.fixture_id}:${a.player_id}`, a.sorare_score as number);
+  if ((a.minutes as number) > 0) played.add(`${a.fixture_id}:${a.player_id}`);
+}
 
 /** Journée Sorare d'un match : week-end (vendredi → lundi, repérée par son vendredi) ou semaine (mardi → jeudi). */
 function gwKey(d: Date): string {
@@ -98,6 +102,9 @@ for (const list of gwsByLeague.values()) list.sort((a, b) => a.key.localeCompare
 /** Scores de la saison d'un joueur, un par match de championnat de son club (0 s'il n'a pas joué). */
 const seasonGames = new Map<number, number[]>();
 for (const p of players) seasonGames.set(p.id, (teamGames.get(p.team) ?? []).map((g) => scores.get(`${g.fixture}:${p.id}`) ?? 0));
+/** Pour chaque match du club, le joueur est-il entré en jeu (sinon : blessé, suspendu, non retenu, banc) ? */
+const seasonPlayed = new Map<number, boolean[]>();
+for (const p of players) seasonPlayed.set(p.id, (teamGames.get(p.team) ?? []).map((g) => played.has(`${g.fixture}:${p.id}`)));
 const avgOf = (p: (typeof players)[number]) => { const g = seasonGames.get(p.id)!; return g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0; };
 for (const p of players) p.l15 = avgOf(p); // la sélection se fait sur la moyenne de saison, plus stable que la forme
 
@@ -240,6 +247,7 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
 // compte pour les gros paliers. Pour chaque club : le meilleur stack par budget ; puis les paires des 6 meilleurs clubs.
 const teamNames = new Map((await sql`select id, name from teams`).map((t) => [t.id as number, t.name as string]));
 const stackRows: Record<string, unknown>[] = [];
+const depthStacks: Record<string, unknown>[] = [];
 md.push('# Stacks (1 ou 2 clubs), 1 équipe alignée', '');
 for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
@@ -287,9 +295,79 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   md.push(`## ${name} — stacks`, '', '| Stack | Coût | Score médian / 1 journée sur 10 | Chance de valider en une journée | Gain saison (non corrigé) | Gain par € | Saison réelle | Équipe |', '|---|---|---|---|---|---|---|---|',
     '| **Meilleurs gains** | | | | | | | |', ...[...low].sort((a, b) => b.seasonGain - a.seasonGain).slice(0, 6).map(line),
     '| **Meilleur rendement (coût ≥ 15 €)** | | | | | | | |', ...low.filter((r) => r.cost >= 15).sort((a, b) => b.seasonGain / b.cost - a.seasonGain / a.cost).slice(0, 6).map(line), '');
+
+  // ——— Effectifs de stack : 2 gardiens et 3 joueurs par poste de champ, pour couvrir absences et rotations ———
+  // Chaque journée, on aligne les 5 meilleures moyennes parmi les joueurs de l'effectif qui jouent vraiment le match
+  // (on suppose connues avant la composition les blessures, suspensions et non-titularisations).
+  const DEPTH: Record<Pos, number> = { G: 2, D: 3, M: 3, F: 3 };
+  const depthSquad = (pool2: Card[], budget: number, bonus: number): Card[] => {
+    const core = bestFive(pool2, budget * 0.65, bonus);
+    if (core.length < 5) return [];
+    const owned = [...core]; let left = budget - core.reduce((t, p) => t + p.price!, 0);
+    for (const k of ['G', 'D', 'M', 'F', 'D', 'M', 'F', 'D', 'M', 'F'] as Pos[]) {
+      if (owned.filter((p) => p.pos === k).length >= DEPTH[k]) continue;
+      const pick = pool2.filter((p) => p.pos === k && !owned.includes(p) && p.price! <= left).sort((a, b) => b.l15 - a.l15)[0];
+      if (pick) { owned.push(pick); left -= pick.price!; }
+    }
+    return owned;
+  };
+  const lineupFrom = (avail: Card[]): Card[] => {
+    const pick: Card[] = [];
+    for (const k of ['G', 'D', 'M', 'F'] as Pos[]) { const c = avail.filter((p) => p.pos === k).sort((a, b) => b.l15 - a.l15)[0]; if (c) pick.push(c); }
+    const extra = avail.filter((p) => p.pos !== 'G' && !pick.includes(p)).sort((a, b) => b.l15 - a.l15)[0];
+    if (extra) pick.push(extra);
+    return pick;
+  };
+  const simDepth = (squad: Card[], bonus: number, draws = 20_000): number[] => {
+    let seed = 777;
+    const rand = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+    const clubsOf = [...new Set(squad.map((p) => p.team))];
+    return Array.from({ length: draws }, () => {
+      const game = new Map(clubsOf.map((c) => [c, Math.floor(rand() * (teamGames.get(c) ?? [{}]).length)]));
+      const avail = squad.filter((p) => seasonPlayed.get(p.id)![game.get(p.team)!]);
+      const team = lineupFrom(avail);
+      if (!team.length) return 0;
+      const sc = (p: Card) => seasonGames.get(p.id)![game.get(p.team)!] ?? 0;
+      const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
+      return team.reduce((t, p) => t + sc(p), 0) * (1 + bonus) + CAPTAIN * sc(captain);
+    });
+  };
+  const depthRows: Record<string, unknown>[] = [];
+  const candidates = [...topClubs.map((c) => [c]), ...topClubs.flatMap((a, i) => topClubs.slice(i + 1).map((b) => [a, b]))];
+  for (const clubIds of candidates) {
+    const label = clubIds.map((c) => teamNames.get(c)).join(' + ');
+    const pool2 = pool.filter((p) => clubIds.includes(p.team));
+    for (const budget of [40, 80, 150, 300, 600, 1200]) for (const bonus of BONUSES) {
+      const squad = depthSquad(pool2, budget, bonus);
+      if (squad.length < 9) continue;
+      const cost = Math.round(squad.reduce((t, p) => t + p.price!, 0) * 100) / 100;
+      if (depthRows.some((r) => r.label === label && r.bonus === bonus && r.cost === cost)) continue;
+      const sims = simDepth(squad, bonus);
+      const q = tiers.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
+      const model = ladder(q, tiers, Math.max(remaining, 1));
+      const realTotals = gws.filter((g) => clubIds.every((c) => g.fixtureOfTeam.has(c))).map((g) => {
+        const avail = squad.filter((p) => played.has(`${g.fixtureOfTeam.get(p.team)}:${p.id}`));
+        const team = lineupFrom(avail);
+        if (!team.length) return 0;
+        const sc = (p: Card) => scores.get(`${g.fixtureOfTeam.get(p.team)}:${p.id}`) ?? 0;
+        const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
+        return team.reduce((t, p) => t + sc(p), 0) * (1 + bonus) + CAPTAIN * sc(captain);
+      });
+      const real = realized(realTotals, tiers);
+      const sorted = [...sims].sort((a, b) => a - b);
+      depthRows.push({
+        league: name, label, budget, bonus, cost, cards: squad.length, remaining, median: Math.round(sorted[sorted.length >> 1]),
+        perGwPass: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(q[i] * 1000) / 1000])),
+        seasonGain: Math.round(model.eur * remaining), realized: { ...real, gws: realTotals.length },
+        squad: squad.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)}, joue ${Math.round((seasonPlayed.get(p.id)!.filter(Boolean).length / (seasonPlayed.get(p.id)!.length || 1)) * 100)} %)`),
+      });
+    }
+  }
+  depthStacks.push(...depthRows);
 }
 mkdirSync('streak-output', { recursive: true });
 writeFileSync('streak-output/stacks.json', JSON.stringify(stackRows, null, 1));
+writeFileSync('streak-output/depth-stacks.json', JSON.stringify(depthStacks, null, 1));
 
 mkdirSync('streak-output', { recursive: true });
 writeFileSync('streak-output/streaks.md', md.join('\n'));
