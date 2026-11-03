@@ -17,6 +17,42 @@ const pick = (fixtureId: number, slug: string) => `${fixtureId}:${slug}`;
  * Matchs jour par jour (sous-listes repliables par jour et par club) et sélection des joueurs à aligner,
  * mémorisée dans ce navigateur, avec le total potentiel de la sélection par jour.
  */
+type Pick = { f: StreakDay['fixtures'][number]; m: StreakFixture['mine'][number] };
+const ORDER = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
+const shortDay = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', timeZone: 'Europe/Paris' });
+
+/** Sélection ouverte, en une ligne par joueur : poste, nom, lieu et adversaire, score potentiel, jour et heure. */
+function PlanSummary({ picks, index }: { picks: string[]; index: Map<string, Pick> }) {
+  const found = picks.map((k) => index.get(k)).filter((x): x is Pick => !!x)
+    .sort((a, b) => a.f.date.localeCompare(b.f.date) || ORDER.indexOf(a.m.positions[0]) - ORDER.indexOf(b.m.positions[0]));
+  const gone = picks.length - found.length;
+  const total = found.reduce((t, { m }) => t + (m.projected ?? 0), 0);
+  return (
+    <div className="plan-summary">
+      {found.length > 0 && (
+        <ul aria-label="Joueurs de la sélection">
+          {found.map(({ f, m }) => {
+            const home = m.team === f.home;
+            return (
+              <li key={pick(f.id, m.slug)}>
+                <span className="plan-pos">{m.positions.map((x) => GENERIC_LABEL_FR[x][0]).join('/')}</span>
+                <span className="plan-name">{m.name}</span>
+                <span className="muted">{home ? 'D' : 'E'} vs {home ? f.away : f.home}</span>
+                <strong className="plan-score">{m.projected === null ? '—' : Math.round(m.projected)}</strong>
+                <span className="muted plan-when">{shortDay(f.date)} {f.time}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="muted small">
+        {found.length} joueur{found.length > 1 ? 's' : ''} · {Math.round(total)} pts potentiels
+        {gone > 0 && ` · ${gone} sur des matchs passés ou d’un autre championnat`}
+      </p>
+    </div>
+  );
+}
+
 export function StreakPlanner({ days, pseudo }: { days: StreakDay[]; pseudo?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [onlySelected, setOnlySelected] = useState(false);
@@ -63,6 +99,8 @@ export function StreakPlanner({ days, pseudo }: { days: StreakDay[]; pseudo?: st
     savePlans(plans.filter((x) => x.id !== p.id), `« ${p.name} » supprimée`);
     if (editing === p.id) { setEditing(null); setName(''); }
   };
+  // Joueur et match de chaque choix possible, pour résumer une sélection ouverte.
+  const index = new Map(days.flatMap((d) => d.fixtures.flatMap((f) => f.mine.map((m) => [pick(f.id, m.slug), { f, m }] as const))));
   const fresh = () => { keep(new Set()); setEditing(null); setName(''); setStatus(''); };
 
   return (
@@ -76,6 +114,7 @@ export function StreakPlanner({ days, pseudo }: { days: StreakDay[]; pseudo?: st
                 <span className="streak-plan-name">{p.name} <span className="muted small">{p.picks.length} joueur{p.picks.length > 1 ? 's' : ''}</span></span>
                 <button type="button" className="chip" onClick={() => open(p)} aria-label={`Ouvrir ${p.name}`}>{editing === p.id ? 'Ouverte' : 'Ouvrir'}</button>
                 <button type="button" className="link-btn" onClick={() => remove(p)} aria-label={`Supprimer ${p.name}`}>✕</button>
+                {editing === p.id && <PlanSummary picks={[...selected]} index={index} />}
               </li>
             ))}
           </ul>

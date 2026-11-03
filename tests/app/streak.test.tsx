@@ -53,6 +53,7 @@ describe('/streak', () => {
     await waitFor(() => expect(puts.at(-1)).toEqual([{ id: 'old', name: 'Ancienne', picks: ['1:gk'] }, { id: expect.any(String), name: 'GW 12', picks: ['1:fw', '1:away'] }]));
     fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Ancienne' }));
     expect(screen.getByRole('button', { name: /Seulement ma sélection \(1\)/ })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Joueurs de la sélection' })).toHaveTextContent('GgkD vs A140sam. 7 20:00');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Supprimer GW 12' }));
     await waitFor(() => expect(puts.at(-1)).toEqual([{ id: 'old', name: 'Ancienne', picks: ['1:gk'] }]));

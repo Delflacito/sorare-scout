@@ -727,3 +727,12 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .streak-save button { min-height: 44px; padding: 0 14px; border: none; border-radius: 10px; background: var(--accent); color: var(--surface); font: inherit; font-weight: 600; cursor: pointer; }
 .streak-save button.secondary { background: var(--neutral-bg); color: var(--text); }
 .streak-save button:disabled { opacity: .5; cursor: default; }
+.streak-plan-list li { flex-wrap: wrap; }
+.plan-summary { flex: 1 1 100%; padding: 4px 4px 6px 0; }
+.plan-summary ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.plan-summary li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.plan-pos { min-width: 16px; font-weight: 700; color: var(--muted); }
+.plan-name { font-weight: 600; }
+.plan-score { font-variant-numeric: tabular-nums; }
+.plan-when { margin-left: auto; font-size: 13px; }
+.plan-summary p { margin: 4px 0 0; }
