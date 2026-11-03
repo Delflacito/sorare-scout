@@ -225,6 +225,42 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   }
   md.push('');
 }
+// ——— Équipes d'un seul club (« full Barça », « full Real ») ———
+// Les joueurs d'un même club jouent le même match : leurs scores montent et baissent ensemble. On compare le tirage
+// indépendant (comme plus haut) au tirage par match (un match du club tiré au hasard, les 5 joueurs le rejouent).
+function simulateJoint(team: Card[], bonus: number, draws = 20_000): number[] {
+  let seed = 4242;
+  const rand = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+  const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
+  const clubs = [...new Set(team.map((p) => p.team))];
+  return Array.from({ length: draws }, () => {
+    const game = new Map(clubs.map((c) => [c, Math.floor(rand() * (teamGames.get(c) ?? []).length)]));
+    let total = 0; let cap = 0;
+    for (const p of team) { const sc = seasonGames.get(p.id)![game.get(p.team)!] ?? 0; total += sc; if (p === captain) cap = sc; }
+    return total * (1 + bonus) + CAPTAIN * cap;
+  });
+}
+const teamIds = new Map((await sql`select id, name from teams`).map((t) => [t.name as string, t.id as number]));
+md.push('## Équipes d\'un seul club (LaLiga)', '', '| Équipe | Coût | Tirage | Score médian | Chance de valider en une journée | Gain moyen d\'ici la fin de saison (non corrigé) | Équipe |', '|---|---|---|---|---|---|---|');
+const laliga = gwsByLeague.get('laliga-es') ?? [];
+const laligaLeft = Math.round((laliga.length / ((now - Date.parse(laliga[0]?.key.slice(0, 10) ?? '2026-08-15')) / (7 * 86_400_000))) * (SEASON_END - now) / (7 * 86_400_000));
+for (const [label, clubs] of [['Full Barça', ['FC Barcelona']], ['Full Real', ['Real Madrid CF', 'Real Madrid']], ['Barça + Real', ['FC Barcelona', 'Real Madrid CF', 'Real Madrid']]] as const) {
+  const ids = clubs.map((c) => teamIds.get(c)).filter((x): x is number => x !== undefined);
+  const pool = players.filter((p) => ids.includes(p.team) && p.price !== null && seasonGames.get(p.id)!.length >= 5);
+  for (const bonus of BONUSES) {
+    const team = bestFive(pool, 100_000, bonus);
+    if (team.length < 5) { md.push(`| ${label} | — | — | — | effectif incomplet dans les données | — | — |`); break; }
+    const cost = Math.round(team.reduce((t, p) => t + p.price!, 0));
+    for (const [mode, sims] of [['indépendant', simulate(team, bonus)], ['même match', simulateJoint(team, bonus)]] as const) {
+      const q = BIG.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
+      const model = ladder(q, BIG, Math.max(laligaLeft, 1));
+      const sorted = [...sims].sort((a, b) => a - b);
+      md.push(`| ${label} (${bonus * 100} %) | ${cost} € | ${mode} | ${Math.round(sorted[sorted.length >> 1])} | ${BIG.map((t, i) => `${t[0]}:${Math.round(q[i] * 100)}%`).join(' ')} | ${Math.round(model.eur * laligaLeft)} € | ${team.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)})`).join(' ; ')} |`);
+    }
+  }
+}
+md.push('');
+
 mkdirSync('streak-output', { recursive: true });
 writeFileSync('streak-output/streaks.md', md.join('\n'));
 writeFileSync('streak-output/streaks.json', JSON.stringify(results, null, 1));
