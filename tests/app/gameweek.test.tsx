@@ -13,7 +13,7 @@ vi.mock('@/db/queries', async (importOriginal) => ({
       { slug: 'psg', name: 'PSG', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'OM', opponentSlug: 'om', isHome: true, opponentRating: 20 }] },
     ],
     getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups,
-    listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }, { slug: '2-bundesliga', name: '2. Bundesliga' }, { slug: 'ligue-2-fr', name: 'Ligue 2' }],
+    listCompetitions: async () => [{ slug: 'contender', name: 'Contender' }, { slug: 'ligue-1-fr', name: 'Ligue 1' }], // déjà regroupés par la requête
     getSquad: async () => [{ slug: 'gk', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 1 }, { slug: 'x', competition: 'ligue-1-fr', status: 'target', purchasePrice: 1 }],
   }),
 }));
@@ -85,10 +85,9 @@ describe('/game-week', () => {
 
   it('Contender : un seul choix pour les championnats Contender, journée de chacun, barème Contender', async () => {
     render(await GameWeek(params({ competition: 'contender' })));
-    expect(getGameWeekFixtures.mock.calls.map(([c]) => c)).toEqual(['2-bundesliga', 'ligue-2-fr']);
+    expect(getGameWeekFixtures.mock.calls.map(([c]) => c)).toEqual(['austrian-bundesliga', '2-bundesliga', 'ligue-2-fr', 'segunda-division-es', '1-hnl']);
     const leagues = screen.getByRole('navigation', { name: 'Championnat' });
     expect(within(leagues).getByRole('link', { name: 'Contender' })).toHaveAttribute('aria-current', 'page');
-    expect(within(leagues).queryByRole('link', { name: 'Ligue 2' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('navigation', { name: 'Palier de streak visé' })).getByRole('link', { name: '360 · 1000 essence' })).toBeInTheDocument();
   });
 

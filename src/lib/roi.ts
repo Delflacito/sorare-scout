@@ -1,3 +1,5 @@
+import { CONTENDER_SLUGS } from '@/lib/competitions';
+
 /** Championnats suivis dans la page ROI ; Contender regroupe les championnats de deuxième rang. */
 export const ROI_GROUPS = [
   { key: 'eredivisie', name: 'Eredivisie' },
@@ -10,7 +12,7 @@ export type RoiGroup = (typeof ROI_GROUPS)[number]['key'];
 
 const BY_SLUG: Record<string, RoiGroup> = {
   eredivisie: 'eredivisie', 'primeira-liga-pt': 'primeira', 'ligue-1-fr': 'ligue1', 'jupiler-pro-league': 'jupiler',
-  'austrian-bundesliga': 'contender', '2-bundesliga': 'contender', 'ligue-2-fr': 'contender', '1-hnl': 'contender', 'segunda-division-es': 'contender',
+  ...Object.fromEntries(CONTENDER_SLUGS.map((s) => [s, 'contender' as const])),
 };
 
 /** Groupe d'un championnat Sorare (club actuel du joueur) ; null s'il n'est pas suivi. */

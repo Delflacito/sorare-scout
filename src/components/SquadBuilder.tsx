@@ -7,6 +7,7 @@ import { GENERIC_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { fmtChange, fmtEur } from '@/lib/format';
 import { PlayerAvatar } from './Media';
 import { tokens } from '@/lib/star';
+import { competitionGroup } from '@/lib/competitions';
 
 /**
  * Carte de l'effectif : possédée (avec son prix d'achat) ou envisagée (prix d'achat prévu, à défaut le prix actuel) ;
@@ -58,10 +59,13 @@ export function mergeImport(entries: SquadEntry[], imported: { slug: string; com
   ];
 }
 
+/** Cartes rangées par championnat du site : les championnats Contender sous « contender » (anciens effectifs compris). */
+const grouped = (es: SquadEntry[]) => es.map((e) => ({ ...e, competition: competitionGroup(e.competition) }));
+
 function load(): SquadEntry[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SquadEntry[]) : [];
+    return raw ? grouped(JSON.parse(raw) as SquadEntry[]) : [];
   } catch {
     return [];
   }
@@ -101,7 +105,8 @@ export function squadTotals(entries: SquadEntry[], info: Map<string, MarketPlaye
 async function loadServer(pseudo: string): Promise<SquadEntry[] | null> {
   const res = await fetch(`/api/effectif/enregistre?user=${encodeURIComponent(pseudo)}`);
   if (!res.ok) throw new Error('lecture impossible');
-  return (await res.json()).entries;
+  const entries = (await res.json()).entries as SquadEntry[] | null;
+  return entries && grouped(entries);
 }
 
 /** Postes de la carte en initiales (G, D, M, A) : les cartes de l'effectif restent compactes. */

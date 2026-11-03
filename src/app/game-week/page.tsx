@@ -8,7 +8,8 @@ import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
 import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 import { MyCardsToggle } from '@/components/MyCards';
-import { STREAK_TIERS, roiGroupOf, streakTiersOf, type StreakTier } from '@/lib/roi';
+import { STREAK_TIERS, streakTiersOf, type StreakTier } from '@/lib/roi';
+import { CONTENDER, CONTENDER_SLUGS } from '@/lib/competitions';
 import { PSEUDO } from '@/lib/squad';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,6 @@ const SECTIONS: [GenericPosition, string][] = [
   ['Goalkeeper', 'Gardiens'], ['Defender', 'Défenseurs'], ['Midfielder', 'Milieux'], ['Forward', 'Attaquants'],
 ];
 const PER_POSITION = 10;
-const CONTENDER = 'contender';
 
 /** Écart entre le score potentiel et le niveau habituel, en points et en %. */
 function Boost({ p }: { p: GameWeekPlayer }) {
@@ -144,7 +144,6 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
   const cartesRaw = one(p.cartes)?.toLowerCase();
   const cartes = cartesRaw && PSEUDO.test(cartesRaw) ? cartesRaw : undefined;
-  // « contender » : les championnats Contender réunis (Autriche, 2. Bundesliga, Ligue 2, Liga 2, Croatie), comme sur Sorare.
   const tiers = competition === CONTENDER ? STREAK_TIERS.contender : streakTiersOf(competition);
   const tier = tiers?.find((t) => t.score === Number(one(p.palier))) ?? null;
   const href = (o: { competition?: string; titu?: number; vue?: GameWeekSort; cartes?: string | null; palier?: number | null }) => {
@@ -156,12 +155,10 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
     return `/game-week${qs.size ? `?${qs}` : ''}`;
   };
   const queries = getQueries();
-  const [allCompetitions, squad] = await Promise.all([queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null]);
-  const contender = allCompetitions.filter((c) => roiGroupOf(c.slug) === CONTENDER).map((c) => c.slug);
-  const competitions = [...allCompetitions.filter((c) => !contender.includes(c.slug)), ...(contender.length ? [{ slug: CONTENDER, name: 'Contender' }] : [])];
+  const [competitions, squad] = await Promise.all([queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null]);
   // Journée propre à chaque championnat Contender : leurs premiers matchs ne tombent pas le même jour.
   const fixtures = competition === CONTENDER
-    ? (await Promise.all(contender.map((c) => queries.getGameWeekFixtures(c)))).flat().sort((a, b) => a.date.localeCompare(b.date))
+    ? (await Promise.all(CONTENDER_SLUGS.map((c) => queries.getGameWeekFixtures(c)))).flat().sort((a, b) => a.date.localeCompare(b.date))
     : await queries.getGameWeekFixtures(competition);
   // Mes cartes : seulement les joueurs possédés (toutes leurs lignes, pour composer l'équipe avec ce qu'on a).
   const owned = cartes ? [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))] : undefined;

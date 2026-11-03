@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getQueries } from '@/db/queries';
 import { seasonStart } from '@/ingest/leagues';
 import { PSEUDO } from '@/lib/squad';
+import { competitionGroup } from '@/lib/competitions';
 import { createSorareClient } from '@/sources/sorare';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,6 @@ export async function GET(req: NextRequest) {
   for (const c of cards) if (c.seasonYear === season && !byPlayer.has(c.playerSlug)) byPlayer.set(c.playerSlug, c.purchaseEur);
   const known = byPlayer.size ? await getQueries().getMarketPlayers({ slugs: [...byPlayer.keys()] }) : [];
   const entries = known.filter((p) => p.competitionSlug)
-    .map((p) => ({ slug: p.slug, competition: p.competitionSlug!, purchasePrice: byPlayer.get(p.slug) ?? null }));
+    .map((p) => ({ slug: p.slug, competition: competitionGroup(p.competitionSlug!), purchasePrice: byPlayer.get(p.slug) ?? null }));
   return NextResponse.json({ entries, cards: cards.length, classic: cards.filter((c) => c.seasonYear !== season).length, untracked: byPlayer.size - entries.length });
 }

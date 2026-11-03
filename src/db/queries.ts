@@ -2,6 +2,7 @@ import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
 import type { RoiData, RoiWeek } from '@/lib/roi';
+import { CONTENDER, CONTENDER_NAME, competitionGroup, groupCompetitions, slugsOf } from '@/lib/competitions';
 import type { OwnedStatus } from '@/lib/beforeGw';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
@@ -250,7 +251,7 @@ export function createQueries(sql: postgres.Sql) {
           on cp.team_id = n.opponent_id and cp.detailed_position = s.usual_position and cp.window_size = 5
         where true
           ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`})` : sql``}
-          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
@@ -276,10 +277,10 @@ export function createQueries(sql: postgres.Sql) {
     async getGameWeekFixtures(competition?: string): Promise<GameWeekFixture[]> {
       const rows = await sql`
         with upcoming as (
-          select f.*, c.name as competition from fixtures f join competitions c on c.id = f.competition_id and c.is_league
-          where f.status = 'scheduled' and f.date > now() ${competition ? sql`and c.slug = ${competition}` : sql``}
+          select f.*, c.name as competition, c.slug as competition_slug from fixtures f join competitions c on c.id = f.competition_id and c.is_league
+          where f.status = 'scheduled' and f.date > now() ${competition ? sql`and c.slug = any(${slugsOf(competition)})` : sql``}
         )
-        select u.id, u.date, u.competition,
+        select u.id, u.date, u.competition, u.competition_slug,
           h.sorare_slug as home_slug, h.name as home_name, h.picture_url as home_picture, ho.rating as home_rating,
           a.sorare_slug as away_slug, a.name as away_name, a.picture_url as away_picture, ao.rating as away_rating
         from upcoming u
@@ -290,7 +291,7 @@ export function createQueries(sql: postgres.Sql) {
         where u.date < (select min(date) from upcoming) + interval '4 days'
         order by u.date, u.id`;
       return rows.map((r) => ({
-        id: r.id, date: (r.date as Date).toISOString(), competition: r.competition,
+        id: r.id, date: (r.date as Date).toISOString(), competition: competitionGroup(r.competition_slug) === CONTENDER ? CONTENDER_NAME : r.competition,
         home: { slug: r.home_slug, name: r.home_name, pictureUrl: r.home_picture, rating: r.home_rating },
         away: { slug: r.away_slug, name: r.away_name, pictureUrl: r.away_picture, rating: r.away_rating },
       }));
@@ -334,7 +335,7 @@ export function createQueries(sql: postgres.Sql) {
     async getStreakPlan(competition: string, slugs: string[], days: number): Promise<StreakFixture[]> {
       const fixtures = await sql`
         select f.id, f.date, f.home_team_id, f.away_team_id, h.name as home, a.name as away
-        from fixtures f join competitions c on c.id = f.competition_id and c.slug = ${competition}
+        from fixtures f join competitions c on c.id = f.competition_id and c.slug = any(${slugsOf(competition)})
         join teams h on h.id = f.home_team_id join teams a on a.id = f.away_team_id
         where f.status = 'scheduled' and f.date > now() and f.date < now() + make_interval(days => ${days})
         order by f.date, f.id`;
@@ -361,7 +362,7 @@ export function createQueries(sql: postgres.Sql) {
           select t.sorare_slug, t.name, t.picture_url, f.date, s.is_home, o.name as opponent, o.sorare_slug as opponent_slug, co.rating,
             row_number() over (partition by t.id order by f.date) as rn
           from fixtures f
-          join competitions c on c.id = f.competition_id and c.slug = ${competition}
+          join competitions c on c.id = f.competition_id and c.slug = any(${slugsOf(competition)})
           cross join lateral (values (f.home_team_id, f.away_team_id, true), (f.away_team_id, f.home_team_id, false)) s(team_id, opponent_id, is_home)
           join teams t on t.id = s.team_id
           join teams o on o.id = s.opponent_id
@@ -497,7 +498,7 @@ export function createQueries(sql: postgres.Sql) {
         where pm.fair_price is not null and pm.sales30 >= 3
           ${f.view === 'gw' ? sql`and s.next_fixture_id = any(${f.fixtureIds ?? []}) and pm.potential_gain is not null
             and s.start_rate5 >= 0.6 and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'` : sql``}
-          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
           ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
           ${f.maxPrice ? sql`and pm.reference_price <= ${f.maxPrice}` : sql``}
         order by ${order}, p.name
@@ -696,7 +697,7 @@ export function createQueries(sql: postgres.Sql) {
     async listTeams(): Promise<{ slug: string; name: string; competitionSlug: string }[]> {
       const rows = await sql`select t.sorare_slug, t.name, c.slug as competition_slug from teams t join competitions c on c.id = t.competition_id
         order by t.name`;
-      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, competitionSlug: r.competition_slug }));
+      return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, competitionSlug: competitionGroup(r.competition_slug) }));
     },
 
     /** Valeur des cartes de chaque club suivi (somme des prix planchers de la saison), le plus cher d'abord. */
@@ -709,7 +710,7 @@ export function createQueries(sql: postgres.Sql) {
         from teams t join competitions c on c.id = t.competition_id
         left join players p on p.team_id = t.id and exists (select 1 from player_summary s where s.player_id = p.id)
         left join player_market pm on pm.player_id = p.id
-        where true ${competition ? sql`and c.slug = ${competition}` : sql``}
+        where true ${competition ? sql`and c.slug = any(${slugsOf(competition)})` : sql``}
         group by t.id, c.id order by total_floor desc, t.name`;
       return rows.map((r) => ({
         slug: r.sorare_slug, name: r.name, pictureUrl: r.picture_url, competition: r.competition, competitionSlug: r.competition_slug,
@@ -739,7 +740,7 @@ export function createQueries(sql: postgres.Sql) {
         where true
           ${f.team ? sql`and t.sorare_slug = ${f.team} and s.player_id is not null` : sql``}
           ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`}) and t.competition_id is not null` : sql``}
-          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
           ${f.slugs ? sql`and p.sorare_slug = any(${f.slugs})` : sql``}
         order by coalesce(pm.reference_price, p.floor_in_season) desc nulls last, p.name
         ${f.limit ? sql`limit ${f.limit}` : sql``}`;
@@ -765,7 +766,7 @@ export function createQueries(sql: postgres.Sql) {
         -- plancher en moyenne) et les ventes au type inconnu sont écartées.
         where cs.deal_type in ('TokenAuction', 'TokenOffer') and exists (select 1 from player_summary s where s.player_id = p.id)
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
-          ${f.competition ? sql`and c.slug = ${f.competition}` : sql``}
+          ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
         group by 1, 2, 3`;
       return rows.map((r) => ({ slug: r.sorare_slug, day: r.day, price: r.price, inSeason: r.in_season }));
     },
@@ -805,7 +806,8 @@ export function createQueries(sql: postgres.Sql) {
         left join player_summary s on s.player_id = p.id
         where p.sorare_slug = any(${slugs})`;
       return rows.map((r) => ({
-        slug: r.sorare_slug, name: r.name, team: r.team, competition: r.competition, competitionName: r.competition_name,
+        slug: r.sorare_slug, name: r.name, team: r.team, competition: competitionGroup(r.competition),
+        competitionName: competitionGroup(r.competition) === CONTENDER ? CONTENDER_NAME : r.competition_name,
         playingStatus: r.playing_status, injury: r.injury, suspension: r.suspension, startRate: r.start_rate5, playsThisGw: r.plays,
       }));
     },
@@ -833,7 +835,7 @@ export function createQueries(sql: postgres.Sql) {
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {
       const rows = await sql`select slug, name from competitions where is_league order by name`;
-      return rows.map((r) => ({ slug: r.slug, name: r.name }));
+      return groupCompetitions(rows.map((r) => ({ slug: r.slug, name: r.name })));
     },
   };
 }
