@@ -3,7 +3,7 @@
 // moyenne de saison (matchs du club manqués comptés 0), alignés chaque journée, capitaine = meilleure moyenne.
 // Le score d'une journée est simulé 20 000 fois en tirant pour chaque joueur un de ses vrais matchs de la saison ;
 // on en déduit la chance de franchir chaque palier, puis le gain moyen sur l'échelle complète des streaks
-// (réussite : palier suivant ; échec : retour à 320). On donne aussi le parcours réel de cette équipe sur la saison.
+// (palier joué sur 2 journées au plus, 4 vies ; raté : retour à 320). 1 équipe (2 essais) ou 2 équipes (4 essais). On donne aussi le parcours réel de cette équipe sur la saison.
 // Lancé par le workflow « Streaks » ; écrit streak-output/streaks.md et streaks.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { config } from 'dotenv';
@@ -120,8 +120,7 @@ function lineupScore(team: Card[], gw: Gw, bonus: number): number {
 }
 
 /** Simulation : chaque joueur rejoue un de ses matchs de la saison tiré au hasard (générateur fixe, résultats reproductibles). */
-function simulate(team: Card[], bonus: number, draws = 20_000): number[] {
-  let seed = 42;
+function simulate(team: Card[], bonus: number, seed = 42, draws = 20_000): number[] {
   const rand = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
   const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
   return Array.from({ length: draws }, () => {
@@ -136,15 +135,24 @@ function simulate(team: Card[], bonus: number, draws = 20_000): number[] {
 }
 
 /**
- * Gain moyen par journée sur les N journées qui restent, en partant du premier palier (il faut remonter l'échelle
- * après chaque échec : sur une saison courte, les gros paliers sont plus rares qu'en régime établi).
+ * Gain moyen par journée sur les N journées qui restent, en partant du premier palier. Règle Sorare : un palier se joue sur
+ * 2 journées au plus (4 vies) ; q[i] = chance de le valider en une journée (au moins une équipe alignée au-dessus du seuil).
+ * Validé : récompense et palier suivant à la journée d'après ; raté deux journées de suite : retour au premier palier.
  */
-function ladder(p: number[], tiers: Tier[], N: number): { eur: number; essence: number } {
+function ladder(q: number[], tiers: Tier[], N: number): { eur: number; essence: number } {
   const n = tiers.length;
-  let dist = [1, ...Array(n - 1).fill(0)]; let eur = 0; let essence = 0;
+  // État : palier i, journée 0 ou 1 passée dessus.
+  let dist = Array.from({ length: n }, (_, i) => [i === 0 ? 1 : 0, 0]); let eur = 0; let essence = 0;
   for (let s = 0; s < N; s++) {
-    const next = Array(n).fill(0);
-    dist.forEach((q, i) => { eur += q * p[i] * tiers[i][1]; essence += q * p[i] * tiers[i][2]; next[(i + 1) % n] += q * p[i]; next[0] += q * (1 - p[i]); });
+    const next = Array.from({ length: n }, () => [0, 0]);
+    dist.forEach(([fresh, second], i) => {
+      for (const [mass, used] of [[fresh, 0], [second, 1]] as const) {
+        if (!mass) continue;
+        eur += mass * q[i] * tiers[i][1]; essence += mass * q[i] * tiers[i][2];
+        next[(i + 1) % n][0] += mass * q[i];
+        if (used === 0) next[i][1] += mass * (1 - q[i]); else next[0][0] += mass * (1 - q[i]);
+      }
+    });
     dist = next;
   }
   return { eur: eur / N, essence: essence / N };
@@ -152,10 +160,11 @@ function ladder(p: number[], tiers: Tier[], N: number): { eur: number; essence: 
 
 /** Parcours réel journée après journée : ce que l'échelle aurait rapporté cette saison. */
 function realized(totals: number[], tiers: Tier[]) {
-  let level = 0; let eur = 0; let essence = 0; const reached: number[] = [];
+  let level = 0; let used = 0; let eur = 0; let essence = 0; const reached: number[] = [];
   for (const t of totals) {
-    if (t >= tiers[level][0]) { eur += tiers[level][1]; essence += tiers[level][2]; reached.push(tiers[level][0]); level = (level + 1) % tiers.length; }
-    else level = 0;
+    if (t >= tiers[level][0]) { eur += tiers[level][1]; essence += tiers[level][2]; reached.push(tiers[level][0]); level = (level + 1) % tiers.length; used = 0; }
+    else if (used === 0) used = 1;
+    else { level = 0; used = 0; }
   }
   return { eur, essence, reached };
 }
@@ -179,35 +188,39 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const share = (x: number) => Math.round((top.filter((v) => v >= x).length / (top.length || 1)) * 100);
   const profile = `Profil (30 meilleures moyennes, ${top.length} matchs) : ≥60 ${share(60)} %, ≥70 ${share(70)} %, ≥80 ${share(80)} %, ≥90 ${share(90)} %`;
   md.push(`## ${name}`, '', profile, '', `${gws.length} journées rejouées, ~${remaining} restantes · paliers : ${tiers.map((t) => `${t[0]} (${t[1] ? `${t[1]} €` : `${t[2]} ess.`})`).join(', ')}`, '',
-    '| Budget | Coût | Bonus | Score médian | Chance par palier | Saison réelle (paliers validés) | Gain moyen / journée | Journées pour amortir | Bénéfice fin de saison | Équipe |',
-    '|---|---|---|---|---|---|---|---|---|---|');
+    '| Budget | Équipes | Coût | Bonus | Score médian | Chance de valider en une journée | Saison réelle (paliers validés) | Gain moyen / journée | Gain d\'ici la fin de saison | Journées pour amortir | Bénéfice fin de saison | Équipes |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const budget of BUDGETS) {
-    for (const bonus of BONUSES) {
-      const team = bestFive(pool, budget, bonus);
-      if (team.length < 5) continue;
-      const cost = team.reduce((t, p) => t + p.price!, 0);
-      if (results.some((r) => r.league === name && r.bonus === bonus && r.cost === Math.round(cost * 100) / 100)) continue; // même équipe qu'un budget plus petit
-      const sims = simulate(team, bonus);
-      const rates = tiers.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
-      const model = ladder(rates, tiers, Math.max(remaining, 1));
-      // Rejeu sur les journées où les 5 clubs jouaient : les autres sont des trous de données (matchs non importés) ou des
-      // journées où l'on alignerait d'autres cartes ; les compter à 0 casserait la streak à tort.
-      const full = gws.filter((g) => team.every((p) => g.fixtureOfTeam.has(p.team)));
-      const realTotals = full.map((g) => lineupScore(team, g, bonus));
-      const real = realized(realTotals, tiers);
-      // Diagnostic : score réel de chaque journée et nombre de joueurs de l'équipe dont le club jouait.
-      const diag = full.map((g, i) => `${g.key} ${Math.round(realTotals[i])}`);
-      const profit = model.eur * remaining + cost * RESALE - cost;
-      const sorted = [...sims].sort((a, b) => a - b);
-      const row = {
-        league: name, budget, cost: Math.round(cost * 100) / 100, bonus, median: Math.round(sorted[sorted.length >> 1]),
-        rates: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(rates[i] * 1000) / 1000])),
-        realized: { ...real, gws: full.length }, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining, profit: Math.round(profit),
-        breakEvenGws: model.eur > 0 ? Math.ceil((cost * (1 - RESALE)) / model.eur) : null,
-        team: team.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)}, ${seasonGames.get(p.id)!.length} matchs)`), diag,
-      };
-      results.push(row);
-      md.push(`| ${budget} € | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(rates[i] * 100)}%`).join(' ')} | ${full.length} j. : ${real.reached.join(', ') || '—'} (${real.eur} €) | ${row.modelPerGw} € · ${row.essencePerGw} ess. | ${row.breakEvenGws ?? '—'} | ${row.profit} € | ${row.team.join(' ; ')} |`);
+    for (const lineups of [1, 2]) {
+      for (const bonus of BONUSES) {
+        // 1 équipe de 5 cartes (2 essais par palier), ou 2 équipes distinctes de 5 avec la moitié du budget chacune (4 essais).
+        const teams: Card[][] = [];
+        for (let k = 0; k < lineups; k++) teams.push(bestFive(pool.filter((p) => !teams.flat().includes(p)), budget / lineups, bonus));
+        if (teams.some((t) => t.length < 5)) continue;
+        const cost = teams.flat().reduce((t, p) => t + p.price!, 0);
+        if (results.some((r) => r.league === name && r.bonus === bonus && r.lineups === lineups && r.cost === Math.round(cost * 100) / 100)) continue;
+        const sims = teams.map((t, k) => simulate(t, bonus, 42 + 7919 * k));
+        const best = sims[0].map((_, d) => Math.max(...sims.map((x) => x[d]))); // une journée réussie si une des équipes passe
+        const q = tiers.map((t) => best.filter((x) => x >= t[0]).length / best.length);
+        const model = ladder(q, tiers, Math.max(remaining, 1));
+        // Rejeu sur les journées où tous les clubs jouaient (les autres sont des trous de données).
+        const full = gws.filter((g) => teams.flat().every((p) => g.fixtureOfTeam.has(p.team)));
+        const realTotals = full.map((g) => Math.max(...teams.map((t) => lineupScore(t, g, bonus))));
+        const real = realized(realTotals, tiers);
+        const diag = full.map((g, i) => `${g.key} ${Math.round(realTotals[i])}`);
+        const profit = model.eur * remaining + cost * RESALE - cost;
+        const sorted = [...best].sort((a, b) => a - b);
+        const row = {
+          league: name, budget, lineups, cost: Math.round(cost * 100) / 100, bonus, median: Math.round(sorted[sorted.length >> 1]),
+          perGwPass: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(q[i] * 1000) / 1000])),
+          realized: { ...real, gws: full.length }, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining,
+          seasonGain: Math.round(model.eur * remaining), profit: Math.round(profit),
+          breakEvenGws: model.eur > 0 ? Math.ceil((cost * (1 - RESALE)) / model.eur) : null,
+          teams: teams.map((t) => t.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)})`)), diag,
+        };
+        results.push(row);
+        md.push(`| ${budget} € | ${lineups} équipe${lineups > 1 ? 's' : ''} | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(q[i] * 100)}%`).join(' ')} | ${full.length} j. : ${real.reached.join(', ') || '—'} (${real.eur} €) | ${row.modelPerGw} € · ${row.essencePerGw} ess. | ${row.seasonGain} € | ${row.breakEvenGws ?? '—'} | ${row.profit} € | ${row.teams.map((t) => t.join(' ; ')).join(' // ')} |`);
+      }
     }
   }
   md.push('');
