@@ -21,6 +21,7 @@ export const SORARE_COMPETITIONS = {
   ligue2: 'ligue-2-fr',
   hnl: '1-hnl',
   scottishPremiership: 'premiership-gb-sct',
+  liga2: 'segunda-division-es',
 } as const;
 
 export interface SorareClub { slug: string; name: string; shortName: string | null; pictureUrl: string | null; competitionSlug: string }

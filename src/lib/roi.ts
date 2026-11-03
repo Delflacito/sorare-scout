@@ -10,14 +10,13 @@ export type RoiGroup = (typeof ROI_GROUPS)[number]['key'];
 
 const BY_SLUG: Record<string, RoiGroup> = {
   eredivisie: 'eredivisie', 'primeira-liga-pt': 'primeira', 'ligue-1-fr': 'ligue1', 'jupiler-pro-league': 'jupiler',
-  'austrian-bundesliga': 'contender', '2-bundesliga': 'contender', 'ligue-2-fr': 'contender', '1-hnl': 'contender',
+  'austrian-bundesliga': 'contender', '2-bundesliga': 'contender', 'ligue-2-fr': 'contender', '1-hnl': 'contender', 'segunda-division-es': 'contender',
 };
 
 /** Groupe d'un championnat Sorare (club actuel du joueur) ; null s'il n'est pas suivi. */
 export function roiGroupOf(leagueSlug: string | null): RoiGroup | null {
   if (!leagueSlug) return null;
-  // shortcut: « Liga 2 » reconnue par son slug (Espagne ou Portugal), à préciser si Sorare la nomme autrement.
-  return BY_SLUG[leagueSlug] ?? (/segunda|liga-2|laliga-2|hypermotion/.test(leagueSlug) ? 'contender' : null);
+  return BY_SLUG[leagueSlug] ?? null;
 }
 
 /** Récompense d'un palier de streak (score d'équipe à atteindre) : euros ou essence. */

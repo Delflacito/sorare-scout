@@ -25,6 +25,7 @@ export const LEAGUES: League[] = [
   { key: 'austrianBundesliga', name: 'Bundesliga (Autriche)', sorareSlug: SORARE_COMPETITIONS.austrianBundesliga },
   { key: 'ligue2', name: 'Ligue 2', sorareSlug: SORARE_COMPETITIONS.ligue2 },
   { key: 'hnl', name: 'HNL (Croatie)', sorareSlug: SORARE_COMPETITIONS.hnl },
+  { key: 'liga2', name: 'Liga 2 (Espagne)', sorareSlug: SORARE_COMPETITIONS.liga2 },
   { key: 'scottishPremiership', name: 'Premiership (Écosse)', sorareSlug: SORARE_COMPETITIONS.scottishPremiership },
 ];
 
