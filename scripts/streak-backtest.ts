@@ -187,21 +187,24 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
       const sims = simulate(team, bonus);
       const rates = tiers.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
       const model = ladder(rates, tiers);
-      const realTotals = gws.map((g) => lineupScore(team, g, bonus));
+      // Rejeu sur les journées où les 5 clubs jouaient : les autres sont des trous de données (matchs non importés) ou des
+      // journées où l'on alignerait d'autres cartes ; les compter à 0 casserait la streak à tort.
+      const full = gws.filter((g) => team.every((p) => g.fixtureOfTeam.has(p.team)));
+      const realTotals = full.map((g) => lineupScore(team, g, bonus));
       const real = realized(realTotals, tiers);
       // Diagnostic : score réel de chaque journée et nombre de joueurs de l'équipe dont le club jouait.
-      const diag = gws.map((g, i) => `${g.key} ${Math.round(realTotals[i])} (${team.filter((p) => g.fixtureOfTeam.has(p.team)).length}/5)`);
+      const diag = full.map((g, i) => `${g.key} ${Math.round(realTotals[i])}`);
       const profit = model.eur * remaining + cost * RESALE - cost;
       const sorted = [...sims].sort((a, b) => a - b);
       const row = {
         league: name, budget, cost: Math.round(cost * 100) / 100, bonus, median: Math.round(sorted[sorted.length >> 1]),
         rates: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(rates[i] * 1000) / 1000])),
-        realized: real, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining, profit: Math.round(profit),
+        realized: { ...real, gws: full.length }, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining, profit: Math.round(profit),
         breakEvenGws: model.eur > 0 ? Math.ceil((cost * (1 - RESALE)) / model.eur) : null,
         team: team.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)}, ${seasonGames.get(p.id)!.length} matchs)`), diag,
       };
       results.push(row);
-      md.push(`| ${budget} € | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(rates[i] * 100)}%`).join(' ')} | ${real.reached.join(', ') || '—'} (${real.eur} €) | ${row.modelPerGw} € · ${row.essencePerGw} ess. | ${row.breakEvenGws ?? '—'} | ${row.profit} € | ${row.team.join(' ; ')} |`);
+      md.push(`| ${budget} € | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(rates[i] * 100)}%`).join(' ')} | ${full.length} j. : ${real.reached.join(', ') || '—'} (${real.eur} €) | ${row.modelPerGw} € · ${row.essencePerGw} ess. | ${row.breakEvenGws ?? '—'} | ${row.profit} € | ${row.team.join(' ; ')} |`);
     }
   }
   md.push('');
