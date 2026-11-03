@@ -135,9 +135,12 @@ function simulate(team: Card[], bonus: number, draws = 20_000): number[] {
   });
 }
 
-/** Gain moyen par journée sur une échelle de streaks, avec la probabilité de franchir chaque palier. */
-function ladder(p: number[], tiers: Tier[]): { eur: number; essence: number } {
-  const n = tiers.length; const N = 2000;
+/**
+ * Gain moyen par journée sur les N journées qui restent, en partant du premier palier (il faut remonter l'échelle
+ * après chaque échec : sur une saison courte, les gros paliers sont plus rares qu'en régime établi).
+ */
+function ladder(p: number[], tiers: Tier[], N: number): { eur: number; essence: number } {
+  const n = tiers.length;
   let dist = [1, ...Array(n - 1).fill(0)]; let eur = 0; let essence = 0;
   for (let s = 0; s < N; s++) {
     const next = Array(n).fill(0);
@@ -186,7 +189,7 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
       if (results.some((r) => r.league === name && r.bonus === bonus && r.cost === Math.round(cost * 100) / 100)) continue; // même équipe qu'un budget plus petit
       const sims = simulate(team, bonus);
       const rates = tiers.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
-      const model = ladder(rates, tiers);
+      const model = ladder(rates, tiers, Math.max(remaining, 1));
       // Rejeu sur les journées où les 5 clubs jouaient : les autres sont des trous de données (matchs non importés) ou des
       // journées où l'on alignerait d'autres cartes ; les compter à 0 casserait la streak à tort.
       const full = gws.filter((g) => team.every((p) => g.fixtureOfTeam.has(p.team)));
