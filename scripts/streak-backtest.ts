@@ -37,6 +37,19 @@ const BONUSES = [0.11, 0.15]; // collection 3-5 % + saison 5 % + XP 3-5 %
 const CAPTAIN = 0.5;
 const RESALE = 0.7; // shortcut: valeur de revente en fin de saison supposée à 70 % du prix d'achat, à affiner avec l'historique des prix.
 const SEASON_END = Date.parse('2027-05-24T00:00:00Z');
+// Journées de championnat sur la saison (phase régulière + play-offs joués par les meilleurs clubs).
+// shortcut: Contender = journées Sorare où au moins un des 5 championnats joue, estimées à 30 d'ici fin mai ; à recompter si besoin.
+const SEASON_ROUNDS: Record<string, number> = {
+  'premier-league-gb-eng': 38, 'laliga-es': 38, 'bundesliga-de': 34, 'ligue-1-fr': 34, 'primeira-liga-pt': 34, eredivisie: 34,
+  'jupiler-pro-league': 40, 'premiership-gb-sct': 38, 'football-league-championship': 46,
+};
+/** Journées restantes : journées de la saison moins celles déjà jouées par un club (moyenne). */
+async function remainingRounds(league: string): Promise<number> {
+  if (league === 'contender') return 30;
+  const [r] = await sql`select avg(n)::float as played from (select t.id, count(f.id) as n from teams t join competitions c on c.id = t.competition_id and c.slug = ${league}
+    join fixtures f on (f.home_team_id = t.id or f.away_team_id = t.id) and f.competition_id = c.id and f.status = 'played' and f.date >= '2026-07-01' group by t.id) x`;
+  return Math.max(1, Math.round(SEASON_ROUNDS[league] - ((r?.played as number) ?? 0)));
+}
 
 // ——— Données ———
 const players = (await sql`
@@ -173,13 +186,11 @@ const now = Date.now();
 const results: Record<string, unknown>[] = [];
 const md: string[] = ['# Rentabilité des streaks rejouée sur la saison', '',
   `Calcul du ${new Date().toISOString().slice(0, 10)}. Prix d'achat : planchers actuels. Bonus de carte ${BONUSES.map((b) => `${b * 100} %`).join(' / ')}, capitaine +50 %.`,
-  `« Journées pour amortir » : journées de streaks pour couvrir la perte à la revente (${(1 - RESALE) * 100} % du prix). Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes estimées d'après le rythme observé jusqu'au ${new Date(SEASON_END).toISOString().slice(0, 10)}.`, ''];
+  `« Journées pour amortir » : journées de streaks pour couvrir la perte à la revente (${(1 - RESALE) * 100} % du prix). Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes : calendrier de chaque championnat moins les journées jouées.`, ''];
 for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
   if (gws.length < 4) continue;
-  const firstGw = Date.parse(gws[0].key.slice(0, 10));
-  const rate = gws.length / ((now - firstGw) / (7 * 86_400_000)); // journées par semaine
-  const remaining = Math.round(rate * (SEASON_END - now) / (7 * 86_400_000));
+  const remaining = await remainingRounds(league);
   // Joueurs réguliers (L15 ≥ 35, matchs manqués comptés à 0) avec une carte de la saison en vente.
   const pool = players.filter((p) => p.league === league && p.price !== null && p.l15 >= 30 && seasonGames.get(p.id)!.length >= 5);
   // Profil du championnat : parmi les 30 meilleures moyennes, chance de dépasser 60, 70, 80, 90 sur un match.
@@ -233,8 +244,7 @@ md.push('# Stacks (1 ou 2 clubs), 1 équipe alignée', '');
 for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
   if (gws.length < 4) continue;
-  const firstGw = Date.parse(gws[0].key.slice(0, 10));
-  const remaining = Math.round((gws.length / ((now - firstGw) / (7 * 86_400_000))) * (SEASON_END - now) / (7 * 86_400_000));
+  const remaining = await remainingRounds(league);
   const pool = players.filter((p) => p.league === league && p.price !== null && seasonGames.get(p.id)!.length >= 5);
   const clubs = [...new Set(pool.map((p) => p.team))];
   const evaluate = (label: string, clubIds: number[], budget: number, bonus: number) => {
