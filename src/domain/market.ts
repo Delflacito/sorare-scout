@@ -180,17 +180,27 @@ export interface ValueSeries { season: ValuePoint[]; classic: ValuePoint[] }
  * sa première vente connue : le prix de celle-ci, pour que l'entrée d'un joueur ne fasse pas monter la courbe).
  * Somme lissée par une moyenne pondérée des jours précédents.
  */
+/** Part des joueurs qui doivent avoir une vente connue pour que la courbe commence. */
+export const COVERAGE = 0.8;
+
 export function valueHistory(prices: { slug: string; day: string; price: number }[], weightedDays = WEIGHTED_DAYS): ValuePoint[] {
   if (!prices.length) return [];
   const dayMs = 86_400_000;
   const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
   const byPlayer = new Map<string, Map<string, number>>();
   for (const p of prices) byPlayer.set(p.slug, (byPlayer.get(p.slug) ?? new Map()).set(p.day, p.price));
-  const first = Math.min(...prices.map((p) => Date.parse(p.day)));
+  // Début de la courbe : le jour où 80 % des joueurs ont déjà une vente connue. Avant, la plupart n'auraient que leur
+  // première vente recopiée en arrière : une valeur inventée, plate, qui fausse l'évolution.
+  const firstSales = [...byPlayer.values()].map((sales) => Date.parse([...sales.keys()].sort()[0])).sort((a, b) => a - b);
+  const first = firstSales[Math.ceil(firstSales.length * COVERAGE) - 1];
   const last = Math.max(...prices.map((p) => Date.parse(p.day)));
   const days = Array.from({ length: Math.round((last - first) / dayMs) + 1 }, (_, i) => iso(first + i * dayMs));
-  // Prix courant de chaque joueur, mis à jour jour après jour ; au départ, sa première vente connue.
-  const known = new Map([...byPlayer].map(([slug, sales]) => [slug, sales.get([...sales.keys()].sort()[0])!]));
+  // Prix courant de chaque joueur au début de la courbe : sa dernière vente jusque-là, à défaut sa première vente connue.
+  const startDay = iso(first);
+  const known = new Map([...byPlayer].map(([slug, sales]) => {
+    const keys = [...sales.keys()].sort();
+    return [slug, sales.get(keys.filter((d) => d <= startDay).at(-1) ?? keys[0])!];
+  }));
   const totals = days.map((day) => {
     let total = 0;
     let sold = 0;

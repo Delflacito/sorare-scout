@@ -77,9 +77,13 @@ describe('valueHistory', () => {
     expect(h.map((p) => p.value)).toEqual([40, 40, 50, 60]);
     expect(h.map((p) => p.players)).toEqual([2, 0, 1, 1]);
   });
-  it('joueur pas encore vendu : compté à sa première vente connue (son arrivée ne fait pas monter la courbe)', () => {
-    const h = valueHistory([sale('a', '2026-10-01', 10), sale('a', '2026-10-02', 10), sale('b', '2026-10-02', 50)], 1);
-    expect(h.map((p) => p.value)).toEqual([60, 60]);
+  it('commence quand 80 % des joueurs ont une vente connue (pas de valeur recopiée en arrière sur des semaines)', () => {
+    // a vendu dès le 1er ; b, c, d, e seulement à partir du 5 : avant, la courbe ne serait que leur prix recopié.
+    const h = valueHistory([
+      sale('a', '2026-10-01', 10), sale('a', '2026-10-04', 20),
+      ...['b', 'c', 'd'].map((x) => sale(x, '2026-10-05', 5)), sale('e', '2026-10-06', 50),
+    ], 1);
+    expect(h.map((p) => [p.day, p.value])).toEqual([['2026-10-05', 20 + 15 + 50], ['2026-10-06', 20 + 15 + 50]]);
   });
   it('moyenne pondérée des 3 derniers jours (3, 2, 1) : un jour isolé pèse moins ; uniquement les prix de vente réels', () => {
     const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
