@@ -1,0 +1,28 @@
+name: Streaks
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  streaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/streak-backtest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Résultats publiés sur la branche streak-results (lisible sans téléchargement d'artefact).
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan streak-results
+          git rm -rq --cached .
+          git add -f streak-output
+          git commit -qm "Streaks $(date -u +%FT%TZ)"
+          git push -f origin streak-results
