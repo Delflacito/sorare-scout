@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import { getQueries, type StreakFixture } from '@/db/queries';
-import { GENERIC_LABEL_FR } from '@/domain/types';
 import { EnsurePseudo } from '@/components/MyCards';
-import { ScorePill } from '@/components/ScorePill';
-import { fmtPct } from '@/lib/format';
+import { StreakPlanner } from '@/components/StreakPlanner';
 import { one, type SearchParams } from '@/lib/params';
 import { PSEUDO } from '@/lib/squad';
 
@@ -50,36 +48,8 @@ export default async function StreakPage({ searchParams }: { searchParams: Searc
           <Link href={`/game-week?competition=${competition}&cartes=${cartes}&titu=0`}>Composer la prochaine journée avec mes cartes →</Link>
         </p>
       )}
-      {days.length === 0 ? <p className="empty">Aucun match programmé dans les {DAYS} prochains jours.</p> : (
-        <div className="streak-days">
-          {days.map(([key, fixtures]) => {
-            const mine = fixtures.reduce((n, f) => n + f.mine.length, 0);
-            return (
-              <section key={key} className="card streak-day" aria-label={fmtDay(fixtures[0].date)}>
-                <h2 className="card-title">{fmtDay(fixtures[0].date)}<span>{mine} de tes joueurs · {fixtures.length} match{fixtures.length > 1 ? 's' : ''}</span></h2>
-                <ul className="streak-fixtures">
-                  {fixtures.map((f) => (
-                    <li key={f.id}>
-                      <div className="streak-match"><span className="muted">{fmtTime(f.date)}</span> <strong>{f.home}</strong> – <strong>{f.away}</strong></div>
-                      {f.mine.length > 0 && (
-                        <ul className="streak-mine" aria-label={`Tes joueurs, ${f.home} – ${f.away}`}>
-                          {f.mine.map((m) => (
-                            <li key={m.slug}>
-                              <Link href={`/joueurs/${m.slug}`}>{m.name}</Link>
-                              <span className="muted small">{m.positions.map((x) => GENERIC_LABEL_FR[x][0]).join('/')} · {m.team} · titu {m.startRate === null ? '—' : fmtPct(m.startRate)}</span>
-                              {m.projected !== null && <ScorePill score={m.projected} size="sm" title="Score potentiel" />}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
-      )}
+      {days.length === 0 ? <p className="empty">Aucun match programmé dans les {DAYS} prochains jours.</p>
+        : <StreakPlanner days={days.map(([key, fixtures]) => ({ key, label: fmtDay(fixtures[0].date), fixtures: fixtures.map((f) => ({ ...f, time: fmtTime(f.date) })) }))} />}
       <p className="note">Score potentiel affiché pour le prochain match de chaque joueur seulement ; les suivants dépendront de sa forme d’ici là.</p>
     </main>
   );

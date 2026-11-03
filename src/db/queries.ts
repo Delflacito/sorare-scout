@@ -65,6 +65,8 @@ export interface ClubSchedule {
   slug: string; name: string; pictureUrl: string | null;
   games: { date: string; opponent: string; opponentSlug: string; isHome: boolean; opponentRating: number | null }[];
 }
+const POSITION_ORDER: GenericPosition[] = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
+
 /** Un match à venir et les cartes possédées de ses deux clubs (score potentiel s'il s'agit de leur prochain match). */
 export interface StreakFixture {
   id: number; date: string; home: string; away: string;
@@ -344,15 +346,21 @@ export function createQueries(sql: postgres.Sql) {
           s.next_fixture_id, s.next_projected, s.start_rate5
         from players p join teams t on t.id = p.team_id left join player_summary s on s.player_id = p.id
         where p.sorare_slug = any(${slugs})` : [];
-      return fixtures.map((f) => ({
+      return fixtures.map((f) => {
+        const projectedHere = (p: (typeof players)[number]) => (p.next_fixture_id === f.id ? (p.next_projected as number | null) : null);
+        return {
         id: f.id, date: (f.date as Date).toISOString(), home: f.home, away: f.away,
+        // Par club (domicile d'abord), puis poste (G, D, M, A), puis score potentiel.
         mine: players.filter((p) => p.team_id === f.home_team_id || p.team_id === f.away_team_id)
+          .sort((a, b) => Number(b.team_id === f.home_team_id) - Number(a.team_id === f.home_team_id)
+            || POSITION_ORDER.indexOf(a.positions[0]) - POSITION_ORDER.indexOf(b.positions[0])
+            || (projectedHere(b) ?? -1) - (projectedHere(a) ?? -1))
           .map((p) => ({
             slug: p.sorare_slug, name: p.name, team: p.team, positions: p.positions,
-            projected: p.next_fixture_id === f.id ? p.next_projected : null, startRate: p.start_rate5,
-          }))
-          .sort((a, b) => (b.projected ?? -1) - (a.projected ?? -1)),
-      }));
+            projected: projectedHere(p), startRate: p.start_rate5,
+          })),
+        };
+      });
     },
 
     /** Les n prochains matchs de championnat de chaque club d'un championnat. */
