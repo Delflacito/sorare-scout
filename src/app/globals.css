@@ -716,3 +716,14 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .streak-pos { min-width: 18px; font-weight: 700; color: var(--muted); }
 .streak-tools { margin: 10px 0 0; }
 .streak-tools .chip { font: inherit; cursor: pointer; }
+.streak-plans { margin-top: 12px; }
+.streak-plan-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.streak-plan-list li { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.streak-plan-list li.is-open { border-color: var(--accent); }
+.streak-plan-name { flex: 1; min-width: 0; font-weight: 600; }
+.streak-plan-list .chip { font: inherit; cursor: pointer; }
+.streak-save { display: flex; flex-wrap: wrap; gap: 8px; }
+.streak-save input { flex: 1 1 220px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; }
+.streak-save button { min-height: 44px; padding: 0 14px; border: none; border-radius: 10px; background: var(--accent); color: var(--surface); font: inherit; font-weight: 600; cursor: pointer; }
+.streak-save button.secondary { background: var(--neutral-bg); color: var(--text); }
+.streak-save button:disabled { opacity: .5; cursor: default; }

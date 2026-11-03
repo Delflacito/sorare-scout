@@ -12,3 +12,15 @@ describe('championnats Contender', () => {
     expect(slugsOf('eredivisie')).toEqual(['eredivisie']);
   });
 });
+
+import { parsePlans } from '@/lib/streakPlans';
+
+describe('sélections Streak enregistrées', () => {
+  it('vérifiées avant enregistrement', () => {
+    const ok = [{ id: 'a1', name: ' GW 12 ', picks: ['12:kees-smit', '12:kees-smit'] }];
+    expect(parsePlans(ok)).toEqual([{ id: 'a1', name: 'GW 12', picks: ['12:kees-smit'] }]);
+    expect(parsePlans([{ id: 'a1', name: '', picks: [] }])).toBeNull();
+    expect(parsePlans([{ id: 'a1', name: 'x', picks: ['<script>'] }])).toBeNull();
+    expect(parsePlans({})).toBeNull();
+  });
+});

@@ -49,7 +49,7 @@ export default async function StreakPage({ searchParams }: { searchParams: Searc
         </p>
       )}
       {days.length === 0 ? <p className="empty">Aucun match programmé dans les {DAYS} prochains jours.</p>
-        : <StreakPlanner days={days.map(([key, fixtures]) => ({ key, label: fmtDay(fixtures[0].date), fixtures: fixtures.map((f) => ({ ...f, time: fmtTime(f.date) })) }))} />}
+        : <StreakPlanner pseudo={cartes} days={days.map(([key, fixtures]) => ({ key, label: fmtDay(fixtures[0].date), fixtures: fixtures.map((f) => ({ ...f, time: fmtTime(f.date) })) }))} />}
       <p className="note">Score potentiel affiché pour le prochain match de chaque joueur seulement ; les suivants dépendront de sa forme d’ici là.</p>
     </main>
   );

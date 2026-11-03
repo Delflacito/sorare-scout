@@ -4,6 +4,7 @@ import type { DetailedPosition, GenericPosition } from '@/domain/types';
 import type { RoiData, RoiWeek } from '@/lib/roi';
 import { CONTENDER, CONTENDER_NAME, competitionGroup, groupCompetitions, slugsOf } from '@/lib/competitions';
 import type { OwnedStatus } from '@/lib/beforeGw';
+import type { StreakPlan } from '@/lib/streakPlans';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
 
@@ -839,6 +840,17 @@ export function createQueries(sql: postgres.Sql) {
     async saveRoi(pseudo: string, data: RoiData): Promise<void> {
       await sql`insert into roi (pseudo, data) values (${pseudo}, ${sql.json(data as unknown as postgres.JSONValue)})
         on conflict (pseudo) do update set data = excluded.data, updated_at = now()`;
+    },
+
+    /** Sélections enregistrées de la page Streak pour un pseudo Sorare. */
+    async getStreakPlans(pseudo: string): Promise<StreakPlan[]> {
+      const [r] = await sql`select plans from streak_plans where pseudo = ${pseudo}`;
+      return r ? (r.plans as StreakPlan[]) : [];
+    },
+
+    async saveStreakPlans(pseudo: string, plans: StreakPlan[]): Promise<void> {
+      await sql`insert into streak_plans (pseudo, plans) values (${pseudo}, ${sql.json(plans as unknown as postgres.JSONValue)})
+        on conflict (pseudo) do update set plans = excluded.plans, updated_at = now()`;
     },
 
     async listCompetitions(): Promise<{ slug: string; name: string }[]> {

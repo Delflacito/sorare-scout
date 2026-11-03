@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { StreakFixture } from '@/db/queries';
 
 const getStreakPlan = vi.fn<(c: string, slugs: string[], days: number) => Promise<StreakFixture[]>>();
@@ -19,6 +19,11 @@ const fx = (id: number, date: string, mine: StreakFixture['mine'] = []): StreakF
 describe('/streak', () => {
   it('matchs par jour (heure de Paris), joueurs par club puis poste, sélection avec total potentiel', async () => {
     window.localStorage.clear();
+    const puts: unknown[] = [];
+    global.fetch = vi.fn(async (_u: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === 'PUT') { puts.push(JSON.parse(String(init.body)).plans); return new Response('{"ok":true}'); }
+      return new Response(JSON.stringify({ plans: [{ id: 'old', name: 'Ancienne', picks: ['1:gk'] }] }));
+    }) as unknown as typeof fetch;
     const m = (slug: string, team: string, pos: 'Goalkeeper' | 'Forward', projected: number | null) =>
       ({ slug, name: slug, team, positions: [pos], projected, startRate: 0.8 });
     getStreakPlan.mockResolvedValue([
@@ -36,9 +41,20 @@ describe('/streak', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Sélectionner away' }));
     expect(screen.getByText('Samedi 7 novembre').parentElement).toHaveTextContent('2 sélectionnés, 115 pts potentiels');
     expect(JSON.parse(window.localStorage.getItem('sorare-scout:streak-selection')!)).toEqual(['1:fw', '1:away']);
-    fireEvent.click(screen.getByRole('button', { name: 'Seulement ma sélection' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Seulement ma sélection/ }));
     expect(screen.queryByRole('list', { name: 'Tes joueurs, H1' })).toHaveTextContent('fw');
     expect(screen.queryByRole('checkbox', { name: 'Sélectionner gk' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ligue 1' })).toHaveAttribute('href', '/streak?competition=ligue-1-fr&cartes=delflacito');
+
+    // enregistrer (une fois les sélections existantes lues), rouvrir une autre sélection, supprimer
+    await screen.findByRole('button', { name: 'Ouvrir Ancienne' });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom de la sélection' }), { target: { value: 'GW 12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la sélection' }));
+    await waitFor(() => expect(puts.at(-1)).toEqual([{ id: 'old', name: 'Ancienne', picks: ['1:gk'] }, { id: expect.any(String), name: 'GW 12', picks: ['1:fw', '1:away'] }]));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir Ancienne' }));
+    expect(screen.getByRole('button', { name: /Seulement ma sélection \(1\)/ })).toBeInTheDocument();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer GW 12' }));
+    await waitFor(() => expect(puts.at(-1)).toEqual([{ id: 'old', name: 'Ancienne', picks: ['1:gk'] }]));
   });
 });
