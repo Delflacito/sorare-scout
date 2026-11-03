@@ -1,7 +1,9 @@
-// Rentabilité des streaks par championnat, rejouée sur les journées passées de la saison.
-// Pour chaque budget : on achète aujourd'hui (prix planchers actuels) un effectif, puis, journée après journée, on aligne
-// l'équipe qu'on aurait choisie AVANT les matchs (forme des 15 derniers matchs du club), on prend les VRAIS scores Sorare,
-// les bonus (cartes + capitaine +50 %) et on fait gravir l'échelle des streaks (réussite : palier suivant ; échec : retour à 320).
+// Rentabilité des streaks par championnat, d'après les vrais scores Sorare de la saison.
+// Pour chaque budget : on achète aujourd'hui (prix planchers actuels) les 5 joueurs (G, D, M, A + extra) à la meilleure
+// moyenne de saison (matchs du club manqués comptés 0), alignés chaque journée, capitaine = meilleure moyenne.
+// Le score d'une journée est simulé 20 000 fois en tirant pour chaque joueur un de ses vrais matchs de la saison ;
+// on en déduit la chance de franchir chaque palier, puis le gain moyen sur l'échelle complète des streaks
+// (réussite : palier suivant ; échec : retour à 320). On donne aussi le parcours réel de cette équipe sur la saison.
 // Lancé par le workflow « Streaks » ; écrit streak-output/streaks.md et streaks.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { config } from 'dotenv';
@@ -33,7 +35,6 @@ const LEAGUES: Record<string, { name: string; tiers: Tier[] }> = {
 const BUDGETS = [10, 20, 40, 80, 150, 300, 600, 1200];
 const BONUSES = [0.11, 0.15]; // collection 3-5 % + saison 5 % + XP 3-5 %
 const CAPTAIN = 0.5;
-const FORM_GAMES = 15;
 const RESALE = 0.7; // shortcut: valeur de revente en fin de saison supposée à 70 % du prix d'achat, à affiner avec l'historique des prix.
 const SEASON_END = Date.parse('2027-05-24T00:00:00Z');
 
@@ -81,11 +82,11 @@ for (const f of fixtures) {
 }
 for (const list of gwsByLeague.values()) list.sort((a, b) => a.key.localeCompare(b.key));
 
-/** Forme avant une journée : moyenne des 15 derniers matchs du club (0 si le joueur n'a pas joué). */
-function formBefore(p: (typeof players)[number], gw: string): number {
-  const past = (teamGames.get(p.team) ?? []).filter((g) => g.gw < gw).slice(-FORM_GAMES);
-  return past.length ? past.reduce((t, g) => t + (scores.get(`${g.fixture}:${p.id}`) ?? 0), 0) / past.length : 0;
-}
+/** Scores de la saison d'un joueur, un par match de championnat de son club (0 s'il n'a pas joué). */
+const seasonGames = new Map<number, number[]>();
+for (const p of players) seasonGames.set(p.id, (teamGames.get(p.team) ?? []).map((g) => scores.get(`${g.fixture}:${p.id}`) ?? 0));
+const avgOf = (p: (typeof players)[number]) => { const g = seasonGames.get(p.id)!; return g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0; };
+for (const p of players) p.l15 = avgOf(p); // la sélection se fait sur la moyenne de saison, plus stable que la forme
 
 // ——— Effectif acheté pour un budget ———
 type Card = (typeof players)[number];
@@ -110,33 +111,28 @@ function bestFive(pool: Card[], budget: number, bonus: number): Card[] {
   return best?.team ?? [];
 }
 
-/** Effectif : l'équipe de 5 avec ~75 % du budget, le reste en remplaçants (meilleur L15 par poste encore abordable). */
-function squad(pool: Card[], budget: number, bonus: number, depth: boolean): Card[] {
-  const five = bestFive(pool, depth ? budget * 0.75 : budget, bonus);
-  if (!depth || !five.length) return five;
-  let left = budget - five.reduce((t, p) => t + p.price!, 0);
-  const owned = [...five];
-  for (const k of ['G', 'D', 'M', 'F', 'D', 'M', 'F'] as Pos[]) {
-    const pick = pool.filter((p) => p.pos === k && !owned.includes(p) && p.price! <= left).sort((a, b) => b.l15 - a.l15)[0];
-    if (pick) { owned.push(pick); left -= pick.price!; }
-  }
-  return owned;
+// ——— Scores d'équipe ———
+/** Score réel de l'équipe fixe à une journée (0 pour un joueur dont le club ne joue pas ou qui ne joue pas). */
+function lineupScore(team: Card[], gw: Gw, bonus: number): number {
+  const actual = (p: Card) => (gw.fixtureOfTeam.has(p.team) ? scores.get(`${gw.fixtureOfTeam.get(p.team)}:${p.id}`) ?? 0 : 0);
+  const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
+  return team.reduce((t, p) => t + actual(p), 0) * (1 + bonus) + CAPTAIN * actual(captain);
 }
 
-// ——— Rejeu des journées ———
-function lineupScore(owned: Card[], gw: Gw, bonus: number): number {
-  const avail = owned.filter((p) => gw.fixtureOfTeam.has(p.team)).map((p) => ({ p, form: formBefore(p, gw.key) }));
-  const pick: typeof avail = [];
-  for (const k of ['G', 'D', 'M', 'F'] as Pos[]) {
-    const c = avail.filter((a) => a.p.pos === k).sort((a, b) => b.form - a.form)[0];
-    if (c) pick.push(c);
-  }
-  const extra = avail.filter((a) => a.p.pos !== 'G' && !pick.includes(a)).sort((a, b) => b.form - a.form)[0];
-  if (extra) pick.push(extra);
-  if (!pick.length) return 0;
-  const actual = (a: (typeof avail)[number]) => scores.get(`${gw.fixtureOfTeam.get(a.p.team)}:${a.p.id}`) ?? 0;
-  const captain = pick.reduce((b, a) => (a.form > b.form ? a : b));
-  return pick.reduce((t, a) => t + actual(a), 0) * (1 + bonus) + CAPTAIN * actual(captain);
+/** Simulation : chaque joueur rejoue un de ses matchs de la saison tiré au hasard (générateur fixe, résultats reproductibles). */
+function simulate(team: Card[], bonus: number, draws = 20_000): number[] {
+  let seed = 42;
+  const rand = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+  const captain = team.reduce((b, p) => (p.l15 > b.l15 ? p : b));
+  return Array.from({ length: draws }, () => {
+    let total = 0; let cap = 0;
+    for (const p of team) {
+      const g = seasonGames.get(p.id)!;
+      const s = g[Math.floor(rand() * g.length)];
+      total += s; if (p === captain) cap = s;
+    }
+    return total * (1 + bonus) + CAPTAIN * cap;
+  });
 }
 
 /** Gain moyen par journée sur une échelle de streaks, avec la probabilité de franchir chaque palier. */
@@ -166,7 +162,7 @@ const now = Date.now();
 const results: Record<string, unknown>[] = [];
 const md: string[] = ['# Rentabilité des streaks rejouée sur la saison', '',
   `Calcul du ${new Date().toISOString().slice(0, 10)}. Prix d'achat : planchers actuels. Bonus de carte ${BONUSES.map((b) => `${b * 100} %`).join(' / ')}, capitaine +50 %.`,
-  `Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes estimées d'après le rythme observé jusqu'au ${new Date(SEASON_END).toISOString().slice(0, 10)}.`, ''];
+  `« Journées pour amortir » : journées de streaks pour couvrir la perte à la revente (${(1 - RESALE) * 100} % du prix). Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes estimées d'après le rythme observé jusqu'au ${new Date(SEASON_END).toISOString().slice(0, 10)}.`, ''];
 for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
   if (gws.length < 4) continue;
@@ -174,32 +170,35 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const rate = gws.length / ((now - firstGw) / (7 * 86_400_000)); // journées par semaine
   const remaining = Math.round(rate * (SEASON_END - now) / (7 * 86_400_000));
   // Joueurs réguliers (L15 ≥ 35, matchs manqués comptés à 0) avec une carte de la saison en vente.
-  const pool = players.filter((p) => p.league === league && p.price !== null && p.l15 >= 35);
-  md.push(`## ${name}`, '', `${gws.length} journées rejouées, ~${remaining} restantes · paliers : ${tiers.map((t) => `${t[0]} (${t[1] ? `${t[1]} €` : `${t[2]} ess.`})`).join(', ')}`, '',
-    '| Budget | Effectif | Coût | Bonus | Score médian | Taux par palier | Parcours réel (paliers validés) | € réel saison | € / journée (modèle) | Bénéfice fin de saison |',
+  const pool = players.filter((p) => p.league === league && p.price !== null && p.l15 >= 30 && seasonGames.get(p.id)!.length >= 5);
+  // Profil du championnat : parmi les 30 meilleures moyennes, chance de dépasser 60, 70, 80, 90 sur un match.
+  const top = [...pool].sort((a, b) => b.l15 - a.l15).slice(0, 30).flatMap((p) => seasonGames.get(p.id)!);
+  const share = (x: number) => Math.round((top.filter((v) => v >= x).length / (top.length || 1)) * 100);
+  const profile = `Profil (30 meilleures moyennes, ${top.length} matchs) : ≥60 ${share(60)} %, ≥70 ${share(70)} %, ≥80 ${share(80)} %, ≥90 ${share(90)} %`;
+  md.push(`## ${name}`, '', profile, '', `${gws.length} journées rejouées, ~${remaining} restantes · paliers : ${tiers.map((t) => `${t[0]} (${t[1] ? `${t[1]} €` : `${t[2]} ess.`})`).join(', ')}`, '',
+    '| Budget | Coût | Bonus | Score médian | Chance par palier | Saison réelle (paliers validés) | Gain moyen / journée | Journées pour amortir | Bénéfice fin de saison | Équipe |',
     '|---|---|---|---|---|---|---|---|---|---|');
   for (const budget of BUDGETS) {
-    for (const depth of [false, true]) {
-      for (const bonus of BONUSES) {
-        const owned = squad(pool, budget, bonus, depth);
-        if (owned.length < 5) continue;
-        const cost = owned.reduce((t, p) => t + p.price!, 0);
-        const totals = gws.map((g) => lineupScore(owned, g, bonus));
-        const rates = tiers.map((t) => totals.filter((x) => x >= t[0]).length / totals.length);
-        // Échelle : la probabilité de franchir le palier i ne dépend que de son seuil (journées indépendantes).
-        const model = ladder(rates, tiers);
-        const real = realized(totals, tiers);
-        const profit = model.eur * remaining + cost * RESALE - cost;
-        const sorted = [...totals].sort((a, b) => a - b);
-        const row = {
-          league: name, budget, depth: depth ? 'avec remplaçants' : '5 cartes', cards: owned.length, cost: Math.round(cost * 100) / 100, bonus,
-          median: Math.round(sorted[Math.floor(sorted.length / 2)]), rates: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(rates[i] * 100) / 100])),
-          realized: real, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining, profit: Math.round(profit),
-          team: owned.map((p) => `${p.pos} ${p.name} (${p.price} €, L15 ${Math.round(p.l15)})`),
-        };
-        results.push(row);
-        md.push(`| ${budget} € | ${row.depth} (${owned.length}) | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(rates[i] * 100)}%`).join(' ')} | ${real.reached.join(', ') || '—'} | ${real.eur} € | ${row.modelPerGw} € | ${row.profit} € |`);
-      }
+    for (const bonus of BONUSES) {
+      const team = bestFive(pool, budget, bonus);
+      if (team.length < 5) continue;
+      const cost = team.reduce((t, p) => t + p.price!, 0);
+      if (results.some((r) => r.league === name && r.bonus === bonus && r.cost === Math.round(cost * 100) / 100)) continue; // même équipe qu'un budget plus petit
+      const sims = simulate(team, bonus);
+      const rates = tiers.map((t) => sims.filter((x) => x >= t[0]).length / sims.length);
+      const model = ladder(rates, tiers);
+      const real = realized(gws.map((g) => lineupScore(team, g, bonus)), tiers);
+      const profit = model.eur * remaining + cost * RESALE - cost;
+      const sorted = [...sims].sort((a, b) => a - b);
+      const row = {
+        league: name, budget, cost: Math.round(cost * 100) / 100, bonus, median: Math.round(sorted[sorted.length >> 1]),
+        rates: Object.fromEntries(tiers.map((t, i) => [t[0], Math.round(rates[i] * 1000) / 1000])),
+        realized: real, modelPerGw: Math.round(model.eur * 100) / 100, essencePerGw: Math.round(model.essence), remaining, profit: Math.round(profit),
+        breakEvenGws: model.eur > 0 ? Math.ceil((cost * (1 - RESALE)) / model.eur) : null,
+        team: team.map((p) => `${p.pos} ${p.name} (${p.price} €, moy. ${Math.round(p.l15)})`),
+      };
+      results.push(row);
+      md.push(`| ${budget} € | ${row.cost} € | ${bonus * 100} % | ${row.median} | ${tiers.map((t, i) => `${t[0]}:${Math.round(rates[i] * 100)}%`).join(' ')} | ${real.reached.join(', ') || '—'} (${real.eur} €) | ${row.modelPerGw} € · ${row.essencePerGw} ess. | ${row.breakEvenGws ?? '—'} | ${row.profit} € | ${row.team.join(' ; ')} |`);
     }
   }
   md.push('');
