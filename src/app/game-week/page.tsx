@@ -8,7 +8,7 @@ import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
 import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 import { MyCardsToggle } from '@/components/MyCards';
-import { streakTiersOf, type StreakTier } from '@/lib/roi';
+import { STREAK_TIERS, roiGroupOf, streakTiersOf, type StreakTier } from '@/lib/roi';
 import { PSEUDO } from '@/lib/squad';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,7 @@ const SECTIONS: [GenericPosition, string][] = [
   ['Goalkeeper', 'Gardiens'], ['Defender', 'Défenseurs'], ['Midfielder', 'Milieux'], ['Forward', 'Attaquants'],
 ];
 const PER_POSITION = 10;
+const CONTENDER = 'contender';
 
 /** Écart entre le score potentiel et le niveau habituel, en points et en %. */
 function Boost({ p }: { p: GameWeekPlayer }) {
@@ -143,7 +144,8 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const sort: GameWeekSort = one(p.vue) === 'boost' ? 'boost' : 'projected';
   const cartesRaw = one(p.cartes)?.toLowerCase();
   const cartes = cartesRaw && PSEUDO.test(cartesRaw) ? cartesRaw : undefined;
-  const tiers = streakTiersOf(competition);
+  // « contender » : les championnats Contender réunis (Autriche, 2. Bundesliga, Ligue 2, Liga 2, Croatie), comme sur Sorare.
+  const tiers = competition === CONTENDER ? STREAK_TIERS.contender : streakTiersOf(competition);
   const tier = tiers?.find((t) => t.score === Number(one(p.palier))) ?? null;
   const href = (o: { competition?: string; titu?: number; vue?: GameWeekSort; cartes?: string | null; palier?: number | null }) => {
     const next = { competition, titu, vue: sort, cartes, palier: tier?.score, ...o };
@@ -154,9 +156,13 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
     return `/game-week${qs.size ? `?${qs}` : ''}`;
   };
   const queries = getQueries();
-  const [fixtures, competitions, squad] = await Promise.all([
-    queries.getGameWeekFixtures(competition), queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null,
-  ]);
+  const [allCompetitions, squad] = await Promise.all([queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null]);
+  const contender = allCompetitions.filter((c) => roiGroupOf(c.slug) === CONTENDER).map((c) => c.slug);
+  const competitions = [...allCompetitions.filter((c) => !contender.includes(c.slug)), ...(contender.length ? [{ slug: CONTENDER, name: 'Contender' }] : [])];
+  // Journée propre à chaque championnat Contender : leurs premiers matchs ne tombent pas le même jour.
+  const fixtures = competition === CONTENDER
+    ? (await Promise.all(contender.map((c) => queries.getGameWeekFixtures(c)))).flat().sort((a, b) => a.date.localeCompare(b.date))
+    : await queries.getGameWeekFixtures(competition);
   // Mes cartes : seulement les joueurs possédés (toutes leurs lignes, pour composer l'équipe avec ce qu'on a).
   const owned = cartes ? [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))] : undefined;
   const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id),
@@ -169,7 +175,7 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
           <h1>Ma Game Week</h1>
           <p className="subtitle">{fixtures.length ? roundLabel(fixtures) : 'Aucun match programmé'}</p>
         </div>
-        <Link href={competition ? `/journee?competition=${competition}` : '/journee'} className="gw-head-link">Adversaires poste par poste →</Link>
+        <Link href={competition && competition !== CONTENDER ? `/journee?competition=${competition}` : '/journee'} className="gw-head-link">Adversaires poste par poste →</Link>
       </div>
 
       <div className="gw-toolbar">

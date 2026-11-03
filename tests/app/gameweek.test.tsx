@@ -12,7 +12,8 @@ vi.mock('@/db/queries', async (importOriginal) => ({
       { slug: 'om', name: 'OM', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'PSG', opponentSlug: 'psg', isHome: false, opponentRating: 90 }] },
       { slug: 'psg', name: 'PSG', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'OM', opponentSlug: 'om', isHome: true, opponentRating: 20 }] },
     ],
-    getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }],
+    getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups,
+    listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }, { slug: '2-bundesliga', name: '2. Bundesliga' }, { slug: 'ligue-2-fr', name: 'Ligue 2' }],
     getSquad: async () => [{ slug: 'gk', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 1 }, { slug: 'x', competition: 'ligue-1-fr', status: 'target', purchasePrice: 1 }],
   }),
 }));
@@ -80,6 +81,15 @@ describe('/game-week', () => {
     expect(within(paliers).getByRole('link', { name: '360 · 5 €' })).toHaveAttribute('aria-current', 'page');
     expect(within(paliers).getByRole('link', { name: '320 · 500 essence' }))
       .toHaveAttribute('href', '/game-week?competition=ligue-1-fr&palier=320&cartes=delflacito');
+  });
+
+  it('Contender : un seul choix pour les championnats Contender, journée de chacun, barème Contender', async () => {
+    render(await GameWeek(params({ competition: 'contender' })));
+    expect(getGameWeekFixtures.mock.calls.map(([c]) => c)).toEqual(['2-bundesliga', 'ligue-2-fr']);
+    const leagues = screen.getByRole('navigation', { name: 'Championnat' });
+    expect(within(leagues).getByRole('link', { name: 'Contender' })).toHaveAttribute('aria-current', 'page');
+    expect(within(leagues).queryByRole('link', { name: 'Ligue 2' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Palier de streak visé' })).getByRole('link', { name: '360 · 1000 essence' })).toBeInTheDocument();
   });
 
   it('championnats et seuil de titularisation en pastilles', async () => {
