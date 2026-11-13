@@ -70,6 +70,34 @@ function byTier(rows: BacktestRow[]): string[] {
   });
 }
 
+/** Joueurs regroupés par tranche de leur club : score réel moyen, score potentiel moyen, écart moyen, biais, dispersion. */
+function byClub(rows: BacktestRow[]): string[] {
+  const ok = rows.filter((r) => r.teamTier != null);
+  const counts = [...new Set(ok.map((r) => r.tierCount!))].sort();
+  return counts.flatMap((count) => [
+    ...(counts.length > 1 ? [`Championnats à ${count} tranches :`, ''] : []),
+    '| Club du joueur | Titulaires | Score réel moyen | Score potentiel moyen | Écart moyen | Biais | Dispersion de l’erreur |',
+    '|---|---|---|---|---|---|---|',
+    ...[...Array(count).keys()].map((t) => {
+      const sel = ok.filter((r) => r.tierCount === count && r.teamTier === t);
+      if (!sel.length) return `| ${code(count, t)} | 0 | — | — | — | — | — |`;
+      const m = (f: (r: BacktestRow) => number) => sel.reduce((a, r) => a + f(r), 0) / sel.length;
+      const bias = m((r) => r.projected - r.actual);
+      const sd = Math.sqrt(m((r) => (r.projected - r.actual - bias) ** 2));
+      return `| ${code(count, t)} | ${sel.length} | ${fmt(m((r) => r.actual))} | ${fmt(m((r) => r.projected))} | ${fmt(m((r) => Math.abs(r.projected - r.actual)))} | ${bias >= 0 ? '+' : '−'}${fmt(Math.abs(bias))} | ${fmt(sd)} |`;
+    }),
+    '',
+  ]);
+}
+
+const clubMd = [
+  '# Comportement des joueurs selon la tranche de leur club',
+  '',
+  'Titulaires ayant joué, classement de la veille. Biais : + le score potentiel surestime, − il sous-estime.',
+  'Dispersion de l’erreur : écart-type de (score potentiel − score réel) ; plus elle est basse, plus les joueurs de cette tranche sont prévisibles.',
+  '',
+];
+
 const tierMd = [
   '# Précision du score potentiel selon les tranches du classement — 5 dernières journées',
   '',
@@ -94,6 +122,7 @@ for (const [name, slugs] of GROUPS) {
     const rows = ids.flatMap((id) => lastRounds(fixtures.filter((f) => f.competitionId === id), n)
       .flatMap((r) => backtestRound(fixtures, appearances, r))).filter((r) => r.started);
     all[key].push(...rows);
+    clubMd.push(`## ${name} — ${title} (${rows.length} titulaires)`, '', ...byClub(rows));
     if (key === 'five') tierMd.push(`## ${name} (${rows.length} titulaires)`, '', ...byTier(rows));
     md.push(`## ${name} — ${title} (${rows.length} titulaires)`, '', ...table(rows), '');
   }
@@ -102,6 +131,8 @@ md.push('## Les quatre ensemble — dernière journée', '', ...table(all.last),
 
 mkdirSync('backtest-output', { recursive: true });
 writeFileSync('backtest-output/tier.md', md.join('\n'));
+writeFileSync('backtest-output/club-tier.md', [...clubMd, '## Les quatre ensemble — dernière journée', '', ...byClub(all.last),
+  '## Les quatre ensemble — 5 dernières journées', '', ...byClub(all.five)].join('\n'));
 writeFileSync('backtest-output/tier-precision.md', [...tierMd, '## Les quatre ensemble', '', ...byTier(all.five)].join('\n'));
 console.log(md.join('\n'));
 console.log(tierMd.join('\n'));
