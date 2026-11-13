@@ -29,7 +29,7 @@ describe('profil domicile / extérieur × adversaire', () => {
       g(false, 2, 40), g(false, 8, 42), g(false, 15, 45), g(true, 3, 48), g(false, 5, 41), g(true, 9, 47),
     ];
     const s = playerSplits(games, { isHome: true, rank: 17, teams: 18 })!;
-    expect(s.cells[2].home).toMatchObject({ games: 3, score: 80 });
+    expect(s.cells[2].home).toMatchObject({ games: 3, score: 80, max: expect.any(Number) });
     expect(s.next).toEqual({ venue: 'home', tier: 2 });
     expect(s.notes.length).toBeGreaterThan(0);
     expect(s.notes.length).toBeLessThanOrEqual(3);

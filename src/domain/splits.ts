@@ -7,7 +7,7 @@
 export interface SplitGame { isHome: boolean; rank: number; teams: number; score: number; decisive: number; allAround: number }
 
 /** Moyennes d'un groupe de matchs. */
-export interface SplitCell { games: number; score: number; decisive: number; allAround: number }
+export interface SplitCell { games: number; score: number; decisive: number; allAround: number; /** Meilleur score du groupe. */ max: number }
 
 export interface Tier { index: number; from: number; to: number }
 
@@ -78,7 +78,7 @@ export const tierName = (tiers: Tier[], i: number) => `${TIER_NAMES[tiers.length
 function cell(games: SplitGame[]): SplitCell | null {
   if (!games.length) return null;
   const avg = (f: (g: SplitGame) => number) => games.reduce((t, g) => t + f(g), 0) / games.length;
-  return { games: games.length, score: avg((g) => g.score), decisive: avg((g) => g.decisive), allAround: avg((g) => g.allAround) };
+  return { games: games.length, score: avg((g) => g.score), decisive: avg((g) => g.decisive), allAround: avg((g) => g.allAround), max: Math.max(...games.map((g) => g.score)) };
 }
 
 /** Écart minimal à la moyenne du joueur (points) pour commenter : par lieu, par tranche, par case lieu × tranche. */

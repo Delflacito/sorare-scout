@@ -42,8 +42,7 @@ export function SplitHint({ s: all }: { s: PlayerSplits | undefined }) {
       {tone === 'good' ? '▲' : tone === 'bad' ? '▼' : '◆'}
       <span className="split-pop" role="tooltip">
         <NoteTags s={s} />
-        {ctx && <span className="split-ctx">Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} (${c.games} m.)` : ' · pas encore joué'}</span>}
-        <span className="split-legend">{legend(s)}</span>
+        {ctx && <span className="split-ctx">Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} · max ${fmtScore(c.max)} (${c.games} m.)` : ' · pas encore joué'}</span>}
       </span>
     </span>
   );
