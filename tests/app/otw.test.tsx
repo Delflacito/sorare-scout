@@ -9,15 +9,17 @@ describe('OTW', () => {
     render(<OtwButton slug="a" name="A" />);
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter A à la liste OTW' }));
     expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a']);
-    localStorage.setItem('sorare-scout:otw', JSON.stringify(['a', 'b', 'achete']));
+    localStorage.setItem('sorare-scout:otw', JSON.stringify(['a', 'b', 'achete', 'deja']));
+    // « achete » ajouté sans carte puis acheté ; « deja » ajouté alors que j'en avais déjà une : il reste.
+    localStorage.setItem('sorare-scout:otw:cartes', JSON.stringify({ achete: 0, deja: 1 }));
     localStorage.setItem(PSEUDO_KEY, 'moi');
     const p = (slug: string, floorInSeason: number | null, price: number | null) => ({ slug, name: slug.toUpperCase(), pictureUrl: null, team: slug === 'a' ? 'PSV' : 'Ajax', competition: slug === 'a' ? 'Ligue 2' : '2. Bundesliga', competitionSlug: slug === 'a' ? 'ligue-2-fr' : '2-bundesliga', cardPositions: slug === 'a' ? ['Forward'] : ['Goalkeeper'], floorInSeason, price });
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => (url.startsWith('/api/effectif')
-      ? { entries: [{ slug: 'achete', status: 'owned' }] } : [p('a', 10, 12), p('b', null, 5)]) })));
+      ? { entries: [{ slug: 'achete', status: 'owned' }, { slug: 'deja', status: 'owned' }] } : [p('a', 10, 12), p('b', null, 5)]) })));
     render(<OtwList />);
     expect(await screen.findByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total15 €');
     expect(screen.getByRole('link', { name: 'Voir A sur Sorare (nouvel onglet)' })).toHaveAttribute('href', 'https://sorare.com/football/players/a');
-    expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a', 'b']); // carte achetée retirée
+    expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a', 'b', 'deja']); // carte achetée retirée
     expect(screen.getByRole('combobox', { name: 'Compétition' })).toHaveTextContent('Toutes les liguesContender');
     expect(screen.getAllByRole('row')[1]).toHaveTextContent('Gardien'); // gardiens d'abord
     fireEvent.change(screen.getByRole('combobox', { name: 'Poste' }), { target: { value: 'Forward' } });
@@ -26,7 +28,7 @@ describe('OTW', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Club' }), { target: { value: 'Ajax' } });
     expect(screen.getByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total5,00 €');
     fireEvent.click(screen.getByRole('button', { name: 'Retirer B' }));
-    expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a']);
+    expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a', 'deja']);
     vi.unstubAllGlobals();
   });
 });

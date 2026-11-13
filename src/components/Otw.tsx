@@ -23,6 +23,15 @@ function write(slugs: string[]) {
   try { window.localStorage.setItem(KEY, JSON.stringify(slugs)); } catch { /* stockage indisponible */ }
 }
 
+// Cartes déjà possédées au moment de l'ajout : le joueur ne sort de la liste qu'après un nouvel achat.
+const COUNTS_KEY = 'sorare-scout:otw:cartes';
+function readCounts(): Record<string, number> {
+  try { return JSON.parse(window.localStorage.getItem(COUNTS_KEY) ?? '{}'); } catch { return {}; }
+}
+function writeCounts(c: Record<string, number>) {
+  try { window.localStorage.setItem(COUNTS_KEY, JSON.stringify(c)); } catch { /* stockage indisponible */ }
+}
+
 /** « + » : ajoute (ou retire) le joueur de la liste d'achats souhaités (onglet OTW). */
 export function OtwButton({ slug, name }: { slug: string; name: string }) {
   const [on, setOn] = useState(false);
@@ -31,6 +40,7 @@ export function OtwButton({ slug, name }: { slug: string; name: string }) {
     const list = read().filter((s) => s !== slug);
     if (!on) list.push(slug);
     write(list);
+    if (!on) loadOwned().then((owned) => writeCounts({ ...readCounts(), [slug]: owned.get(slug) ?? 0 }));
     setOn(!on);
   };
   return (
@@ -53,8 +63,11 @@ export function OtwList() {
   const [position, setPosition] = useState('');
   useEffect(() => {
     loadOwned().then((owned) => {
-    // Joueur acheté depuis (présent dans mon effectif) : il sort de la liste.
-    const s = read().filter((x) => !owned.has(x));
+    // Joueur acheté depuis l'ajout (plus de cartes qu'à l'ajout) : il sort de la liste.
+    // Ajout sans compte connu (anciennes listes) : on part des cartes actuelles, rien n'est retiré.
+    const counts = readCounts();
+    const s = read().filter((x) => (owned.get(x) ?? 0) <= (counts[x] ??= owned.get(x) ?? 0));
+    writeCounts(Object.fromEntries(s.map((x) => [x, counts[x]])));
     write(s);
     setSlugs(s);
     if (!s.length) return setPlayers([]);
