@@ -819,9 +819,9 @@ th.th-sort[aria-sort='descending']::after { content: ' ▼'; }
 }
 /* Mobile : tableau lieu × adversaire entièrement visible, sans défilement horizontal. */
 @media (max-width: 560px) {
-  .splits-card th, .splits-card td { padding: 6px 3px; font-size: 10.5px; letter-spacing: 0; }
+  .splits-card th, .splits-card td { padding: 6px 3px; font-size: 12px; letter-spacing: 0; }
   .splits-card th[scope='row'] small { display: block; font-weight: 400; }
   .splits-card .split-cell .score-pill { display: flex; width: fit-content; }
-  .splits-card .split-stats { gap: 3px; font-size: 10px; }
-  .splits-card .split-games { padding: 0 3px; font-size: 8.5px; }
+  .splits-card .split-stats { gap: 3px; font-size: 11.5px; }
+  .splits-card .split-games { padding: 0 3px; font-size: 9.5px; }
 }

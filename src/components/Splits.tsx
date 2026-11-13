@@ -86,7 +86,7 @@ export function SplitsCard({ s }: { s: PlayerSplits | undefined }) {
       <div className="table-wrap">
         <table aria-label="Moyennes selon le lieu et l’adversaire">
           <thead>
-            <tr><th>Adversaire</th><th>Domicile</th><th>Extérieur</th><th>Tous</th></tr>
+            <tr><th><abbr title="Adversaire">Adv.</abbr></th><th>Domicile</th><th>Extérieur</th><th>Tous</th></tr>
           </thead>
           <tbody>
             {s.tiers.map((t, i) => (
