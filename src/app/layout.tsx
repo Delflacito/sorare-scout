@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { DataFooter } from '@/components/DataFooter';
 import { NavTabs } from '@/components/NavTabs';
+import { PopDismiss } from '@/components/PopDismiss';
 import { PlayerSearch } from '@/components/PlayerSearch';
 import { TableSort } from '@/components/TableSort';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div id="contenu" tabIndex={-1}>{children}</div>
         <DataFooter />
         <TableSort />
+        <PopDismiss />
       </body>
     </html>
   );
