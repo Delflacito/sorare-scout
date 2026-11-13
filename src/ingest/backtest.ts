@@ -119,7 +119,7 @@ export function backtestRound(
     const f = fixtureById.get(a.fixtureId)!;
     const isHome = f.homeTeamId === a.teamId;
     const opponentId = isHome ? f.awayTeamId : f.homeTeamId;
-    const p = project(s, { isHome, opponentId, competitionId: f.competitionId });
+    const p = project(s, { isHome, opponentId, competitionId: f.competitionId, teamId: a.teamId });
     if (!p) continue; // aucun match joué avant la journée
     rows.push({
       competitionId: f.competitionId, fixtureId: f.id, playerId: a.playerId, isHome, started: a.started,

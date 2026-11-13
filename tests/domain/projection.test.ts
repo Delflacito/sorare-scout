@@ -1,5 +1,5 @@
 import {
-  shrink, shrinkTowards, baseScore, playerVenueFactor, opponentMultiplier, projectedScore, qualityRatings, venueFactors,
+  shrink, shrinkTowards, baseScore, playerVenueFactor, opponentMultiplier, projectedScore, qualityRatings, venueFactors, projectForFixture, TOP_CLUB_BONUS,
 } from '@/domain/projection';
 
 describe('shrink', () => {
@@ -91,5 +91,14 @@ describe('venueFactors', () => {
     const r = venueFactors([{ home: true, score: 60 }, { home: true, score: 50 }, { home: false, score: 40 }, { home: false, score: 50 }]);
     expect(r.home).toBeCloseTo(55 / 50);
     expect(r.away).toBeCloseTo(45 / 50);
+  });
+});
+
+describe('bonus des clubs du haut de tableau', () => {
+  const p = { base: 50, homeAvg: null, homeGames: 0, awayAvg: null, awayGames: 0 };
+  const f = { isHome: true, leagueVenueFactor: 1, position: null, overall: null };
+  it('+2 points pour un club du premier tiers, plafonné à 100', () => {
+    expect(projectForFixture(p, { ...f, topClub: true }).projected).toBe(projectForFixture(p, f).projected! + TOP_CLUB_BONUS);
+    expect(projectForFixture({ ...p, base: 100 }, { ...f, topClub: true }).projected).toBe(100);
   });
 });

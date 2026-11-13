@@ -2,6 +2,7 @@ import type { Repo, CompletedFixture, AppearanceRow, PlayerSummaryRow, ConcededO
 import { concededByPosition, concededOverall, lastN, playingTime, scoreBreakdown, type Conceded, type ConcededObs, type TeamGame, type PlayerGame } from '@/domain/metrics';
 import type { DetailedPosition } from '@/domain/types';
 import { BASE_GAMES, DECISIVE_GAMES, baseScore, projectForFixture, qualityRatings, venueFactors } from '@/domain/projection';
+import { standings, tierOf } from '@/domain/splits';
 
 export const CONCEDED_WINDOWS = [5, 10];
 const USUAL_POSITION_SAMPLE = 10;
@@ -138,11 +139,12 @@ function summaries(fixtures: CompletedFixture[], apps: AppearanceRow[]): PlayerS
 
 /** Calcule tous les agrégats à partir de matchs complets (fonction pure, réutilisée par le test sur le passé). */
 export function computeAggregates(fixtures: CompletedFixture[], appearances: AppearanceRow[]) {
-  return { ...conceded(fixtures, appearances), summaries: summaries(fixtures, appearances) };
+  return { ...conceded(fixtures, appearances), summaries: summaries(fixtures, appearances), standings: standings(fixtures.filter(isLeague)) };
 }
 
 export type Aggregates = ReturnType<typeof computeAggregates>;
-export interface FixtureSide { isHome: boolean; opponentId: number; competitionId: number }
+/** teamId : club du joueur, pour le bonus des clubs du haut de tableau. */
+export interface FixtureSide { isHome: boolean; opponentId: number; competitionId: number; teamId?: number }
 
 /**
  * Score potentiel d'un joueur pour un match à partir des agrégats : concédé au poste (5 derniers matchs),
@@ -163,7 +165,9 @@ export function projector(agg: Aggregates, amplification?: number) {
     const pos = byPosition.get(`${opp}|${s.usualPosition}`);
     const all = overall.get(opp);
     const venue = venues.get(f.competitionId);
+    const rank = f.teamId === undefined ? undefined : agg.standings.get(`${f.competitionId}|${f.teamId}`);
     return projectForFixture(s, {
+      topClub: !!rank && tierOf(rank.rank, rank.teams) === 0,
       isHome: f.isHome,
       leagueVenueFactor: venue ? (f.isHome ? venue.home : venue.away) : 1,
       position: { average: pos?.average ?? null, leagueAverage: pos?.leagueAverage ?? mean(leagueAtPosition.get(s.usualPosition)), observations: pos?.observations ?? 0 },
@@ -183,7 +187,7 @@ export function withNextProjection(
     const team = playerTeams.get(s.playerId);
     const next = team === undefined ? undefined : nextFixtures.get(team);
     if (!next) return { ...s, nextFixtureId: null, nextProjected: null };
-    return { ...s, nextFixtureId: next.fixtureId, nextProjected: project(s, next)?.projected ?? null };
+    return { ...s, nextFixtureId: next.fixtureId, nextProjected: project(s, { ...next, teamId: team })?.projected ?? null };
   });
 }
 
