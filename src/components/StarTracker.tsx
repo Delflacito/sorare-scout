@@ -6,6 +6,7 @@ import type { StarPlayer } from '@/db/queries';
 import { starStatus, type GalleryCard, type StarCard, type StarStatus } from '@/lib/star';
 import { PlayerAvatar } from './Media';
 import { fmtEur } from '@/lib/format';
+import { OtwButton } from './Otw';
 import { PSEUDO_KEY } from './SquadBuilder';
 
 export interface StarView { competition: string; name: string; cards: (StarCard & { player: StarPlayer | null })[] }
@@ -85,6 +86,7 @@ export function StarTracker({ collections }: { collections: StarView[] }) {
                   const s = status(x);
                   return (
                     <li key={x.name} className={`gw-row no-rank star-row ${s === 'ok' ? 'is-owned' : ''}`}>
+                      {x.player && <OtwButton slug={x.player.slug} name={x.name} />}
                       <PlayerAvatar name={x.name} url={x.player?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
                         <div className="gw-name">{x.player ? <Link href={`/joueurs/${x.player.slug}`}>{x.name}</Link> : x.name}</div>

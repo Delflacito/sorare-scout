@@ -12,6 +12,7 @@ export const SECTIONS = [
   { href: '/marche', label: 'Marché' },
   { href: '/effectif', label: 'Mon effectif' },
   { href: '/star', label: 'Star' },
+  { href: '/otw', label: 'OTW' },
   { href: '/roi', label: 'ROI' },
   { href: '/streak', label: 'Streak' },
 ] as const;

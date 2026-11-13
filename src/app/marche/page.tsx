@@ -9,6 +9,7 @@ import { fmtChange, fmtEur, fmtScore } from '@/lib/format';
 import { one, type SearchParams } from '@/lib/params';
 import { seasonStart } from '@/ingest/leagues';
 import { PSEUDO } from '@/lib/squad';
+import { OtwButton } from '@/components/Otw';
 import { EnsurePseudo } from '@/components/MyCards';
 import type { SquadEntry } from '@/components/SquadBuilder';
 
@@ -132,6 +133,7 @@ function ClubPlayers({ players, yy, history, owned }: { players: MarketPlayerVie
                 <tr key={p.slug}>
                   <td>
                     <span className="player-cell">
+                      <OtwButton slug={p.slug} name={p.name} />
                       {mine && <span className="owned-mark" title={`${mine.count} carte${mine.count > 1 ? 's' : ''} possédée${mine.count > 1 ? 's' : ''}`}
                         role="img" aria-label="Carte possédée">✓{mine.count > 1 ? `×${mine.count}` : ''}</span>}
                       <PlayerAvatar name={p.name} url={p.pictureUrl} size={32} />

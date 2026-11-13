@@ -5,6 +5,7 @@ import { fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
+import { OtwButton } from '@/components/Otw';
 import { Venue } from '@/components/Venue';
 import { START_RATE_LEVELS, one, oneOf, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 
@@ -32,6 +33,7 @@ function Opponent({ r }: { r: PlayerListRow }) {
 function PlayerRow({ r }: { r: PlayerListRow }) {
   return (
     <li className="gw-row no-rank">
+      <OtwButton slug={r.slug} name={r.name} />
       <PlayerAvatar name={r.name} url={r.pictureUrl} size={40} />
       <div className="gw-who">
         <div className="gw-name">
