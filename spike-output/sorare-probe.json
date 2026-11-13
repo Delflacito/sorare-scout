@@ -1,0 +1,827 @@
+{
+  "probes": {
+    "recompenses-user": {
+      "rewards": "absent",
+      "so5Rewards": "absent",
+      "so5Lineups": "absent",
+      "footballSo5Rewards": "Field 'footballSo5Rewards' doesn't exist on type 'User' (Did you mean `footballUserProfile`?)",
+      "claimedRewards": "absent",
+      "unclaimedSo5Rewards": "absent",
+      "wonRewards": "absent",
+      "streakRewards": "absent",
+      "managerProgression": "Field 'managerProgression' doesn't exist on type 'User' (Did you mean `managerTeams`?)",
+      "earnings": "absent",
+      "totalRewards": "absent",
+      "footballUserProfile": "Field must have selections (field 'footballUserProfile' returns FootballUserSportProfile but has no selections. Did you mean 'footballUserProfile { ... }'?)",
+      "profile": "Field must have selections (field 'profile' returns UserProfile but has no selections. Did you mean 'profile { ... }'?)"
+    },
+    "recompenses-so5": {
+      "so5Rewards": "Field must have selections (field 'so5Rewards' returns So5Reward but has no selections. Did you mean 'so5Rewards { ... }'?)",
+      "so5Lineups": "Field 'so5Lineups' doesn't exist on type 'So5Root' (Did you mean `so5Lineup`?)",
+      "so5Leaderboards": "Field 'so5Leaderboards' doesn't exist on type 'So5Root' (Did you mean `so5Leaderboard`?)",
+      "so5Fixture": "Field must have selections (field 'so5Fixture' returns So5Fixture but has no selections. Did you mean 'so5Fixture { ... }'?)",
+      "streaks": "absent",
+      "so5Rankings": "Field 'so5Rankings' doesn't exist on type 'So5Root' (Did you mean `so5Ranking`?)",
+      "myRewards": "absent"
+    },
+    "recompenses-football": {
+      "rewards": "absent",
+      "so5": "absent",
+      "streaks": "absent",
+      "managerStreaks": "absent",
+      "userRewards": "absent"
+    }
+  },
+  "samples": {
+    "leagues": [
+      [
+        "eredivisie | Eredivisie | saison 2026",
+        121
+      ],
+      [
+        "mlspa | MLS | saison 2026",
+        101
+      ],
+      [
+        "jupiler-pro-league | First Division A | saison 2026",
+        76
+      ],
+      [
+        "primeira-liga-pt | Primeira Liga | saison 2026",
+        64
+      ],
+      [
+        "football-league-championship | Championship | saison 2026",
+        53
+      ],
+      [
+        "mlspa | MLS | saison 2024",
+        37
+      ],
+      [
+        "ligue-1-fr | Ligue 1 | saison 2025",
+        35
+      ],
+      [
+        "eredivisie | Eredivisie | saison 2025",
+        32
+      ],
+      [
+        "2-bundesliga | 2. Bundesliga | saison 2026",
+        24
+      ],
+      [
+        "ligue-1-fr | Ligue 1 | saison 2024",
+        24
+      ],
+      [
+        "ligue-1-fr | Ligue 1 | saison 2026",
+        20
+      ],
+      [
+        "spor-toto-super-lig | Süper Lig | saison 2025",
+        19
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2024",
+        19
+      ],
+      [
+        "jupiler-pro-league | First Division A | saison 2025",
+        18
+      ],
+      [
+        "austrian-bundesliga | Bundesliga | saison 2026",
+        17
+      ],
+      [
+        "laliga-es | Primera División | saison 2024",
+        14
+      ],
+      [
+        "ligue-2-fr | Ligue 2 | saison 2026",
+        13
+      ],
+      [
+        "1-hnl | HNL | saison 2026",
+        13
+      ],
+      [
+        "primeira-liga-pt | Primeira Liga | saison 2025",
+        12
+      ],
+      [
+        "austrian-bundesliga | Bundesliga | saison 2025",
+        12
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2024",
+        12
+      ],
+      [
+        "premiership-gb-sct | Premiership | saison 2026",
+        10
+      ],
+      [
+        "eredivisie | Eredivisie | saison 2024",
+        10
+      ],
+      [
+        "2-bundesliga | 2. Bundesliga | saison 2025",
+        10
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2025",
+        10
+      ],
+      [
+        "mlspa | MLS | saison 2023",
+        10
+      ],
+      [
+        "2-bundesliga | 2. Bundesliga | saison 2024",
+        10
+      ],
+      [
+        "ligue-2-fr | Ligue 2 | saison 2025",
+        10
+      ],
+      [
+        "? | ? | saison 2025",
+        10
+      ],
+      [
+        "premiership-gb-sct | Premiership | saison 2024",
+        10
+      ],
+      [
+        "k-league-2 | K League 2 | saison 2024",
+        10
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2025",
+        9
+      ],
+      [
+        "j1-league | J1 League | saison 2025",
+        9
+      ],
+      [
+        "j1-league | J1 League | saison 2023",
+        9
+      ],
+      [
+        "serie-a-it | Serie A | saison 2024",
+        8
+      ],
+      [
+        "1-hnl | HNL | saison 2025",
+        8
+      ],
+      [
+        "laliga-es | Primera División | saison 2025",
+        8
+      ],
+      [
+        "j1-league | J1 League | saison 2024",
+        8
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2026",
+        7
+      ],
+      [
+        "football-league-championship | Championship | saison 2025",
+        7
+      ],
+      [
+        "spor-toto-super-lig | Süper Lig | saison 2024",
+        7
+      ],
+      [
+        "j1-league | J1 League | saison 2022",
+        7
+      ],
+      [
+        "mlspa | MLS | saison 2025",
+        7
+      ],
+      [
+        "eredivisie | Eredivisie | saison 2022",
+        7
+      ],
+      [
+        "mlspa | MLS | saison 2022",
+        7
+      ],
+      [
+        "? | ? | saison 2024",
+        7
+      ],
+      [
+        "football-league-championship | Championship | saison 2024",
+        7
+      ],
+      [
+        "k-league-1 | K League 1 | saison 2024",
+        6
+      ],
+      [
+        "liga-mx | Liga MX | saison 2022",
+        6
+      ],
+      [
+        "serie-b-it | Serie B | saison 2024",
+        6
+      ],
+      [
+        "serie-a-it | Serie A | saison 2025",
+        6
+      ],
+      [
+        "? | ? | saison 2022",
+        6
+      ],
+      [
+        "k-league-1 | K League 1 | saison 2025",
+        6
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2026",
+        5
+      ],
+      [
+        "j1-league | J1 League | saison 2026",
+        5
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2022",
+        5
+      ],
+      [
+        "premiership-gb-sct | Premiership | saison 2025",
+        5
+      ],
+      [
+        "chinese-super-league | Chinese Super League | saison 2022",
+        5
+      ],
+      [
+        "austrian-bundesliga | Bundesliga | saison 2022",
+        5
+      ],
+      [
+        "superliga-argentina-de-futbol | Liga Profesional Argentina | saison 2024",
+        5
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2023",
+        5
+      ],
+      [
+        "? | ? | saison 2021",
+        5
+      ],
+      [
+        "laliga-es | Primera División | saison 2026",
+        4
+      ],
+      [
+        "jupiler-pro-league | First Division A | saison 2024",
+        4
+      ],
+      [
+        "primera-division-cl | Primera División | saison 2024",
+        4
+      ],
+      [
+        "k-league-1 | K League 1 | saison 2022",
+        4
+      ],
+      [
+        "superliga-argentina-de-futbol | Liga Profesional Argentina | saison 2025",
+        4
+      ],
+      [
+        "k-league-2 | K League 2 | saison 2025",
+        4
+      ],
+      [
+        "austrian-bundesliga | Bundesliga | saison 2024",
+        4
+      ],
+      [
+        "liga-mx | Liga MX | saison 2024",
+        4
+      ],
+      [
+        "eliteserien | Eliteserien | saison 2025",
+        3
+      ],
+      [
+        "first-division | Challenge League | saison 2025",
+        3
+      ],
+      [
+        "superliga-dk | Superliga | saison 2024",
+        3
+      ],
+      [
+        "super-league-1 | Super League 1 | saison 2025",
+        3
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2025",
+        3
+      ],
+      [
+        "super-league-ch | Super League | saison 2025",
+        3
+      ],
+      [
+        "primera-a | Primera A | saison 2022",
+        3
+      ],
+      [
+        "primera-a | Primera A | saison 2024",
+        3
+      ],
+      [
+        "superliga-dk | Superliga | saison 2025",
+        3
+      ],
+      [
+        "laliga-es | Primera División | saison 2023",
+        3
+      ],
+      [
+        "mlspa | MLS | saison 2021",
+        3
+      ],
+      [
+        "superliga-argentina-de-futbol | Liga Profesional Argentina | saison 2022",
+        3
+      ],
+      [
+        "k-league-1 | K League 1 | saison 2026",
+        2
+      ],
+      [
+        "segunda-division-es | Segunda División | saison 2024",
+        2
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2023",
+        2
+      ],
+      [
+        "chinese-super-league | Chinese Super League | saison 2025",
+        2
+      ],
+      [
+        "primera-a | Primera A | saison 2026",
+        2
+      ],
+      [
+        "chinese-super-league | Chinese Super League | saison 2021",
+        2
+      ],
+      [
+        "primera-division-uy | Liga AUF | saison 2024",
+        2
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2022",
+        2
+      ],
+      [
+        "first-division-b | Challenger Pro League | saison 2025",
+        2
+      ],
+      [
+        "ekstraklasa | Ekstraklasa | saison 2025",
+        2
+      ],
+      [
+        "? | ? | saison 2023",
+        2
+      ],
+      [
+        "serie-b-it | Serie B | saison 2025",
+        2
+      ],
+      [
+        "1-hnl | HNL | saison 2024",
+        2
+      ],
+      [
+        "nb-i | NB I | saison 2024",
+        2
+      ],
+      [
+        "national-1 | Ligue 3 | saison 2024",
+        2
+      ],
+      [
+        "jupiler-pro-league | First Division A | saison 2023",
+        2
+      ],
+      [
+        "ekstraklasa | Ekstraklasa | saison 2024",
+        2
+      ],
+      [
+        "russian-premier-league | Premier League | saison 2024",
+        2
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2022",
+        2
+      ],
+      [
+        "laliga-es | Primera División | saison 2022",
+        2
+      ],
+      [
+        "ligue-2-fr | Ligue 2 | saison 2024",
+        2
+      ],
+      [
+        "division-1-sa | First Division League | saison 2021",
+        2
+      ],
+      [
+        "primera-division | Primera División | saison 2021",
+        2
+      ],
+      [
+        "liga-mx | Liga MX | saison 2021",
+        2
+      ],
+      [
+        "primeira-liga-pt | Primeira Liga | saison 2022",
+        2
+      ],
+      [
+        "k-league-1 | K League 1 | saison 2023",
+        2
+      ],
+      [
+        "first-division | Challenge League | saison 2023",
+        1
+      ],
+      [
+        "first-division | Challenge League | saison 2024",
+        1
+      ],
+      [
+        "segunda-division-es | Segunda División | saison 2026",
+        1
+      ],
+      [
+        "superliga-dk | Superliga | saison 2026",
+        1
+      ],
+      [
+        "liga-mx | Liga MX | saison 2026",
+        1
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2026",
+        1
+      ],
+      [
+        "srpska-liga | Srpska Liga | saison 2025",
+        1
+      ],
+      [
+        "russian-premier-league | Premier League | saison 2023",
+        1
+      ],
+      [
+        "liga-mx | Liga MX | saison 2023",
+        1
+      ],
+      [
+        "super-league-1 | Super League 1 | saison 2023",
+        1
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2024",
+        1
+      ],
+      [
+        "primera-a | Primera A | saison 2021",
+        1
+      ],
+      [
+        "national-3 | National 2 | saison 2025",
+        1
+      ],
+      [
+        "primera-a | Primera A | saison 2025",
+        1
+      ],
+      [
+        "czech-liga | Czech Liga | saison 2025",
+        1
+      ],
+      [
+        "russian-premier-league | Premier League | saison 2025",
+        1
+      ],
+      [
+        "segunda-division-es | Segunda División | saison 2025",
+        1
+      ],
+      [
+        "liga-i | Liga I | saison 2025",
+        1
+      ],
+      [
+        "oberliga | Oberliga | saison 2023",
+        1
+      ],
+      [
+        "pro-league | Saudi League | saison 2025",
+        1
+      ],
+      [
+        "ligat-ha-al | Ligat Ha'al | saison 2025",
+        1
+      ],
+      [
+        "super-league-2 | Super League 2 | saison 2025",
+        1
+      ],
+      [
+        "pro-league | Saudi League | saison 2024",
+        1
+      ],
+      [
+        "premier-league-sg | Premier League | saison 2025",
+        1
+      ],
+      [
+        "division-2 | Division 2 | saison 2025",
+        1
+      ],
+      [
+        "super-liga-rs | Super Liga | saison 2025",
+        1
+      ],
+      [
+        "football-league-championship | Championship | saison 2023",
+        1
+      ],
+      [
+        "serie-a-it | Serie A | saison 2022",
+        1
+      ],
+      [
+        "usl-championship | USL Championship | saison 2025",
+        1
+      ],
+      [
+        "mls-next-pro | MLS Next Pro | saison 2025",
+        1
+      ],
+      [
+        "premier-league-kz | Premier League | saison 2024",
+        1
+      ],
+      [
+        "first-league-mk | First League | saison 2024",
+        1
+      ],
+      [
+        "eerste-divisie | Eerste Divisie | saison 2024",
+        1
+      ],
+      [
+        "stars-league | Stars League | saison 2024",
+        1
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2023",
+        1
+      ],
+      [
+        "football-league-championship | Championship | saison 2022",
+        1
+      ],
+      [
+        "czech-liga | Czech Liga | saison 2024",
+        1
+      ],
+      [
+        "league-one-gb-sct | League One | saison 2024",
+        1
+      ],
+      [
+        "liga-de-expansion-mx | Liga de Expansión MX | saison 2024",
+        1
+      ],
+      [
+        "new-south-wales-npl | New South Wales NPL | saison 2024",
+        1
+      ],
+      [
+        "ligat-ha-al | Ligat Ha'al | saison 2024",
+        1
+      ],
+      [
+        "super-league-ch | Super League | saison 2024",
+        1
+      ],
+      [
+        "league-one | League One | saison 2024",
+        1
+      ],
+      [
+        "arabian-gulf-league | Pro League | saison 2024",
+        1
+      ],
+      [
+        "arabian-gulf-league | Pro League | saison 2022",
+        1
+      ],
+      [
+        "league-two | League Two | saison 2024",
+        1
+      ],
+      [
+        "primera-division | Primera División | saison 2024",
+        1
+      ],
+      [
+        "k-league-2 | K League 2 | saison 2021",
+        1
+      ],
+      [
+        "eliteserien | Eliteserien | saison 2024",
+        1
+      ],
+      [
+        "j2-league | J2 League | saison 2024",
+        1
+      ],
+      [
+        "catarinense-2 | Catarinense 2 | saison 2021",
+        1
+      ],
+      [
+        "ligue-1-fr | Ligue 1 | saison 2022",
+        1
+      ],
+      [
+        "bundesliga-de | Bundesliga | saison 2021",
+        1
+      ],
+      [
+        "russian-premier-league | Premier League | saison 2021",
+        1
+      ],
+      [
+        "campeonato-brasileiro-serie-a | Serie A | saison 2021",
+        1
+      ],
+      [
+        "paranaense-1 | Paranaense 1 | saison 2024",
+        1
+      ],
+      [
+        "primera-division-pe | Liga 1 | saison 2022",
+        1
+      ],
+      [
+        "football-league-championship | Championship | saison 2021",
+        1
+      ],
+      [
+        "liga-de-expansion-mx | Liga de Expansión MX | saison 2021",
+        1
+      ],
+      [
+        "2-liga | 2. Liga | saison 2022",
+        1
+      ],
+      [
+        "pro-league | Saudi League | saison 2022",
+        1
+      ],
+      [
+        "a-league-men | A-League Men | saison 2022",
+        1
+      ],
+      [
+        "serie-b-it | Serie B | saison 2023",
+        1
+      ],
+      [
+        "primera-division-pe | Liga 1 | saison 2024",
+        1
+      ],
+      [
+        "serie-a-it | Serie A | saison 2023",
+        1
+      ],
+      [
+        "china-league-one | Chinese Football League 1 | saison 2024",
+        1
+      ],
+      [
+        "copa-do-nordeste | Copa do Nordeste | saison 2024",
+        1
+      ],
+      [
+        "a-league-men | A-League Men | saison 2024",
+        1
+      ],
+      [
+        "regional-leagues | Regional Leagues | saison 2024",
+        1
+      ],
+      [
+        "first-league-bg | First League | saison 2023",
+        1
+      ],
+      [
+        "laliga-es | Primera División | saison 2021",
+        1
+      ],
+      [
+        "stars-league | Stars League | saison 2022",
+        1
+      ],
+      [
+        "liga-mx | Liga MX | saison 1998",
+        1
+      ],
+      [
+        "superliga-argentina-de-futbol | Liga Profesional Argentina | saison 2004",
+        1
+      ],
+      [
+        "arabian-gulf-league | Pro League | saison 2023",
+        1
+      ],
+      [
+        "stars-league | Stars League | saison 2021",
+        1
+      ],
+      [
+        "spor-toto-super-lig | Süper Lig | saison 2022",
+        1
+      ],
+      [
+        "jupiler-pro-league | First Division A | saison 2021",
+        1
+      ],
+      [
+        "2-bundesliga | 2. Bundesliga | saison 2023",
+        1
+      ],
+      [
+        "liga-pro | Liga Pro | saison 2023",
+        1
+      ],
+      [
+        "primera-a | Primera A | saison 2023",
+        1
+      ],
+      [
+        "primera-division-ve | Primera División | saison 2021",
+        1
+      ],
+      [
+        "division-profesional | Division Profesional | saison 2022",
+        1
+      ],
+      [
+        "j1-league | J1 League | saison 2021",
+        1
+      ],
+      [
+        "russian-premier-league | Premier League | saison 2022",
+        1
+      ],
+      [
+        "1-hnl | HNL | saison 2022",
+        1
+      ],
+      [
+        "1-division-cy | 1. Division | saison 2021",
+        1
+      ],
+      [
+        "premier-league-gb-eng | Premier League | saison 2021",
+        1
+      ],
+      [
+        "2-bundesliga | 2. Bundesliga | saison 2021",
+        1
+      ]
+    ]
+  }
+}

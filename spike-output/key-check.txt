@@ -1,0 +1,3 @@
+clé présente : true, longueur : 128, espaces autour : false
+sans clé : HTTP 200 — ERREUR Selecting `playerGameScores` within a list of `Game` (`latestGames`) is not supported, please select `playerGameScores` for a specific `Game` instead.
+avec clé : HTTP 200 — ERREUR Selecting `playerGameScores` within a list of `Game` (`latestGames`) is not supported, please select `playerGameScores` for a specific `Game` instead.
