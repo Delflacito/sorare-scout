@@ -24,8 +24,11 @@ export function MyCardsToggle({ href, active }: { href: string; active: boolean 
   );
 }
 
-/** Ajoute le pseudo Sorare enregistré à l'URL s'il manque (pages consacrées à tes cartes) ; rien sinon. */
-export function EnsurePseudo({ href, present }: { href: string; present: boolean }) {
+/**
+ * Ajoute le pseudo Sorare enregistré à l'URL s'il manque (pages qui s'appuient sur tes cartes) ; sans pseudo, un message,
+ * sauf en mode quiet (pages où tes cartes ne sont qu'un complément).
+ */
+export function EnsurePseudo({ href, present, quiet }: { href: string; present: boolean; quiet?: boolean }) {
   const router = useRouter();
   const [missing, setMissing] = useState(false);
   useEffect(() => {
@@ -33,5 +36,5 @@ export function EnsurePseudo({ href, present }: { href: string; present: boolean
     const p = readPseudo();
     if (p) router.replace(withParam(href, p)); else setMissing(true);
   }, [href, present, router]);
-  return missing ? <p className="empty">Importe d’abord ta galerie dans <Link href="/effectif">Mon effectif</Link> : cette page s’appuie sur tes cartes.</p> : null;
+  return missing && !quiet ? <p className="empty">Importe d’abord ta galerie dans <Link href="/effectif">Mon effectif</Link> : cette page s’appuie sur tes cartes.</p> : null;
 }

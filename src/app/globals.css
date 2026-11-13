@@ -173,6 +173,7 @@ td.strong { font-weight: 600; }
 /* --- Explorateur --- */
 .player-cell { display: flex; align-items: center; gap: 10px; }
 .player-cell .avatar { border-radius: 8px; }
+.owned-mark { flex: none; padding: 1px 6px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--good-bg); color: var(--good); }
 .match-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
 .filters .check { display: flex; align-items: center; gap: 6px; font-size: 14px; }

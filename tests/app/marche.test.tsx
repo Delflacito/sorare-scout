@@ -4,10 +4,12 @@ import type { ClubMarketView, MarketPlayerView } from '@/db/queries';
 
 const getClubsMarket = vi.fn<(c?: string) => Promise<ClubMarketView[]>>();
 const getMarketPlayers = vi.fn<(f: object) => Promise<MarketPlayerView[]>>();
+const getSquad = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
   getQueries: () => ({
-    getClubsMarket, getMarketPlayers,
+    getClubsMarket, getMarketPlayers, getSquad,
     getDailyPrices: async () => ['a', 'b', 'c'].flatMap((slug) => [
       { slug, day: '2026-10-21', price: 40, inSeason: true }, { slug, day: '2026-10-22', price: 50, inSeason: true },
       { slug, day: '2026-10-21', price: 8, inSeason: false }, { slug, day: '2026-10-22', price: 6, inSeason: false },
@@ -76,5 +78,24 @@ describe('/marche', () => {
     fireEvent.click(within(chart).getByRole('radio', { name: 'Classic' }));
     expect(within(chart).getByRole('radio', { name: 'Classic' })).toBeChecked();
     expect(within(chart).getByRole('img')).toHaveAccessibleName(/Classic.*de 24 € le 21 oct\. à 20,4 €/);
+  });
+
+  it('club avec mes cartes : repère devant les joueurs possédés, investi face à la valeur actuelle', async () => {
+    getMarketPlayers.mockResolvedValue([mp('a', 40, 10), mp('b', 12.5, null), mp('c', null, null)]);
+    getSquad.mockResolvedValue([
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 30 },
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 20 },
+      { slug: 'b', competition: 'eredivisie', status: 'owned', purchasePrice: null },
+      { slug: 'c', competition: 'eredivisie', status: 'target', purchasePrice: null },
+    ]);
+    render(await Page(params({ club: 'psv', cartes: 'delflacito' })));
+    expect(getSquad).toHaveBeenCalledWith('delflacito');
+    const rows = within(screen.getByRole('table', { name: 'Prix des cartes du club' })).getAllByRole('row');
+    expect(within(rows[1]).getByRole('img', { name: 'Carte possédée' })).toHaveTextContent('✓×2');
+    expect(within(rows[2]).getByRole('img', { name: 'Carte possédée' })).toHaveTextContent('✓');
+    expect(within(rows[3]).queryByRole('img', { name: 'Carte possédée' })).not.toBeInTheDocument(); // simple cible
+    // Investi : 30 + 20 (prix inconnu de b non compté) ; valeur : 2 × 40 + 12,5 = 92,5 €, soit +85 %
+    expect(screen.getByText('Investi dans le club').parentElement).toHaveTextContent('50 €3 cartes possédées · 1 prix d’achat inconnu');
+    expect(screen.getByText('Valeur actuelle de mes cartes').parentElement).toHaveTextContent('92,5 €+85 % par rapport à l’investi');
   });
 });

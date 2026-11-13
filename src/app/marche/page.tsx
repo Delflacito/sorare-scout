@@ -8,6 +8,9 @@ import { valueSeries, type ValueSeries } from '@/domain/market';
 import { fmtChange, fmtEur, fmtScore } from '@/lib/format';
 import { one, type SearchParams } from '@/lib/params';
 import { seasonStart } from '@/ingest/leagues';
+import { PSEUDO } from '@/lib/squad';
+import { EnsurePseudo } from '@/components/MyCards';
+import type { SquadEntry } from '@/components/SquadBuilder';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,11 +69,47 @@ function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView
   );
 }
 
-function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy: string; history: ValueSeries }) {
+/** Cartes possédées par joueur (Mon effectif) : nombre, total payé, cartes au prix d'achat inconnu. */
+type Owned = Map<string, { count: number; paid: number; unknown: number }>;
+
+function ownedBySlug(squad: SquadEntry[] | null): Owned {
+  const m: Owned = new Map();
+  for (const e of squad ?? []) {
+    if (e.status !== 'owned') continue;
+    const o = m.get(e.slug) ?? { count: 0, paid: 0, unknown: 0 };
+    o.count += 1;
+    if (e.purchasePrice === null) o.unknown += 1; else o.paid += e.purchasePrice;
+    m.set(e.slug, o);
+  }
+  return m;
+}
+
+/** Ce que j'ai dans le club : total payé face à la valeur actuelle des mêmes cartes (prix de référence, sinon plancher). */
+function MyClubCards({ players, owned }: { players: MarketPlayerView[]; owned: Owned }) {
+  const mine = players.flatMap((p) => { const o = owned.get(p.slug); return o ? [{ p, o }] : []; });
+  if (!mine.length) return <div className="card"><div className="card-kicker">Mes cartes du club</div><strong>0</strong></div>;
+  const cards = mine.reduce((t, x) => t + x.o.count, 0);
+  const paid = mine.reduce((t, x) => t + x.o.paid, 0);
+  const unknown = mine.reduce((t, x) => t + x.o.unknown, 0);
+  const value = mine.reduce((t, x) => t + x.o.count * (x.p.price ?? x.p.floorInSeason ?? 0), 0);
+  const unpriced = mine.filter((x) => (x.p.price ?? x.p.floorInSeason) === null).reduce((t, x) => t + x.o.count, 0);
+  return (
+    <>
+      <div className="card"><div className="card-kicker">Investi dans le club</div><strong>{fmtEur(paid)}</strong>
+        <div className="muted small">{cards} carte{cards > 1 ? 's' : ''} possédée{cards > 1 ? 's' : ''}{unknown ? ` · ${unknown} prix d’achat inconnu${unknown > 1 ? 's' : ''}` : ''}</div></div>
+      <div className="card"><div className="card-kicker">Valeur actuelle de mes cartes</div><strong>{fmtEur(value)}</strong>
+        {paid > 0 && <div className={`small ${value > paid ? 'hot' : value < paid ? 'cold' : 'muted'}`}>{fmtChange(value / paid - 1)} par rapport à l’investi</div>}
+        {unpriced > 0 && <div className="muted small">{unpriced} carte{unpriced > 1 ? 's' : ''} sans prix</div>}</div>
+    </>
+  );
+}
+
+function ClubPlayers({ players, yy, history, owned }: { players: MarketPlayerView[]; yy: string; history: ValueSeries; owned: Owned | null }) {
   const priced = players.filter((p) => p.floorInSeason !== null);
   return (
     <>
       <div className="summary-tiles">
+        {owned && <MyClubCards players={players} owned={owned} />}
         <div className="card"><div className="card-kicker">Total planchers {yy}</div><strong>{fmtEur(sum(players.map((p) => p.floorInSeason)))}</strong>
           <div className="muted small">{priced.length} carte{priced.length > 1 ? 's' : ''} en vente sur {players.length} joueur{players.length > 1 ? 's' : ''}</div></div>
         <div className="card"><div className="card-kicker">Total planchers Classic</div><strong>{fmtEur(sum(players.map((p) => p.floorClassic)))}</strong></div>
@@ -88,10 +127,13 @@ function ClubPlayers({ players, yy, history }: { players: MarketPlayerView[]; yy
           <tbody>
             {players.map((p) => {
               const label = valueLabel(p.valueRatio);
+              const mine = owned?.get(p.slug);
               return (
                 <tr key={p.slug}>
                   <td>
                     <span className="player-cell">
+                      {mine && <span className="owned-mark" title={`${mine.count} carte${mine.count > 1 ? 's' : ''} possédée${mine.count > 1 ? 's' : ''}`}
+                        role="img" aria-label="Carte possédée">✓{mine.count > 1 ? `×${mine.count}` : ''}</span>}
                       <PlayerAvatar name={p.name} url={p.pictureUrl} size={32} />
                       <Link href={`/joueurs/${p.slug}?onglet=marche`}>{p.name}</Link>
                     </span>
@@ -132,6 +174,8 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   const p = await searchParams;
   const competition = one(p.competition);
   const club = one(p.club);
+  const cartesRaw = one(p.cartes)?.toLowerCase();
+  const cartes = cartesRaw && PSEUDO.test(cartesRaw) ? cartesRaw : undefined;
   const queries = getQueries();
   const [competitions, teams] = await Promise.all([queries.listCompetitions(), queries.listTeams()]);
   const clubTeam = club ? teams.find((t) => t.slug === club) : undefined;
@@ -142,8 +186,9 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
     return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices)} />;
   };
   const clubView = async (team: string) => {
-    const [players, prices] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team })]);
-    return <ClubPlayers players={players} yy={yy} history={valueSeries(prices)} />;
+    const [players, prices, squad] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team }),
+      cartes ? queries.getSquad(cartes) : null]);
+    return <ClubPlayers players={players} yy={yy} history={valueSeries(prices)} owned={cartes ? ownedBySlug(squad) : null} />;
   };
 
   return (
@@ -161,6 +206,7 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
         </select>
         <button type="submit">Appliquer</button>
       </form>
+      {clubTeam && <EnsurePseudo href={`/marche?club=${clubTeam.slug}${competition ? `&competition=${competition}` : ''}`} present={!!cartes} quiet />}
       {clubTeam && <p><Link href={competition ? `/marche?competition=${competition}` : '/marche'}>← Tous les clubs</Link></p>}
       {clubTeam
         ? await clubView(clubTeam.slug)
