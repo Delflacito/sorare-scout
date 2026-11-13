@@ -770,3 +770,11 @@ th.th-sort[aria-sort='descending']::after { content: ' ▼'; }
 .split-cell.thin { opacity: .45; }
 .split-cell.is-next { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 8px; }
 .profils-ctx { white-space: nowrap; }
+.split-tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.split-tags li { padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: help;
+  font-variant-numeric: tabular-nums; border: 1px solid transparent; }
+.split-tags li.up { color: var(--hot); background: var(--hot-bg); }
+.split-tags li.down { color: var(--cold); background: var(--cold-bg); }
+.split-tags li.is-next { border-color: currentColor; }
+.split-legend { color: var(--muted); font-size: 11px; }
+.splits-card .split-tags { margin: 4px 0 12px; }

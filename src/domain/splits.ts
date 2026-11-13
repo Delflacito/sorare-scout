@@ -17,6 +17,9 @@ export type Metric = 'score' | 'allAround' | 'decisive';
 export interface SplitNote {
   tone: 'up' | 'down';
   metric: Metric;
+  /** Forme courte : « AA D·T3 +14 » (écart à la moyenne du joueur). */
+  tag: string;
+  /** Détail au survol. */
   text: string;
   /** Effet sur le prochain match : favorable, défavorable ou sans lien. */
   next: 'good' | 'bad' | null;
@@ -71,7 +74,6 @@ const TIER_NAMES: Record<number, string[]> = {
 };
 /** « haut de tableau (1-6) ». */
 export const tierName = (tiers: Tier[], i: number) => `${TIER_NAMES[tiers.length][i]} (${tiers[i].from}-${tiers[i].to})`;
-export const TIER_SHORT: Record<number, string[]> = { 3: ['Haut', 'Milieu', 'Bas'], 4: ['Haut', 'Milieu +', 'Milieu −', 'Bas'] };
 
 function cell(games: SplitGame[]): SplitCell | null {
   if (!games.length) return null;
@@ -79,76 +81,60 @@ function cell(games: SplitGame[]): SplitCell | null {
   return { games: games.length, score: avg((g) => g.score), decisive: avg((g) => g.decisive), allAround: avg((g) => g.allAround) };
 }
 
-/** Écart minimal (points) pour commenter : lieu contre lieu, tranche contre moyenne, case contre moyenne. */
+/** Écart minimal à la moyenne du joueur (points) pour commenter : par lieu, par tranche, par case lieu × tranche. */
 const THRESHOLD: Record<Metric, { venue: number; tier: number; cell: number }> = {
-  score: { venue: 10, tier: 10, cell: 12 },
-  allAround: { venue: 7, tier: 7, cell: 8 },
-  decisive: { venue: 8, tier: 8, cell: 10 },
+  score: { venue: 5, tier: 10, cell: 12 },
+  allAround: { venue: 4, tier: 7, cell: 8 },
+  decisive: { venue: 4, tier: 8, cell: 10 },
 };
 // L'AA fait la base des gros scores : à écart égal, il passe devant.
 const PRIORITY: Record<Metric, number> = { score: 1, allAround: 1.2, decisive: 1 };
 const MAX_NOTES = 3;
 
+export const METRIC_LABEL: Record<Metric, string> = { score: 'Score', allAround: 'AA', decisive: 'Déc' };
 const PLACE: Record<Venue, string> = { home: 'à domicile', away: 'à l’extérieur' };
-const fmt = (x: number) => String(Math.round(x));
-const games = (c: SplitCell) => `${c.games} m.`;
-
-function phrase(metric: Metric, tone: 'up' | 'down', where: string): string {
-  const head = {
-    score: tone === 'up' ? 'Très fort' : 'En difficulté',
-    allAround: tone === 'up' ? 'AA élevé' : 'AA faible',
-    decisive: tone === 'up' ? 'Décisif' : 'Peu décisif',
-  }[metric];
-  return `${head} ${where}`;
-}
+/** T1…T3 pour des tiers, Q1…Q4 pour des quarts ; 1 = haut du classement. */
+export const tierCode = (tiers: Tier[], i: number) => `${tiers.length === 4 ? 'Q' : 'T'}${i + 1}`;
+/** « D·T3 », « E », « T1 ». */
+export const contextCode = (tiers: Tier[], venue?: Venue, tier?: number) =>
+  [venue && (venue === 'home' ? 'D' : 'E'), tier !== undefined && tierCode(tiers, tier)].filter(Boolean).join('·');
+const signed = (x: number) => `${x >= 0 ? '+' : '−'}${Math.round(Math.abs(x))}`;
 
 interface Candidate extends SplitNote { weight: number; venue?: Venue; tier?: number }
 
-/** Commentaires : écarts nets seulement, les plus marqués d'abord, sans redire un écart déjà couvert. */
+/** Commentaires : écarts nets à la moyenne du joueur, les plus marqués d'abord, sans redire un écart déjà couvert. */
 export function splitNotes(s: Omit<PlayerSplits, 'notes'>): SplitNote[] {
   const out: Candidate[] = [];
-  const nextGood = (venue?: Venue, tier?: number, tone?: 'up' | 'down') => {
-    if (!s.next) return null;
-    if ((venue !== undefined && venue !== s.next.venue) || (tier !== undefined && tier !== s.next.tier)) return null;
-    return tone === 'up' ? 'good' : 'bad';
-  };
   for (const metric of ['score', 'allAround', 'decisive'] as Metric[]) {
-    const { home, away } = s.venue;
-    if (home && away && home.games >= MIN_GAMES && away.games >= MIN_GAMES) {
-      const diff = home[metric] - away[metric];
-      if (Math.abs(diff) >= THRESHOLD[metric].venue) {
-        const [best, worst]: Venue[] = diff > 0 ? ['home', 'away'] : ['away', 'home'];
-        const b = s.venue[best]!, w = s.venue[worst]!;
-        out.push({
-          tone: 'up', metric, venue: best, weight: (Math.abs(diff) / THRESHOLD[metric].venue) * PRIORITY[metric],
-          text: `${phrase(metric, 'up', PLACE[best])} (${fmt(b[metric])}, ${games(b)}), bien moins ${PLACE[worst]} (${fmt(w[metric])}, ${games(w)})`,
-          next: s.next ? (s.next.venue === best ? 'good' : 'bad') : null,
-        });
-      }
-    }
-    const vsAverage = (c: SplitCell | null, kind: 'tier' | 'cell', where: string, venue?: Venue, tier?: number) => {
+    const push = (c: SplitCell | null, kind: 'venue' | 'tier' | 'cell', venue?: Venue, tier?: number) => {
       if (!c || c.games < MIN_GAMES || c.games === s.overall.games) return;
       const diff = c[metric] - s.overall[metric];
       if (Math.abs(diff) < THRESHOLD[metric][kind]) return;
       const tone = diff > 0 ? 'up' : 'down';
+      const concerned = s.next && (venue === undefined || venue === s.next.venue) && (tier === undefined || tier === s.next.tier);
+      const where = [venue && PLACE[venue], tier !== undefined && `contre le ${tierName(s.tiers, tier)}`].filter(Boolean).join(' ');
       out.push({
         tone, metric, venue, tier, weight: (Math.abs(diff) / THRESHOLD[metric][kind]) * PRIORITY[metric],
-        text: `${phrase(metric, tone, where)} : ${fmt(c[metric])} de moyenne (${games(c)}), contre ${fmt(s.overall[metric])} en général`,
-        next: nextGood(venue, tier, tone),
+        tag: `${METRIC_LABEL[metric]} ${contextCode(s.tiers, venue, tier)} ${signed(diff)}`,
+        text: `${METRIC_LABEL[metric]} ${where} : ${Math.round(c[metric])} sur ${c.games} m., contre ${Math.round(s.overall[metric])} en moyenne`,
+        next: concerned ? (tone === 'up' ? 'good' : 'bad') : null,
       });
     };
-    s.byTier.forEach((c, i) => vsAverage(c, 'tier', `contre le ${tierName(s.tiers, i)}`, undefined, i));
-    s.cells.forEach((byVenue, i) => (['home', 'away'] as Venue[]).forEach((v) =>
-      vsAverage(byVenue[v], 'cell', `${PLACE[v]} contre le ${tierName(s.tiers, i)}`, v, i)));
+    push(s.venue.home, 'venue', 'home');
+    push(s.venue.away, 'venue', 'away');
+    s.byTier.forEach((c, i) => push(c, 'tier', undefined, i));
+    s.cells.forEach((byVenue, i) => { push(byVenue.home, 'cell', 'home', i); push(byVenue.away, 'cell', 'away', i); });
   }
   const chosen: Candidate[] = [];
   for (const c of out.sort((a, b) => b.weight - a.weight)) {
-    const covered = chosen.some((x) => x.metric === c.metric && x.tone === c.tone
-      && ((x.venue && x.venue === c.venue) || (x.tier !== undefined && x.tier === c.tier)));
+    const covered = chosen.some((x) => x.metric === c.metric && (
+      // domicile et extérieur sont les deux faces d'un même écart
+      (x.tier === undefined && c.tier === undefined)
+      || (x.tone === c.tone && ((x.venue && x.venue === c.venue) || (x.tier !== undefined && x.tier === c.tier)))));
     if (!covered) chosen.push(c);
     if (chosen.length === MAX_NOTES) break;
   }
-  return chosen.map(({ tone, metric, text, next }) => ({ tone, metric, text, next }));
+  return chosen.map(({ tone, metric, tag, text, next }) => ({ tone, metric, tag, text, next }));
 }
 
 /** Profil complet ; null sans match de championnat joué. */
@@ -175,5 +161,4 @@ export function playerSplits(all: SplitGame[], next: { isHome: boolean; rank: nu
 
 /** Moyenne du joueur dans le contexte de son prochain match (lieu et tranche de l'adversaire). */
 export const nextCell = (s: PlayerSplits) => (s.next ? s.cells[s.next.tier][s.next.venue] : null);
-export const contextLabel = (s: PlayerSplits) =>
-  s.next ? `${s.next.venue === 'home' ? 'Dom.' : 'Ext.'} vs ${TIER_SHORT[s.tiers.length][s.next.tier].toLowerCase()}` : null;
+export const contextLabel = (s: PlayerSplits) => (s.next ? contextCode(s.tiers, s.next.venue, s.next.tier) : null);

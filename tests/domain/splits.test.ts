@@ -33,8 +33,8 @@ describe('profil domicile / extérieur × adversaire', () => {
     expect(s.next).toEqual({ venue: 'home', tier: 2 });
     expect(s.notes.length).toBeGreaterThan(0);
     expect(s.notes.length).toBeLessThanOrEqual(3);
-    expect(s.notes[0].tone).toBe('up');
-    expect(s.notes.some((n) => /domicile/.test(n.text) && n.next === 'good')).toBe(true);
+    expect(s.notes.some((n) => /^AA D·T3 \+\d+$/.test(n.tag) && n.next === 'good')).toBe(true);
+    expect(s.notes.some((n) => n.tag.startsWith('Score E −'))).toBe(true);
   });
 
   it('décisif à domicile mais pas à l’extérieur, sans écart de score total', () => {
@@ -42,12 +42,18 @@ describe('profil domicile / extérieur × adversaire', () => {
     const away = (r: number) => g(false, r, 50, { decisive: 35, allAround: 15 });
     const s = playerSplits([home(2), home(9), home(15), away(4), away(10), away(16)], null)!;
     expect(s.notes.map((n) => n.metric).sort()).toEqual(['allAround', 'decisive']);
-    expect(s.notes.find((n) => n.metric === 'decisive')!.text).toMatch(/^Décisif à domicile/);
-    expect(s.notes.find((n) => n.metric === 'allAround')!.text).toMatch(/^AA élevé à l’extérieur/);
+    expect(s.notes.find((n) => n.metric === 'decisive')!.tag).toMatch(/^Déc (D \+8|E −8)$/);
+    expect(s.notes.find((n) => n.metric === 'allAround')!.tag).toBe('AA D −8');
   });
 
   it('moins de 3 matchs dans un groupe : pas de commentaire', () => {
     expect(playerSplits([g(true, 15, 90), g(true, 16, 90), g(false, 2, 30), g(false, 3, 30)], null)!.notes).toEqual([]);
+  });
+
+  it('quarts à 20 clubs : étiquettes Q', () => {
+    const q = (isHome: boolean, rank: number, score: number) => g(isHome, rank, score, { teams: 20 });
+    const s = playerSplits([q(false, 1, 20), q(false, 3, 22), q(true, 5, 24), q(true, 10, 60), q(false, 12, 62), q(true, 18, 64)], null)!;
+    expect(s.notes[0].tag).toMatch(/^AA Q1 −\d+$/); // à écart égal, l'AA passe devant le score
   });
 
   it('aucun match : pas de profil', () => {

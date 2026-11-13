@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getQueries, type PlayerSplitRow } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
-import { MIN_GAMES, TIER_SHORT, contextLabel, nextCell, type SplitCell } from '@/domain/splits';
+import { MIN_GAMES, contextLabel, nextCell, tierCode, type SplitCell } from '@/domain/splits';
+import { NoteTags, legend } from '@/components/Splits';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { fmtScore } from '@/lib/format';
 import { one, oneOf, type SearchParams } from '@/lib/params';
@@ -21,7 +22,6 @@ function Avg({ c }: { c: SplitCell | null }) {
 /** Un tableau par taille de championnat : les colonnes suivent ses tranches (3 tiers ou 4 quarts). */
 function SplitsTable({ rows }: { rows: PlayerSplitRow[] }) {
   const { tiers } = rows[0].splits;
-  const short = TIER_SHORT[tiers.length];
   return (
     <div className="table-wrap">
       <table aria-label="Profils lieu × adversaire">
@@ -30,11 +30,11 @@ function SplitsTable({ rows }: { rows: PlayerSplitRow[] }) {
             <th>Joueur</th><th>Poste</th><th title="Moyenne en championnat (matchs joués)">Moy.</th>
             {(['Dom.', 'Ext.'] as const).flatMap((v) => tiers.map((t, i) => (
               <th key={`${v}${i}`} title={`${v === 'Dom.' ? 'Domicile' : 'Extérieur'} contre les clubs classés ${t.from} à ${t.to}`}>
-                {v} {short[i].toLowerCase()} <small>{t.from}-{t.to}</small>
+                {v === 'Dom.' ? 'D' : 'E'}·{tierCode(tiers, i)} <small>{t.from}-{t.to}</small>
               </th>
             )))}
             <th title="Lieu et tranche de l'adversaire du prochain match ; moyenne du joueur dans ce contexte">Prochain</th>
-            <th>Traits marquants</th>
+            <th title={legend(rows[0].splits)}>Traits marquants</th>
           </tr>
         </thead>
         <tbody>
@@ -57,9 +57,7 @@ function SplitsTable({ rows }: { rows: PlayerSplitRow[] }) {
                 <td className="profils-ctx">{c ? <>{Math.round(c.score)} <small>({c.games}) {contextLabel(s)}</small></> : contextLabel(s) ?? '—'}</td>
                 <td>
                   {s.notes.length ? (
-                    <ul className="split-notes">
-                      {s.notes.map((n) => <li key={n.text} className={n.tone}>{n.text}{n.next && <em> · {n.next === 'good' ? 'favorable' : 'défavorable'}</em>}</li>)}
-                    </ul>
+                    <NoteTags s={s} />
                   ) : <span className="muted">Régulier</span>}
                 </td>
               </tr>
