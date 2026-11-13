@@ -42,6 +42,8 @@ export interface PlayerListRow {
   floorInSeason: number | null; lastSale: number | null;
   /** Postes où ses cartes Sorare peuvent être alignées. */
   cardPositions: GenericPosition[];
+  /** Autres postes, accessibles seulement via une carte Classic. */
+  classicPositions?: GenericPosition[];
 }
 
 export interface GameWeekFixture {
@@ -57,6 +59,8 @@ export interface GameWeekPlayer {
   /** Niveau habituel (L15 sur les matchs joués) : le score potentiel s'en écarte selon l'adversaire et le lieu. */
   base: number;
   cardPositions: GenericPosition[];
+  /** Autres postes, accessibles seulement via une carte Classic. */
+  classicPositions?: GenericPosition[];
 }
 /** Concédé par l'adversaire à chaque poste (5 derniers matchs), vu depuis une équipe qui joue la journée. */
 export interface RoundMatchup {
@@ -113,6 +117,8 @@ export interface PlayerDetail {
   country: { code: string; name: string; flagUrl: string | null } | null;
   firstName: string | null; lastName: string | null; height: number | null; shirtNumber: number | null;
   cardPositions: GenericPosition[];
+  /** Autres postes, accessibles seulement via une carte Classic. */
+  classicPositions?: GenericPosition[];
   market: PlayerMarketView | null;
   /** Photo détourée de la carte Sorare (à défaut, la photo carrée). */
   bodyPictureUrl: string | null;
@@ -131,6 +137,8 @@ export type TradingView = 'sous' | 'sur' | 'gw';
 export interface TradingFilters { view: TradingView; competition?: string; position?: GenericPosition; maxPrice?: number; fixtureIds?: number[]; limit: number }
 export interface TradingRow {
   slug: string; name: string; pictureUrl: string | null; team: string | null; teamPictureUrl: string | null; cardPositions: GenericPosition[];
+  /** Autres postes, accessibles seulement via une carte Classic. */
+  classicPositions?: GenericPosition[];
   usualPosition: DetailedPosition | null; l5: number; l15: number; startRate: number;
   price: number; fairPrice: number | null; valueRatio: number | null; priceTrend7: number | null; sales30: number;
   potentialPrice: number | null; potentialGain: number | null; nextProjected: number | null;
@@ -147,7 +155,9 @@ export interface ClubMarketView {
 /** Joueur coté (marché, effectif) : prix de référence = carte de la saison la moins chère en vente. */
 export interface MarketPlayerView {
   slug: string; name: string; pictureUrl: string | null; team: string | null; teamSlug: string | null; teamPictureUrl: string | null;
-  competition: string | null; competitionSlug: string | null; cardPositions: GenericPosition[]; usualPosition: DetailedPosition | null;
+  competition: string | null; competitionSlug: string | null; cardPositions: GenericPosition[];
+  /** Autres postes, accessibles seulement via une carte Classic. */
+  classicPositions?: GenericPosition[]; usualPosition: DetailedPosition | null;
   l15: number | null; floorInSeason: number | null; floorClassic: number | null; recentPrice: number | null; price: number | null;
   fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null; priceTrend7: number | null;
   lastAuction: { eur: number; date: string } | null;
@@ -314,7 +324,7 @@ export function createQueries(sql: postgres.Sql) {
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
           p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
-          s.next_projected, coalesce(p.card_positions, array[p.position]) as card_positions, p.floor_in_season,
+          s.next_projected, array[p.position] as card_positions, p.floor_in_season,
           (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season order by cs.sold_at desc limit 1) as last_sale
         from players p
         join player_summary s on s.player_id = p.id
@@ -328,7 +338,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.q ? sql`and extensions.unaccent(p.name) ilike extensions.unaccent(${`%${f.q}%`})` : sql``}
           ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
-          ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
+          ${f.position ? sql`and ${f.position} = any(array[p.position])` : sql``}
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
           ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
           ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
@@ -381,13 +391,13 @@ export function createQueries(sql: postgres.Sql) {
           select p.sorare_slug, p.name, g.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
             o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
             s.next_projected, s.start_rate5, s.l15, s.base, p.playing_status, p.sorare_projection,
-            coalesce(p.card_positions, array[p.position]) as card_positions,
+            array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions,
             row_number() over (partition by g.position order by
               ${f.sort === 'boost' ? sql`s.next_projected - s.base` : sql`s.next_projected`} desc, p.name) as rank
           from player_summary s
           join players p on p.id = s.player_id
-          -- Une ligne par poste où ses cartes peuvent être alignées.
-          cross join lateral unnest(coalesce(p.card_positions, array[p.position])) as g(position)
+          -- Poste de la carte de la saison uniquement (les postes Classic sont signalés à part).
+          cross join lateral unnest(array[p.position]) as g(position)
           join teams t on t.id = p.team_id
           join fixtures fx on fx.id = s.next_fixture_id
           join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
@@ -403,7 +413,7 @@ export function createQueries(sql: postgres.Sql) {
         team: r.team, teamPictureUrl: r.team_picture, pictureUrl: r.picture_url,
         opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
         projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
-        cardPositions: r.card_positions,
+        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [],
       }));
     },
 
@@ -416,7 +426,7 @@ export function createQueries(sql: postgres.Sql) {
         where f.status = 'scheduled' and f.date > now() and f.date < now() + make_interval(days => ${days})
         order by f.date, f.id`;
       const players = slugs.length ? await sql`
-        select p.sorare_slug, p.name, p.team_id, t.name as team, coalesce(p.card_positions, array[p.position]) as positions,
+        select p.sorare_slug, p.name, p.team_id, t.name as team, array[p.position] as positions,
           s.next_fixture_id, s.next_projected, s.start_rate5
         from players p join teams t on t.id = p.team_id left join player_summary s on s.player_id = p.id
         where p.sorare_slug = any(${slugs})` : [];
@@ -498,7 +508,7 @@ export function createQueries(sql: postgres.Sql) {
           p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
           p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
           p.first_name, p.last_name, p.height, p.shirt_number, p.body_picture_url,
-          coalesce(p.card_positions, array[p.position]) as card_positions,
+          array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions,
           p.floor_in_season, p.floor_classic, pm.reference_price, pm.recent_price, pm.price_trend7, pm.sales30, pm.fair_price,
           pm.value_ratio, pm.potential_price, pm.potential_gain, p.market_updated_at,
           (select json_build_object('eur', cs.price_eur, 'date', cs.sold_at) from card_sales cs
@@ -543,7 +553,7 @@ export function createQueries(sql: postgres.Sql) {
         birthDate: r.birth_date,
         country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
         firstName: r.first_name, lastName: r.last_name, height: r.height, shirtNumber: r.shirt_number, bodyPictureUrl: r.body_picture_url,
-        cardPositions: r.card_positions,
+        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [],
         market: r.market_updated_at ? {
           floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, referencePrice: r.reference_price, recentPrice: r.recent_price,
           priceTrend7: r.price_trend7, sales30: r.sales30 ?? 0, fairPrice: r.fair_price, valueRatio: r.value_ratio,
@@ -567,7 +577,7 @@ export function createQueries(sql: postgres.Sql) {
       const order = f.view === 'sous' ? sql`pm.value_ratio asc` : f.view === 'sur' ? sql`pm.value_ratio desc` : sql`pm.potential_gain desc`;
       const rows = await sql`
         select p.sorare_slug, p.name, p.picture_url, t.name as team, t.picture_url as team_picture,
-          coalesce(p.card_positions, array[p.position]) as card_positions, s.usual_position, s.l5, s.l15, s.start_rate5,
+          array[p.position] as card_positions, s.usual_position, s.l5, s.l15, s.start_rate5,
           pm.reference_price, pm.fair_price, pm.value_ratio, pm.price_trend7, pm.sales30, pm.potential_price, pm.potential_gain,
           s.next_projected, o.name as next_opponent, o.picture_url as next_opponent_picture, fx.home_team_id = t.id as next_is_home, fx.date as next_date
         from player_market pm
@@ -581,7 +591,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.view === 'gw' ? sql`and s.next_fixture_id = any(${f.fixtureIds ?? []}) and pm.potential_gain is not null
             and s.start_rate5 >= 0.6 and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'` : sql``}
           ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
-          ${f.position ? sql`and ${f.position} = any(coalesce(p.card_positions, array[p.position]))` : sql``}
+          ${f.position ? sql`and ${f.position} = any(array[p.position])` : sql``}
           ${f.maxPrice ? sql`and pm.reference_price <= ${f.maxPrice}` : sql``}
         order by ${order}, p.name
         limit ${f.limit}`;
@@ -809,7 +819,7 @@ export function createQueries(sql: postgres.Sql) {
       if (f.slugs && !f.slugs.length) return [];
       const rows = await sql`
         select p.sorare_slug, p.name, p.picture_url, t.name as team, t.sorare_slug as team_slug, t.picture_url as team_picture,
-          c.name as competition, c.slug as competition_slug, coalesce(p.card_positions, array[p.position]) as card_positions,
+          c.name as competition, c.slug as competition_slug, array[p.position] as card_positions,
           s.usual_position, s.l15, p.floor_in_season, p.floor_classic, pm.recent_price, pm.reference_price, pm.fair_price, pm.value_ratio,
           pm.potential_price, pm.potential_gain, pm.price_trend7,
           (select json_build_object('eur', cs.price_eur, 'date', cs.sold_at) from card_sales cs

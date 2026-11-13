@@ -1,3 +1,4 @@
+import { ClassicHint } from '@/components/ClassicHint';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView } from '@/db/queries';
@@ -76,7 +77,8 @@ function Hero({ player }: { player: PlayerDetail }) {
             </Link>
           ) : <span className="pill-link">Sans club suivi</span>}
           {player.competition && <span className="pill-link">{player.competition}</span>}
-          <span className="pill-link pill-card" title="Postes où ses cartes Sorare peuvent être alignées">Carte : {cardLabel(player.cardPositions)}</span>
+          <span className="pill-link pill-card" title="Poste de sa carte de la saison">Carte : {cardLabel(player.cardPositions)}</span>
+          <ClassicHint positions={player.classicPositions} />
         </div>
         <StatusBadges playingStatus={player.playingStatus} injury={player.injury} suspension={player.suspension} />
         <dl className="pcard-attrs">

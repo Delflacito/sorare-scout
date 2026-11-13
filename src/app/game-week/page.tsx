@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries';
-import { GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
+import { ClassicHint } from '@/components/ClassicHint';
+import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
@@ -63,7 +64,7 @@ function PlayerRow({ p, rank, splits }: { p: GameWeekPlayer; rank: number; split
         <MatchLine p={p} />
         <div className="gw-meta">
           <span>{fmtDate(p.date)}</span>
-          {p.cardPositions.length > 1 && <span className="gw-meta-pos" title="Postes de la carte">{cardLabel(p.cardPositions)}</span>}
+          <ClassicHint positions={p.classicPositions} />
           {p.usualPosition && <span className="gw-meta-pos" title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
           <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(p.base)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(p.startRate)}</span>
