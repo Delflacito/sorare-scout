@@ -46,9 +46,9 @@ const upcoming: UpcomingView = {
   base: 80, homeAvg: 76, homeGames: 5, awayAvg: 84.6, awayGames: 5, startRate: 0.8, usualPosition: 'LB',
   fixtures: [
     { fixtureId: 9, date: '2099-01-01T20:00:00.000Z', opponent: 'Olympique de Marseille', opponentSlug: 'om', isHome: true, opponentPictureUrl: 'https://t/om.png',
-      position: { average: 66, leagueAverage: 50, observations: 5 }, overall: { index: 1.1, rating: 30, observations: 20 }, leagueVenueFactor: 1.03 },
+      position: { average: 66, leagueAverage: 50, observations: 5 }, overall: { index: 1.1, rating: 30, observations: 20 }, leagueVenueFactor: 1.03, topClub: false },
     { fixtureId: 10, date: '2099-01-08T20:00:00.000Z', opponent: 'RC Lens', opponentSlug: 'lens', isHome: false, opponentPictureUrl: null,
-      position: null, overall: null, leagueVenueFactor: 0.97 },
+      position: null, overall: null, leagueVenueFactor: 0.97, topClub: false },
   ],
 };
 const params = (slug: string, onglet?: string) => ({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(onglet ? { onglet } : {}) });

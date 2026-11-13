@@ -111,7 +111,12 @@ export interface FixtureContext {
   leagueVenueFactor: number;
   position: { average: number | null; leagueAverage: number | null; observations: number } | null;
   overall: { index: number | null; observations: number } | null;
+  /** Club du joueur dans le premier tiers (ou quart) de son championnat : bonus fixe. */
+  topClub?: boolean;
 }
+
+/** Les joueurs des clubs du haut de tableau dépassent leur score potentiel d'environ 2 points (test sur le passé, nov. 2026). */
+export const TOP_CLUB_BONUS = 2;
 
 /** Score potentiel d'un joueur pour un match donné, avec ses deux composantes (utilisé par le site et le test sur le passé). */
 export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext, amplification = OPPONENT_AMPLIFICATION) {
@@ -126,5 +131,7 @@ export function projectForFixture(p: PlayerProjectionBase, f: FixtureContext, am
     positionLeagueAverage: f.position?.leagueAverage ?? null,
     teamIndex: f.overall?.index ?? null, teamObs: f.overall?.observations ?? 0,
   }, amplification);
-  return { venueFactor, opponent, projected: projectedScore({ base: p.base, venueFactor, opponent }) };
+  const raw = projectedScore({ base: p.base, venueFactor, opponent });
+  const projected = raw === null || !f.topClub ? raw : Math.min(100, Math.round((raw + TOP_CLUB_BONUS) * 10) / 10);
+  return { venueFactor, opponent, projected };
 }

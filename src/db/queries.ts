@@ -7,7 +7,7 @@ import type { OwnedStatus } from '@/lib/beforeGw';
 import type { StreakPlan } from '@/lib/streakPlans';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
-import { playerSplits, type PlayerSplits, type SplitGame } from '@/domain/splits';
+import { playerSplits, tierOf, type PlayerSplits, type SplitGame } from '@/domain/splits';
 
 export const SORTS = ['projected', 'l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
@@ -226,6 +226,8 @@ export interface UpcomingFixture {
   overall: { index: number | null; rating: number | null; observations: number } | null;
   /** Avantage du terrain mesuré dans le championnat (domicile ou extérieur, selon le lieu du match). */
   leagueVenueFactor: number;
+  /** Match de championnat d'un club du premier tiers (ou quart) : bonus du score potentiel. */
+  topClub: boolean;
 }
 export interface UpcomingView {
   /** Niveau de base (L15 sur les matchs joués) et moyennes du joueur à domicile / à l'extérieur. */
@@ -691,11 +693,16 @@ export function createQueries(sql: postgres.Sql) {
         select p.id, p.team_id, s.base, s.home_avg, s.home_games, s.away_avg, s.away_games, s.start_rate5, s.usual_position
         from players p left join player_summary s on s.player_id = p.id where p.sorare_slug = ${slug}`;
       if (!p) return null;
+      const [rank] = p.team_id ? await sql`
+        with st as (${standings()})
+        select st.rank, st.teams from st join teams t on t.id = st.team_id and t.competition_id = st.competition_id
+        where st.team_id = ${p.team_id}` : [];
+      const topClub = !!rank && tierOf(rank.rank, rank.teams) === 0;
       const rows = p.team_id ? await sql`
         with next as (
-          select f.id, f.date, f.home_team_id = ${p.team_id} as is_home,
+          select f.id, f.date, f.home_team_id = ${p.team_id} as is_home, c.is_league,
             case when f.home_team_id = ${p.team_id} then f.away_team_id else f.home_team_id end as opponent_id
-          from fixtures f
+          from fixtures f join competitions c on c.id = f.competition_id
           where ${p.team_id} in (f.home_team_id, f.away_team_id) and f.status = 'scheduled' and f.date > now()
           order by f.date limit ${limit}
         )
@@ -722,6 +729,7 @@ export function createQueries(sql: postgres.Sql) {
             : { average: r.pos_average, leagueAverage: r.pos_league_any, observations: r.pos_obs ?? 0 },
           overall: r.all_obs === null ? null : { index: r.all_index, rating: r.all_rating, observations: r.all_obs },
           leagueVenueFactor: r.venue_factor ?? 1,
+          topClub: topClub && r.is_league,
         })),
       };
     },
