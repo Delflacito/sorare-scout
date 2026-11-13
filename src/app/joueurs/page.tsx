@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getQueries, PAGE_SIZE, SORTS, type PlayerListRow, type Sort } from '@/db/queries';
 import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
-import { fmtPct, fmtScore, indexClass } from '@/lib/format';
+import { fmtEur, fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
@@ -65,6 +65,8 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
           <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(r.l15)}</span>
           <span className="gw-meta-pos"><abbr title="Moyenne des 40 derniers matchs">L40</abbr> {fmtScore(r.l40)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(r.startRate)}</span>
+          <span title="Carte de la saison la moins chère en vente">Plancher {r.floorInSeason === null ? '—' : fmtEur(r.floorInSeason)}</span>
+          <span title="Dernière vente d’une carte de la saison">Dernier achat {r.lastSale === null ? '—' : fmtEur(r.lastSale)}</span>
         </div>
       </div>
       <div className="gw-score">

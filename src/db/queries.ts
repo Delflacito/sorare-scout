@@ -37,6 +37,8 @@ export interface PlayerListRow {
   injuryKind: string | null; suspensionReason: string | null; sorareProjection: number | null;
   /** Score potentiel du prochain match de championnat. */
   nextProjected: number | null;
+  /** Carte de la saison la moins chère en vente, et dernière vente d'une carte de la saison. */
+  floorInSeason: number | null; lastSale: number | null;
   /** Postes où ses cartes Sorare peuvent être alignées. */
   cardPositions: GenericPosition[];
 }
@@ -245,7 +247,8 @@ export function createQueries(sql: postgres.Sql) {
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
           p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
-          s.next_projected, coalesce(p.card_positions, array[p.position]) as card_positions
+          s.next_projected, coalesce(p.card_positions, array[p.position]) as card_positions, p.floor_in_season,
+          (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season order by cs.sold_at desc limit 1) as last_sale
         from players p
         join player_summary s on s.player_id = p.id
         left join teams t on t.id = p.team_id
@@ -272,7 +275,7 @@ export function createQueries(sql: postgres.Sql) {
         nextIndex: r.next_index, nextLowSample: r.low_sample,
         pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, playingStatus: r.playing_status,
         injuryKind: r.injury_kind, suspensionReason: r.suspension_reason, sorareProjection: r.sorare_projection,
-        nextProjected: r.next_projected, cardPositions: r.card_positions,
+        nextProjected: r.next_projected, cardPositions: r.card_positions, floorInSeason: r.floor_in_season, lastSale: r.last_sale,
       }));
     },
 

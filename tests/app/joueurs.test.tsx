@@ -15,7 +15,7 @@ const row: PlayerListRow = {
   usualPosition: 'LB', l5: 62.4, l15: 58.1, l40: 50, startRate: 0.8,
   nextOpponent: 'Olympique de Marseille', nextOpponentSlug: 'om', nextIsHome: true, nextIndex: 1.234, nextLowSample: false,
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
-  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3, cardPositions: ['Defender', 'Midfielder'],
+  injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3, cardPositions: ['Defender', 'Midfielder'], floorInSeason: 42, lastSale: null,
 };
 
 describe('/joueurs', () => {
@@ -33,6 +33,7 @@ describe('/joueurs', () => {
     expect(within(line).getByText('+23 %')).toBeInTheDocument();
     expect(within(line).getByText('Sorare 41')).toBeInTheDocument();
     expect(line).toHaveTextContent('L5 62.4');
+    expect(line).toHaveTextContent('Plancher 42 €Dernier achat —');
     expect(line).toHaveTextContent('Titu 80 %');
     expect(line).toHaveTextContent('Défenseur / Milieu · DG');
     expect(within(line).getByRole('img', { name: 'Nuno Mendes' })).toHaveAttribute('src', 'https://p/nuno.png');
