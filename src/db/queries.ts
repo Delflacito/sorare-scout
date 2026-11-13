@@ -1,3 +1,4 @@
+import { ACTIONS } from '@/domain/actions';
 import type postgres from 'postgres';
 import { getSql } from './client';
 import type { DetailedPosition, GenericPosition } from '@/domain/types';
@@ -308,7 +309,7 @@ export function createQueries(sql: postgres.Sql) {
       const games = await sql`
         with st as (${standings()})
         select a.player_id, a.team_id = f.home_team_id as is_home, st.rank, st.teams,
-          a.sorare_score, a.decisive_score, a.all_around_score
+          a.sorare_score, a.decisive_score, a.all_around_score, a.minutes, a.decisive_actions
         from appearances a
         join fixtures f on f.id = a.fixture_id and f.status = 'played'
         join st on st.competition_id = f.competition_id
@@ -318,12 +319,17 @@ export function createQueries(sql: postgres.Sql) {
       const byPlayer = new Map<number, SplitGame[]>();
       for (const g of games) {
         const list = byPlayer.get(g.player_id) ?? [];
-        list.push({ isHome: g.is_home, rank: g.rank, teams: g.teams, score: g.sorare_score, decisive: g.decisive_score, allAround: g.all_around_score });
+        const acts: Record<string, number> = g.decisive_actions ?? {};
+        list.push({
+          isHome: g.is_home, rank: g.rank, teams: g.teams, score: g.sorare_score, decisive: g.decisive_score, allAround: g.all_around_score,
+          minutes: g.minutes, cleanSheet: (acts.clean_sheet_60 ?? 0) > 0,
+          actions: Object.entries(acts).reduce((t, [k, n]) => t + (ACTIONS[k]?.positive && k !== 'clean_sheet_60' ? n : 0), 0),
+        });
         byPlayer.set(g.player_id, list);
       }
       return players.flatMap((p) => {
         const next = p.next_rank === null ? null : { isHome: p.next_home, rank: p.next_rank, teams: p.next_teams };
-        const splits = playerSplits(byPlayer.get(p.id) ?? [], next);
+        const splits = playerSplits(byPlayer.get(p.id) ?? [], next, p.position === 'Goalkeeper');
         return splits ? [{
           slug: p.sorare_slug, name: p.name, pictureUrl: p.picture_url, position: p.position, usualPosition: p.usual_position,
           team: p.team, teamPictureUrl: p.team_picture, splits,
@@ -749,7 +755,7 @@ export function createQueries(sql: postgres.Sql) {
       if (!f) return null;
       const players = await sql`
         select a.team_id, p.sorare_slug, p.name, a.detailed_position, a.grid, a.started, a.minutes,
-          a.sorare_score, a.decisive_score, a.all_around_score
+          a.sorare_score, a.decisive_score, a.all_around_score, a.minutes, a.decisive_actions
         from appearances a join players p on p.id = a.player_id
         where a.fixture_id = ${id}
         order by a.team_id = ${f.home_team_id} desc, a.started desc, a.grid nulls last, a.minutes desc, p.name`;

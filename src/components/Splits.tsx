@@ -1,5 +1,5 @@
 import { ScorePill } from '@/components/ScorePill';
-import { MIN_GAMES, contextLabel, nextCell, tierCode, tierName, type PlayerSplits, type SplitCell } from '@/domain/splits';
+import { MIN_GAMES, contextLabel, fmtDecisive, nextCell, tierCode, tierName, type PlayerSplits, type SplitCell } from '@/domain/splits';
 import { fmtScore } from '@/lib/format';
 
 /** Ton de la pastille : favorable / défavorable au prochain match, sinon neutre. */
@@ -25,7 +25,7 @@ export function NoteTags({ s }: { s: PlayerSplits }) {
 
 /** « D domicile · E extérieur · T1 1-6 · T2 7-12 · T3 13-18 ». */
 export const legend = (s: PlayerSplits) =>
-  `D dom. · E ext. · ${s.tiers.map((t, i) => `${tierCode(s.tiers, i)} ${t.from}-${t.to}`).join(' · ')} · écart à sa moyenne`;
+  `${s.tiers.map((t, i) => `${tierCode(s.tiers, i)} ${t.from}-${t.to}`).join(' · ')} · écart à sa moyenne`;
 
 /**
  * Pastille qui ouvre, au survol ou au toucher, les traits marquants du joueur (lieu, niveau de l'adversaire, AA, décisif).
@@ -42,19 +42,19 @@ export function SplitHint({ s: all }: { s: PlayerSplits | undefined }) {
       {tone === 'good' ? '▲' : tone === 'bad' ? '▼' : '◆'}
       <span className="split-pop" role="tooltip">
         <NoteTags s={s} />
-        {ctx && <span className="split-ctx">Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} · max ${fmtScore(c.max)} (${c.games} m.)` : ' · pas encore joué'}</span>}
+        {ctx && <span className="split-ctx">Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} · max ${fmtScore(c.max)} · ${fmtDecisive(s.goalkeeper, c.decisive)} (${c.games} m.)` : ' · pas encore joué'}</span>}
       </span>
     </span>
   );
 }
 
-function Cell({ c, next }: { c: SplitCell | null; next?: boolean }) {
+function Cell({ c, next, gk }: { c: SplitCell | null; next?: boolean; gk: boolean }) {
   return (
     <td className={`split-cell ${!c || c.games < MIN_GAMES ? 'thin' : ''} ${next ? 'is-next' : ''}`}>
       {c ? (
         <>
           <ScorePill score={c.score} size="sm" />
-          <span className="split-sub">AA {fmtScore(c.allAround)} · Déc {fmtScore(c.decisive)}</span>
+          <span className="split-sub">AA {fmtScore(c.allAround)} · {fmtDecisive(gk, c.decisive)}</span>
           <span className="split-sub">{c.games} m.</span>
         </>
       ) : '—'}
@@ -78,16 +78,16 @@ export function SplitsCard({ s }: { s: PlayerSplits | undefined }) {
             {s.tiers.map((t, i) => (
               <tr key={i}>
                 <th scope="row" title={`Contre le ${tierName(s.tiers, i)}`}>{tierCode(s.tiers, i)} <small>{t.from}-{t.to}</small></th>
-                <Cell c={s.cells[i].home} next={s.next?.tier === i && s.next.venue === 'home'} />
-                <Cell c={s.cells[i].away} next={s.next?.tier === i && s.next.venue === 'away'} />
-                <Cell c={s.byTier[i]} />
+                <Cell gk={s.goalkeeper} c={s.cells[i].home} next={s.next?.tier === i && s.next.venue === 'home'} />
+                <Cell gk={s.goalkeeper} c={s.cells[i].away} next={s.next?.tier === i && s.next.venue === 'away'} />
+                <Cell gk={s.goalkeeper} c={s.byTier[i]} />
               </tr>
             ))}
             <tr>
               <th scope="row">Tous</th>
-              <Cell c={s.venue.home} />
-              <Cell c={s.venue.away} />
-              <Cell c={s.overall} />
+              <Cell gk={s.goalkeeper} c={s.venue.home} />
+              <Cell gk={s.goalkeeper} c={s.venue.away} />
+              <Cell gk={s.goalkeeper} c={s.overall} />
             </tr>
           </tbody>
         </table>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getQueries, type PlayerSplitRow } from '@/db/queries';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
-import { MIN_GAMES, contextLabel, nextCell, tierCode, type SplitCell } from '@/domain/splits';
+import { MIN_GAMES, contextLabel, fmtDecisive, nextCell, tierCode, type SplitCell } from '@/domain/splits';
 import { NoteTags, legend } from '@/components/Splits';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { fmtScore } from '@/lib/format';
@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 
 const GENERIC = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
 
-function Avg({ c }: { c: SplitCell | null }) {
+function Avg({ c, gk }: { c: SplitCell | null; gk: boolean }) {
   return (
-    <td className={`num ${!c || c.games < MIN_GAMES ? 'muted' : ''}`} title={c ? `AA ${fmtScore(c.allAround)} · Déc ${fmtScore(c.decisive)}` : undefined}>
+    <td className={`num ${!c || c.games < MIN_GAMES ? 'muted' : ''}`} title={c ? `AA ${fmtScore(c.allAround)} · ${fmtDecisive(gk, c.decisive)}` : undefined}>
       {c ? <>{Math.round(c.score)} <small>({c.games})</small></> : '—'}
     </td>
   );
@@ -52,8 +52,8 @@ function SplitsTable({ rows }: { rows: PlayerSplitRow[] }) {
                 </td>
                 <td>{r.usualPosition ? POSITION_LABEL_FR[r.usualPosition] : GENERIC_LABEL_FR[r.position]}</td>
                 <td className="num">{Math.round(s.overall.score)} <small>({s.overall.games})</small></td>
-                {s.tiers.map((_, i) => <Avg key={`h${i}`} c={s.cells[i].home} />)}
-                {s.tiers.map((_, i) => <Avg key={`a${i}`} c={s.cells[i].away} />)}
+                {s.tiers.map((_, i) => <Avg gk={s.goalkeeper} key={`h${i}`} c={s.cells[i].home} />)}
+                {s.tiers.map((_, i) => <Avg gk={s.goalkeeper} key={`a${i}`} c={s.cells[i].away} />)}
                 <td className="profils-ctx">{c ? <>{Math.round(c.score)} <small>({c.games}) {contextLabel(s)}</small></> : contextLabel(s) ?? '—'}</td>
                 <td>
                   {s.notes.length ? (

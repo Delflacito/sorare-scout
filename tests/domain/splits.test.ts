@@ -33,17 +33,25 @@ describe('profil domicile / extérieur × adversaire', () => {
     expect(s.next).toEqual({ venue: 'home', tier: 2 });
     expect(s.notes.length).toBeGreaterThan(0);
     expect(s.notes.length).toBeLessThanOrEqual(3);
-    expect(s.notes.some((n) => /^AA D·T3 \+\d+$/.test(n.tag) && n.next === 'good')).toBe(true);
-    expect(s.notes.some((n) => n.tag.startsWith('Score E −'))).toBe(true);
+    expect(s.notes.some((n) => /^AA dom\.·T3 \+\d+$/.test(n.tag) && n.next === 'good')).toBe(true);
+    expect(s.notes.some((n) => n.tag.startsWith('Score ext. −'))).toBe(true);
   });
 
   it('décisif à domicile mais pas à l’extérieur, sans écart de score total', () => {
-    const home = (r: number) => g(true, r, 50, { decisive: 50, allAround: 0 });
-    const away = (r: number) => g(false, r, 50, { decisive: 35, allAround: 15 });
+    const home = (r: number) => g(true, r, 50, { actions: 1, allAround: 0 });
+    const away = (r: number) => g(false, r, 50, { actions: 0, allAround: 15 });
     const s = playerSplits([home(2), home(9), home(15), away(4), away(10), away(16)], null)!;
     expect(s.notes.map((n) => n.metric).sort()).toEqual(['allAround', 'decisive']);
-    expect(s.notes.find((n) => n.metric === 'decisive')!.tag).toMatch(/^Déc (D \+8|E −8)$/);
-    expect(s.notes.find((n) => n.metric === 'allAround')!.tag).toBe('AA D −8');
+    expect(s.notes.find((n) => n.metric === 'decisive')!.tag).toMatch(/^AD\/90 (dom\. \+0\.5|ext\. −0\.5)$/);
+    expect(s.notes.find((n) => n.metric === 'allAround')!.tag).toBe('AA dom. −8');
+  });
+
+  it('gardien : % de clean sheets', () => {
+    const cs = (isHome: boolean, r: number, clean: boolean) => g(isHome, r, 50, { cleanSheet: clean });
+    const s = playerSplits([cs(true, 2, true), cs(true, 9, true), cs(true, 15, true), cs(false, 4, false), cs(false, 10, false), cs(false, 16, false)], null, true)!;
+    expect(s.venue.home!.decisive).toBe(100);
+    expect(s.overall.decisive).toBe(50);
+    expect(s.notes.some((n) => /^CS (dom\. \+50|ext\. −50) %$/.test(n.tag))).toBe(true);
   });
 
   it('moins de 3 matchs dans un groupe : pas de commentaire', () => {
