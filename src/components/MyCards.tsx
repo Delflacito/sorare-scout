@@ -41,7 +41,7 @@ export function EnsurePseudo({ href, present, quiet }: { href: string; present: 
 
 // Une seule lecture de l'effectif par page, partagée par toutes les coches.
 let ownedLoad: Promise<Map<string, number>> | null = null;
-function loadOwned(): Promise<Map<string, number>> {
+export function loadOwned(): Promise<Map<string, number>> {
   const p = readPseudo();
   if (!p) return Promise.resolve(new Map());
   ownedLoad ??= fetch(`/api/effectif/enregistre?user=${encodeURIComponent(p)}`).then((r) => (r.ok ? r.json() : { entries: null }))

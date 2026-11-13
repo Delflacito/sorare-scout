@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { MarketPlayerView } from '@/db/queries';
 import { PlayerAvatar } from './Media';
 import { fmtEur } from '@/lib/format';
+import { loadOwned } from './MyCards';
 
 // shortcut: liste gardée dans le navigateur (pas synchronisée entre appareils), passer par une API liée au pseudo si besoin.
 const KEY = 'sorare-scout:otw';
@@ -44,13 +45,17 @@ export function OtwList() {
   const [competition, setCompetition] = useState('');
   const [club, setClub] = useState('');
   useEffect(() => {
-    const s = read();
+    loadOwned().then((owned) => {
+    // Joueur acheté depuis (présent dans mon effectif) : il sort de la liste.
+    const s = read().filter((x) => !owned.has(x));
+    write(s);
     setSlugs(s);
     if (!s.length) return setPlayers([]);
     fetch(`/api/joueurs?slugs=${s.map(encodeURIComponent).join(',')}`).then(async (r) => {
       if (!r.ok) throw new Error('Prix indisponibles');
       setPlayers(await r.json());
     }).catch((e: Error) => setError(e.message));
+    });
   }, []);
   const remove = (slug: string) => {
     const s = (slugs ?? []).filter((x) => x !== slug);
