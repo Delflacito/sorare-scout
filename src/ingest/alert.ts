@@ -15,7 +15,10 @@ export async function sendAlert(queries: Queries, env = process.env, fetchImpl: 
   if (!env.ALERT_PSEUDO || !env.NTFY_TOPIC) return false;
   const text = alertText(await beforeGwFor(queries, env.ALERT_PSEUDO.toLowerCase()));
   if (!text) return false;
-  const res = await fetchImpl(`https://ntfy.sh/${encodeURIComponent(env.NTFY_TOPIC)}`, { method: 'POST', headers: { Title: 'Sorare Scout : cartes a verifier' }, body: text });
+  // Le secret peut contenir l'adresse entière (https://ntfy.sh/mon-canal) : seul le nom du canal compte.
+  const topic = env.NTFY_TOPIC.trim().replace(/\/+$/, '').replace(/^.*\//, '');
+  if (!/^[-_A-Za-z0-9]{1,64}$/.test(topic)) throw new Error('NTFY_TOPIC invalide : lettres, chiffres, tirets et tirets bas seulement, 64 caractères au plus');
+  const res = await fetchImpl(`https://ntfy.sh/${topic}`, { method: 'POST', headers: { Title: 'Sorare Scout : cartes a verifier' }, body: text });
   if (!res.ok) throw new Error(`ntfy ${res.status}`);
   return true;
 }
