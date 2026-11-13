@@ -6,7 +6,6 @@ import { config } from 'dotenv';
 import { getSql } from '@/db/client';
 import { createRepo } from '@/db/repo';
 import { backtestRound, lastRounds, summarize, tierFactor, type BacktestRow } from '@/ingest/backtest';
-import { CONTENDER_SLUGS } from '@/lib/competitions';
 
 config({ path: '.env.local', quiet: true });
 
@@ -14,7 +13,7 @@ const sql = getSql();
 const { fixtures, appearances } = await createRepo(sql).aggregateInputs();
 const competitions = await sql`select id, slug from competitions where is_league`;
 const GROUPS: [string, string[]][] = [
-  ['Belgique', ['jupiler-pro-league']], ['Pays-Bas', ['eredivisie']], ['Portugal', ['primeira-liga-pt']], ['Contender', CONTENDER_SLUGS],
+  ['Ligue 1', ['ligue-1-fr']], ['Pays-Bas', ['eredivisie']], ['Portugal', ['primeira-liga-pt']],
 ];
 // [libellé, k (matchs pour peser autant que la moyenne), plafond]
 const VARIANTS: [string, number, number][] = [['k 4 · ±10 %', 4, 0.1], ['k 8 · ±10 %', 8, 0.1], ['k 16 · ±10 %', 16, 0.1], ['k 8 · ±20 %', 8, 0.2]];
@@ -127,13 +126,13 @@ for (const [name, slugs] of GROUPS) {
     md.push(`## ${name} — ${title} (${rows.length} titulaires)`, '', ...table(rows), '');
   }
 }
-md.push('## Les quatre ensemble — 3 dernières journées', '', ...table(all.last), '', '## Les quatre ensemble — 5 dernières journées', '', ...table(all.five), '');
+md.push('## Les trois ensemble — 3 dernières journées', '', ...table(all.last), '', '## Les trois ensemble — 5 dernières journées', '', ...table(all.five), '');
 
 mkdirSync('backtest-output', { recursive: true });
 writeFileSync('backtest-output/tier.md', md.join('\n'));
-writeFileSync('backtest-output/club-tier.md', [...clubMd, '## Les quatre ensemble — 3 dernières journées', '', ...byClub(all.last),
-  '## Les quatre ensemble — 5 dernières journées', '', ...byClub(all.five)].join('\n'));
-writeFileSync('backtest-output/tier-precision.md', [...tierMd, '## Les quatre ensemble', '', ...byTier(all.five)].join('\n'));
+writeFileSync('backtest-output/club-tier.md', [...clubMd, '## Les trois ensemble — 3 dernières journées', '', ...byClub(all.last),
+  '## Les trois ensemble — 5 dernières journées', '', ...byClub(all.five)].join('\n'));
+writeFileSync('backtest-output/tier-precision.md', [...tierMd, '## Les trois ensemble', '', ...byTier(all.five)].join('\n'));
 console.log(md.join('\n'));
 console.log(tierMd.join('\n'));
 await sql.end();
