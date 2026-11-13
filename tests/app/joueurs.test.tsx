@@ -5,7 +5,7 @@ import type { PlayerListRow, SearchFilters } from '@/db/queries';
 const searchPlayers = vi.fn<(f: SearchFilters) => Promise<PlayerListRow[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
-  getQueries: () => ({ searchPlayers, listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }], listTeams: async () => [{ slug: 'om', name: 'Olympique de Marseille' }] }),
+  getQueries: () => ({ searchPlayers, getSquad: async () => [{ slug: 'mine', status: 'owned' }, { slug: 'cible', status: 'target' }], listCompetitions: async () => [{ slug: 'ligue-1-fr', name: 'Ligue 1' }], listTeams: async () => [{ slug: 'om', name: 'Olympique de Marseille' }] }),
 }));
 
 const { default: Page } = await import('@/app/joueurs/page');
@@ -82,5 +82,10 @@ describe('/joueurs', () => {
     searchPlayers.mockResolvedValue([]);
     render(await Page({ searchParams: Promise.resolve({}) }));
     expect(screen.getByText('Aucun joueur ne correspond à ces filtres')).toBeInTheDocument();
+  });
+  it('cartes que je n’ai pas : écarte les joueurs possédés', async () => {
+    searchPlayers.mockResolvedValue([]);
+    render(await Page({ searchParams: Promise.resolve({ sans: 'moi' }) }));
+    expect(searchPlayers).toHaveBeenLastCalledWith(expect.objectContaining({ excludeSlugs: ['mine'] }));
   });
 });

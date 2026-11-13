@@ -13,6 +13,8 @@ export type Sort = (typeof SORTS)[number];
 export const PAGE_SIZE = 50;
 
 export interface SearchFilters {
+  /** Joueurs à écarter (cartes déjà dans mon effectif). */
+  excludeSlugs?: string[];
   q?: string;
   competition?: string;
   team?: string;
@@ -260,6 +262,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
           ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
           ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
+          ${f.excludeSlugs?.length ? sql`and p.sorare_slug <> all(${f.excludeSlugs})` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
         limit ${PAGE_SIZE} offset ${f.offset}`;
       return rows.map((r) => ({

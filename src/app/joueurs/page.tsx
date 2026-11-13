@@ -5,6 +5,8 @@ import { fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
 import { StatusBadges } from '@/components/StatusBadges';
+import { NotOwnedToggle, OwnedMark } from '@/components/MyCards';
+import { PSEUDO } from '@/lib/squad';
 import { OtwButton } from '@/components/Otw';
 import { Venue } from '@/components/Venue';
 import { START_RATE_LEVELS, one, oneOf, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
@@ -37,6 +39,7 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
       <PlayerAvatar name={r.name} url={r.pictureUrl} size={40} />
       <div className="gw-who">
         <div className="gw-name">
+          <OwnedMark slug={r.slug} />
           <Link href={`/joueurs/${r.slug}`}>{r.name}</Link>
           <StatusBadges compact playingStatus={r.playingStatus}
             injury={r.injuryKind ? { kind: r.injuryKind, end: null } : null}
@@ -74,6 +77,8 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
 
 export default async function JoueursPage({ searchParams }: { searchParams: SearchParams }) {
   const p = await searchParams;
+  const sansRaw = one(p.sans)?.toLowerCase();
+  const sans = sansRaw && PSEUDO.test(sansRaw) ? sansRaw : undefined;
   const pageNum = Math.max(1, Number(one(p.page)) || 1);
   const filters = {
     q: one(p.q),
@@ -85,9 +90,12 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     minStartRate: startRateParam(one(p.titu), 0) / 100 || undefined,
     sort: oneOf(one(p.sort), SORTS) ?? 'projected',
     offset: (pageNum - 1) * PAGE_SIZE,
+    sans,
   };
   const queries = getQueries();
-  const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(filters), queries.listCompetitions(), queries.listTeams()]);
+  const squad = sans ? await queries.getSquad(sans) : null;
+  const excludeSlugs = squad ? squad.filter((e) => e.status === 'owned').map((e) => e.slug) : undefined;
+  const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(excludeSlugs ? { ...filters, excludeSlugs } : filters), queries.listCompetitions(), queries.listTeams()]);
   // Lien qui garde les filtres en cours et en change certains (retour en page 1 sauf demande).
   const href = (o: Partial<Omit<typeof filters, 'offset'>> & { page?: number } = {}) => {
     const { available, minStartRate, offset: _, ...rest } = { ...filters, page: undefined, ...o };
@@ -97,7 +105,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs${qs.size ? `?${qs}` : ''}`;
   };
-  const activeFilters = [filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available, filters.minStartRate].filter(Boolean).length;
+  const activeFilters = [filters.sans, filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available, filters.minStartRate].filter(Boolean).length;
   const advanced = [filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
 
   return (
@@ -112,6 +120,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
           {filters.competition && <input type="hidden" name="competition" value={filters.competition} />}
           {filters.position && <input type="hidden" name="position" value={filters.position} />}
           {filters.sort !== 'projected' && <input type="hidden" name="sort" value={filters.sort} />}
+          {filters.sans && <input type="hidden" name="sans" value={filters.sans} />}
           {filters.minStartRate && <input type="hidden" name="titu" value={Math.round(filters.minStartRate * 100)} />}
           <details className="more-filters" open={advanced > 0}>
             <summary>Plus de filtres{advanced > 0 && ` (${advanced})`}</summary>
@@ -152,6 +161,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
               aria-current={Math.round((filters.minStartRate ?? 0) * 100) === n ? 'page' : undefined}>{startRateLabel(n)}</Link>
           ))}
         </nav>
+        <div className="chip-row"><NotOwnedToggle href={href({ sans: undefined })} active={!!filters.sans} /></div>
         <nav className="chip-row sort-row" aria-label="Trier par">
           <span className="muted">Trier par</span>
           {SORTS.map((s) => (

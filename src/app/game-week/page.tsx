@@ -7,7 +7,7 @@ import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
 import { fmtDate, fmtPct, fmtScore, roundLabel } from '@/lib/format';
 import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
-import { MyCardsToggle } from '@/components/MyCards';
+import { MyCardsToggle, OwnedMark } from '@/components/MyCards';
 import { STREAK_TIERS, streakTiersOf, type StreakTier } from '@/lib/roi';
 import { CONTENDER, CONTENDER_SLUGS } from '@/lib/competitions';
 import { PSEUDO } from '@/lib/squad';
@@ -48,6 +48,7 @@ function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
       <PlayerAvatar name={p.name} url={p.pictureUrl} size={40} />
       <div className="gw-who">
         <div className="gw-name">
+          <OwnedMark slug={p.slug} />
           <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
           <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
           <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />

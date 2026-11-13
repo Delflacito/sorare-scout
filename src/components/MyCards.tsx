@@ -38,3 +38,35 @@ export function EnsurePseudo({ href, present, quiet }: { href: string; present: 
   }, [href, present, router]);
   return missing && !quiet ? <p className="empty">Importe d’abord ta galerie dans <Link href="/effectif">Mon effectif</Link> : cette page s’appuie sur tes cartes.</p> : null;
 }
+
+// Une seule lecture de l'effectif par page, partagée par toutes les coches.
+let ownedLoad: Promise<Map<string, number>> | null = null;
+function loadOwned(): Promise<Map<string, number>> {
+  const p = readPseudo();
+  if (!p) return Promise.resolve(new Map());
+  ownedLoad ??= fetch(`/api/effectif/enregistre?user=${encodeURIComponent(p)}`).then((r) => (r.ok ? r.json() : { entries: null }))
+    .then((b: { entries: { slug: string; status: string }[] | null }) => {
+      const m = new Map<string, number>();
+      for (const e of b.entries ?? []) if (e.status === 'owned') m.set(e.slug, (m.get(e.slug) ?? 0) + 1);
+      return m;
+    }).catch(() => new Map());
+  return ownedLoad;
+}
+
+/** Coche verte devant un joueur dont j'ai la carte (effectif du pseudo enregistré). */
+export function OwnedMark({ slug }: { slug: string }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => { loadOwned().then((m) => setCount(m.get(slug) ?? 0)); }, [slug]);
+  if (!count) return null;
+  return <span className="owned-mark" title={`${count} carte${count > 1 ? 's' : ''} possédée${count > 1 ? 's' : ''}`}
+    role="img" aria-label="Carte possédée">✓{count > 1 ? `×${count}` : ''}</span>;
+}
+
+/** Filtre « Cartes que je n'ai pas » : ajoute le pseudo (paramètre sans) pour écarter les joueurs de mon effectif. */
+export function NotOwnedToggle({ href, active }: { href: string; active: boolean }) {
+  const [pseudo, setPseudo] = useState<string | null>(null);
+  useEffect(() => setPseudo(readPseudo()), []);
+  if (!pseudo && !active) return null;
+  const on = pseudo ? `${href}${href.includes('?') ? '&' : '?'}sans=${encodeURIComponent(pseudo)}` : href;
+  return <Link href={active ? href : on} className="chip" aria-pressed={active}>Cartes que je n’ai pas</Link>;
+}
