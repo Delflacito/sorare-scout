@@ -20,6 +20,9 @@ jobs:
       - run: npx tsx scripts/tune.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npx tsx scripts/tier-backtest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Résultats publiés sur la branche backtest-results (lisible sans téléchargement d'artefact).
       - run: |
           git config user.name "github-actions"

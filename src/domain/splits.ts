@@ -162,3 +162,26 @@ export function playerSplits(all: SplitGame[], next: { isHome: boolean; rank: nu
 /** Moyenne du joueur dans le contexte de son prochain match (lieu et tranche de l'adversaire). */
 export const nextCell = (s: PlayerSplits) => (s.next ? s.cells[s.next.tier][s.next.venue] : null);
 export const contextLabel = (s: PlayerSplits) => (s.next ? contextCode(s.tiers, s.next.venue, s.next.tier) : null);
+
+/** Classement (points, différence, buts marqués, puis id) de chaque championnat : clé `${competitionId}|${teamId}`. Même règle que la requête du site. */
+export function standings(fixtures: { competitionId: number; homeTeamId: number; awayTeamId: number; homeGoals?: number | null; awayGoals?: number | null }[]) {
+  const rows = new Map<string, { competitionId: number; teamId: number; pts: number; gd: number; gf: number }>();
+  for (const f of fixtures) {
+    if (f.homeGoals == null || f.awayGoals == null) continue;
+    for (const [teamId, gf, ga] of [[f.homeTeamId, f.homeGoals, f.awayGoals], [f.awayTeamId, f.awayGoals, f.homeGoals]]) {
+      const key = `${f.competitionId}|${teamId}`;
+      const r = rows.get(key) ?? { competitionId: f.competitionId, teamId, pts: 0, gd: 0, gf: 0 };
+      r.pts += gf > ga ? 3 : gf === ga ? 1 : 0;
+      r.gd += gf - ga;
+      r.gf += gf;
+      rows.set(key, r);
+    }
+  }
+  const out = new Map<string, { rank: number; teams: number }>();
+  for (const c of new Set([...rows.values()].map((r) => r.competitionId))) {
+    const table = [...rows.values()].filter((r) => r.competitionId === c)
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.teamId - b.teamId);
+    table.forEach((r, i) => out.set(`${c}|${r.teamId}`, { rank: i + 1, teams: table.length }));
+  }
+  return out;
+}

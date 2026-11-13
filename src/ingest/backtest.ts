@@ -1,5 +1,8 @@
 import type { CompletedFixture, AppearanceRow } from '@/db/repo';
 import { computeAggregates, projector } from './aggregates';
+import { standings, tierOf } from '@/domain/splits';
+import { shrinkTowards } from '@/domain/projection';
+import type { DetailedPosition } from '@/domain/types';
 
 const ROUND_DAYS = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -9,7 +12,58 @@ export interface Round { cutoff: string; fixtureIds: number[] }
 export interface BacktestRow {
   competitionId: number; fixtureId: number; playerId: number; isHome: boolean; started: boolean;
   actual: number; base: number; projected: number; venueFactor: number; opponent: number;
+  /** Réaction du joueur à la tranche de l'adversaire, relative à son poste (1 = comme tout le monde) ; null sans historique. */
+  tier?: TierProfile | null;
 }
+
+export interface TierProfile { ratio: number; games: number }
+
+/**
+ * Profil par tranche à partir de l'historique (classement à la date de coupure) : (moyenne du joueur contre la tranche
+ * / sa moyenne) ÷ (même rapport pour son poste habituel dans le championnat). Retire ce que le facteur adversaire compte déjà.
+ */
+export function tierProfiles(history: CompletedFixture[], apps: AppearanceRow[], usualPosition: Map<number, DetailedPosition | null>) {
+  const league = history.filter((f) => (f.scope ?? 'league') === 'league');
+  const table = standings(league);
+  const fixtureById = new Map(league.map((f) => [f.id, f]));
+  const tierAgainst = (competitionId: number, opponentId: number) => {
+    const s = table.get(`${competitionId}|${opponentId}`);
+    return s ? tierOf(s.rank, s.teams) : null;
+  };
+  const player = new Map<string, { sum: number; n: number }>();
+  const ref = new Map<string, { sum: number; n: number }>();
+  const add = (m: Map<string, { sum: number; n: number }>, key: string, x: number) => {
+    const a = m.get(key) ?? { sum: 0, n: 0 };
+    a.sum += x; a.n++;
+    m.set(key, a);
+  };
+  for (const a of apps) {
+    const f = fixtureById.get(a.fixtureId);
+    if (!f || a.minutes <= 0) continue;
+    const t = tierAgainst(f.competitionId, a.teamId === f.homeTeamId ? f.awayTeamId : f.homeTeamId);
+    if (t === null) continue;
+    add(player, `${a.playerId}|${f.competitionId}|${t}`, a.score);
+    add(player, `${a.playerId}|${f.competitionId}|all`, a.score);
+    const pos = usualPosition.get(a.playerId);
+    if (pos) { add(ref, `${f.competitionId}|${pos}|${t}`, a.score); add(ref, `${f.competitionId}|${pos}|all`, a.score); }
+  }
+  const avg = (a?: { sum: number; n: number }) => (a?.n ? a.sum / a.n : null);
+  return (playerId: number, competitionId: number, opponentId: number): TierProfile | null => {
+    const t = tierAgainst(competitionId, opponentId);
+    const pos = usualPosition.get(playerId);
+    if (t === null || !pos) return null;
+    const pt = player.get(`${playerId}|${competitionId}|${t}`);
+    const pa = avg(player.get(`${playerId}|${competitionId}|all`));
+    const rt = avg(ref.get(`${competitionId}|${pos}|${t}`));
+    const ra = avg(ref.get(`${competitionId}|${pos}|all`));
+    if (!pt || !pa || !rt || !ra) return null;
+    return { ratio: (pt.sum / pt.n / pa) / (rt / ra), games: pt.n };
+  };
+}
+
+/** Multiplicateur appliqué au score potentiel : rapproché de 1 selon le nombre de matchs (k), plafonné à ±cap. */
+export const tierFactor = (p: TierProfile | null, k: number, cap: number) =>
+  (p ? Math.min(1 + cap, Math.max(1 - cap, shrinkTowards(p.ratio, 1, p.games, k))) : 1);
 
 /** Dernière journée d'un championnat : matchs joués dans les 4 jours précédant le dernier match ; coupure au premier d'entre eux. */
 export function lastRound(fixtures: CompletedFixture[]): Round | null {
@@ -45,6 +99,7 @@ export function backtestRound(
   const agg = computeAggregates(history, appearances.filter((a) => historyIds.has(a.fixtureId)));
 
   const summaryOf = new Map(agg.summaries.map((s) => [s.playerId, s]));
+  const tierOfPlayer = tierProfiles(history, appearances.filter((a) => historyIds.has(a.fixtureId)), new Map(agg.summaries.map((s) => [s.playerId, s.usualPosition])));
   const project = projector(agg, amplification);
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
   const inRound = new Set(round.fixtureIds);
@@ -56,11 +111,13 @@ export function backtestRound(
     if (!s) continue;
     const f = fixtureById.get(a.fixtureId)!;
     const isHome = f.homeTeamId === a.teamId;
-    const p = project(s, { isHome, opponentId: isHome ? f.awayTeamId : f.homeTeamId, competitionId: f.competitionId });
+    const opponentId = isHome ? f.awayTeamId : f.homeTeamId;
+    const p = project(s, { isHome, opponentId, competitionId: f.competitionId });
     if (!p) continue; // aucun match joué avant la journée
     rows.push({
       competitionId: f.competitionId, fixtureId: f.id, playerId: a.playerId, isHome, started: a.started,
       actual: a.score, base: s.base!, projected: p.projected!, venueFactor: p.venueFactor, opponent: p.opponent,
+      tier: tierOfPlayer(a.playerId, f.competitionId, opponentId),
     });
   }
   return rows;

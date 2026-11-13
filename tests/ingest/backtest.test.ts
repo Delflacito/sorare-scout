@@ -1,4 +1,5 @@
-import { lastRound, lastRounds, backtestRound, summarize } from '@/ingest/backtest';
+import { lastRound, lastRounds, backtestRound, summarize, tierFactor, tierProfiles } from '@/ingest/backtest';
+import { standings } from '@/domain/splits';
 import type { CompletedFixture, AppearanceRow } from '@/db/repo';
 
 const fx = (id: number, day: number, home: number, away: number, competitionId = 1): CompletedFixture =>
@@ -63,5 +64,36 @@ describe('summarize', () => {
     ]);
     expect(s.buckets[0].actualOverBase).toBe(1.2);
     expect(Number.isFinite(s.buckets[0].projectedOverBase)).toBe(true);
+  });
+});
+
+describe('profil par tranche (test du score potentiel)', () => {
+  // 6 clubs (tiers de 2) ; le club 1 bat tout le monde, le 6 perd tout : classement 1 > … > 6.
+  const res = (id: number, home: number, away: number, hg: number, ag: number): CompletedFixture =>
+    ({ ...fx(id, 1 + (id % 20), home, away), homeGoals: hg, awayGoals: ag });
+  const games = [
+    res(1, 1, 2, 2, 0), res(2, 1, 3, 2, 0), res(3, 1, 4, 2, 0), res(4, 1, 5, 2, 0), res(5, 1, 6, 2, 0),
+    res(6, 2, 3, 2, 0), res(7, 2, 4, 2, 0), res(8, 2, 5, 2, 0), res(9, 2, 6, 2, 0),
+    res(10, 3, 4, 2, 0), res(11, 3, 5, 2, 0), res(12, 3, 6, 2, 0), res(13, 4, 5, 2, 0), res(14, 4, 6, 2, 0), res(15, 5, 6, 2, 0),
+  ];
+
+  it('classement : points puis différence de buts', () => {
+    const t = standings(games);
+    expect([1, 2, 3, 4, 5, 6].map((team) => t.get(`1|${team}`)!.rank)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('joueur du club 3 bien meilleur contre le bas que son poste : rapport > 1, facteur rapproché de 1 et plafonné', () => {
+    // Joueur 7 (club 3) : 30 contre le haut (clubs 1-2), 80 contre le bas (5-6). Joueur 8 (club 4), même poste : 50 partout.
+    const apps2 = [
+      app(2, 7, 3, 30), app(6, 7, 3, 30), app(11, 7, 3, 80), app(12, 7, 3, 80),
+      app(3, 8, 4, 50), app(7, 8, 4, 50), app(13, 8, 4, 50), app(14, 8, 4, 50),
+    ];
+    const profile = tierProfiles(games, apps2, new Map([[7, 'ST'], [8, 'ST']]));
+    const p = profile(7, 1, 6)!;
+    expect(p.games).toBe(2);
+    expect(p.ratio).toBeGreaterThan(1);
+    expect(tierFactor(p, 8, 0.1)).toBeGreaterThan(1);
+    expect(tierFactor(p, 0, 0.1)).toBe(1.1);
+    expect(tierFactor(null, 8, 0.1)).toBe(1);
   });
 });
