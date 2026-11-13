@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { CardStatusIcon, ClassicHint } from '@/components/ClassicHint';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -5,6 +6,7 @@ import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView }
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
+import { Fold } from '@/components/Fold';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { StatusBadges } from '@/components/StatusBadges';
 import { Venue } from '@/components/Venue';
@@ -58,7 +60,7 @@ function Attr({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** Carte d'identité façon Sorare : nom, club, ligue, rôle, nationalité, âge, taille, maillot, terrain et photo. */
-function Hero({ player }: { player: PlayerDetail }) {
+function Hero({ player, children }: { player: PlayerDetail; children?: ReactNode }) {
   const first = player.firstName && player.lastName ? player.firstName : null;
   const last = first ? player.lastName! : player.name;
   return (
@@ -95,6 +97,7 @@ function Hero({ player }: { player: PlayerDetail }) {
           {player.shirtNumber !== null && <Attr label="Maillot">#{player.shirtNumber}</Attr>}
         </dl>
         {player.birthDate && <p className="pcard-born">Né le {fmtBirth(player.birthDate)}</p>}
+        {children}
       </div>
       <div className="pcard-side">
         <div className="pcard-photo">
@@ -113,7 +116,7 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
   const next = upcoming?.fixtures[0];
   const projected = next && upcoming ? projectForFixture(upcoming, next).projected : null;
   return (
-    <section className="card next-card" data-testid="hero">
+    <div className="next-card pcard-next" data-testid="hero">
       {next ? (
         <>
           <div>
@@ -135,7 +138,7 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
       ) : (
         <div className="card-kicker">Aucun match programmé</div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -366,7 +369,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
 
   return (
     <main className="player-page">
-      <Hero player={player} />
+      <Hero player={player}>{tab === 'apercu' && <NextMatch player={player} upcoming={upcoming} />}</Hero>
 
       <nav className="tabs" aria-label="Sections de la fiche">
         {TABS.map(([key, label]) => (
@@ -378,18 +381,17 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
 
       {tab === 'apercu' && (
         <>
-          <NextMatch player={player} upcoming={upcoming} />
           {s ? (
             <div className="cards">
-              <FormCard player={player} games={games} />
-              <RegularityCard games={games} />
-              <MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} />
+              <Fold id="forme" title="Forme"><FormCard player={player} games={games} /></Fold>
+              <Fold id="marche" title="Marché"><MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} /></Fold>
             </div>
           ) : (
             <p className="empty">Pas encore de match importé pour ce joueur</p>
           )}
-          <SplitsCard s={splits} />
-          <ScoreChart games={games} l15={s?.l15 ?? null} byPosition={byPosition} />
+          {splits && <Fold id="lieu" title="Lieu et adversaire"><SplitsCard s={splits} /></Fold>}
+          <Fold id="scores" title="Scores Sorare"><ScoreChart games={games} l15={s?.l15 ?? null} byPosition={byPosition} /></Fold>
+          {s && <Fold id="regularite" title="Régularité"><RegularityCard games={games} /></Fold>}
         </>
       )}
 
