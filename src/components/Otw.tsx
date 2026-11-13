@@ -6,6 +6,11 @@ import type { MarketPlayerView } from '@/db/queries';
 import { PlayerAvatar } from './Media';
 import { fmtEur } from '@/lib/format';
 import { loadOwned } from './MyCards';
+import { GENERIC_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
+
+const POSITIONS = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
+// Rang du premier poste de la carte : gardiens, défenseurs, milieux puis attaquants.
+const posRank = (p: MarketPlayerView) => Math.min(...p.cardPositions.map((x) => POSITIONS.indexOf(x)), POSITIONS.length);
 import { CONTENDER, CONTENDER_NAME, competitionGroup } from '@/lib/competitions';
 
 // shortcut: liste gardée dans le navigateur (pas synchronisée entre appareils), passer par une API liée au pseudo si besoin.
@@ -45,6 +50,7 @@ export function OtwList() {
   const [error, setError] = useState<string | null>(null);
   const [competition, setCompetition] = useState('');
   const [club, setClub] = useState('');
+  const [position, setPosition] = useState('');
   useEffect(() => {
     loadOwned().then((owned) => {
     // Joueur acheté depuis (présent dans mon effectif) : il sort de la liste.
@@ -76,7 +82,8 @@ export function OtwList() {
     .sort((a, b) => a[1].localeCompare(b[1]));
   const clubs = [...new Set(players.filter(inComp).map((p) => p.team).filter((t): t is string => !!t))].sort();
   const all = players;
-  players = players.filter((p) => inComp(p) && (!club || p.team === club));
+  players = players.filter((p) => inComp(p) && (!club || p.team === club) && (!position || p.cardPositions.includes(position as GenericPosition)))
+    .sort((a, b) => posRank(a) - posRank(b));
   const total = players.reduce((t, p) => t + (priceOf(p) ?? 0), 0);
   const unpriced = players.filter((p) => priceOf(p) === null).length;
   return (
@@ -90,6 +97,10 @@ export function OtwList() {
           <option value="">Tous les clubs</option>
           {clubs.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        <select value={position} onChange={(e) => setPosition(e.target.value)} aria-label="Poste">
+          <option value="">Tous les postes</option>
+          {POSITIONS.map((g) => <option key={g} value={g}>{GENERIC_LABEL_FR[g]}</option>)}
+        </select>
       </div>
       <div className="summary-tiles">
         <div className="card"><div className="card-kicker">Joueurs</div><strong>{players.length}{players.length !== all.length && <span className="muted"> / {all.length}</span>}</strong></div>
@@ -98,11 +109,12 @@ export function OtwList() {
       </div>
       <div className="table-wrap">
         <table aria-label="Liste OTW">
-          <thead><tr><th>Joueur</th><th>Club</th><th>Prix actuel</th><th /></tr></thead>
+          <thead><tr><th>Joueur</th><th>Poste</th><th>Club</th><th>Prix actuel</th><th /></tr></thead>
           <tbody>
             {players.map((p) => (
               <tr key={p.slug}>
                 <td><span className="player-cell"><PlayerAvatar name={p.name} url={p.pictureUrl} size={32} /><Link href={`/joueurs/${p.slug}?onglet=marche`}>{p.name}</Link></span></td>
+                <td>{cardLabel(p.cardPositions)}</td>
                 <td>{p.team ?? '—'}</td>
                 <td className="num strong">{priceOf(p) === null ? '—' : fmtEur(priceOf(p)!)}</td>
                 <td><a href={`https://sorare.com/football/players/${p.slug}`} target="_blank" rel="noopener noreferrer"
@@ -111,7 +123,7 @@ export function OtwList() {
               </tr>
             ))}
           </tbody>
-          <tfoot><tr className="history-total"><td>Total</td><td /><td className="num">{fmtEur(total)}</td><td /></tr></tfoot>
+          <tfoot><tr className="history-total"><td>Total</td><td /><td /><td className="num">{fmtEur(total)}</td><td /></tr></tfoot>
         </table>
       </div>
     </>

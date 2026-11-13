@@ -11,7 +11,7 @@ describe('OTW', () => {
     expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a']);
     localStorage.setItem('sorare-scout:otw', JSON.stringify(['a', 'b', 'achete']));
     localStorage.setItem(PSEUDO_KEY, 'moi');
-    const p = (slug: string, floorInSeason: number | null, price: number | null) => ({ slug, name: slug.toUpperCase(), pictureUrl: null, team: slug === 'a' ? 'PSV' : 'Ajax', competition: slug === 'a' ? 'Ligue 2' : '2. Bundesliga', competitionSlug: slug === 'a' ? 'ligue-2-fr' : '2-bundesliga', floorInSeason, price });
+    const p = (slug: string, floorInSeason: number | null, price: number | null) => ({ slug, name: slug.toUpperCase(), pictureUrl: null, team: slug === 'a' ? 'PSV' : 'Ajax', competition: slug === 'a' ? 'Ligue 2' : '2. Bundesliga', competitionSlug: slug === 'a' ? 'ligue-2-fr' : '2-bundesliga', cardPositions: slug === 'a' ? ['Forward'] : ['Goalkeeper'], floorInSeason, price });
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => (url.startsWith('/api/effectif')
       ? { entries: [{ slug: 'achete', status: 'owned' }] } : [p('a', 10, 12), p('b', null, 5)]) })));
     render(<OtwList />);
@@ -19,6 +19,10 @@ describe('OTW', () => {
     expect(screen.getByRole('link', { name: 'Voir A sur Sorare (nouvel onglet)' })).toHaveAttribute('href', 'https://sorare.com/football/players/a');
     expect(JSON.parse(localStorage.getItem('sorare-scout:otw')!)).toEqual(['a', 'b']); // carte achetée retirée
     expect(screen.getByRole('combobox', { name: 'Compétition' })).toHaveTextContent('Toutes les liguesContender');
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Gardien'); // gardiens d'abord
+    fireEvent.change(screen.getByRole('combobox', { name: 'Poste' }), { target: { value: 'Forward' } });
+    expect(screen.getByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total10 €');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Poste' }), { target: { value: '' } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Club' }), { target: { value: 'Ajax' } });
     expect(screen.getByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total5,00 €');
     fireEvent.click(screen.getByRole('button', { name: 'Retirer B' }));
