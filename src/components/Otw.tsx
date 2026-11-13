@@ -6,6 +6,7 @@ import type { MarketPlayerView } from '@/db/queries';
 import { PlayerAvatar } from './Media';
 import { fmtEur } from '@/lib/format';
 import { loadOwned } from './MyCards';
+import { CONTENDER, CONTENDER_NAME, competitionGroup } from '@/lib/competitions';
 
 // shortcut: liste gardée dans le navigateur (pas synchronisée entre appareils), passer par une API liée au pseudo si besoin.
 const KEY = 'sorare-scout:otw';
@@ -68,10 +69,14 @@ export function OtwList() {
   if (!loaded) return <p aria-live="polite">Chargement…</p>;
   if (!loaded.length) return <p className="empty">Aucun joueur dans la liste : ajoute-les avec le « + » dans Marché, Star ou Joueurs.</p>;
   let players = loaded;
-  const competitions = [...new Set(players.map((p) => p.competition).filter((c): c is string => !!c))].sort();
-  const clubs = [...new Set(players.filter((p) => !competition || p.competition === competition).map((p) => p.team).filter((t): t is string => !!t))].sort();
+  // Championnats Contender regroupés en un seul choix.
+  const groupOf = (p: MarketPlayerView) => (p.competitionSlug ? competitionGroup(p.competitionSlug) : null);
+  const inComp = (p: MarketPlayerView) => !competition || groupOf(p) === competition;
+  const competitions = [...new Map(players.flatMap((p) => { const g = groupOf(p); return g ? [[g, g === CONTENDER ? CONTENDER_NAME : p.competition ?? g] as const] : []; })).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const clubs = [...new Set(players.filter(inComp).map((p) => p.team).filter((t): t is string => !!t))].sort();
   const all = players;
-  players = players.filter((p) => (!competition || p.competition === competition) && (!club || p.team === club));
+  players = players.filter((p) => inComp(p) && (!club || p.team === club));
   const total = players.reduce((t, p) => t + (priceOf(p) ?? 0), 0);
   const unpriced = players.filter((p) => priceOf(p) === null).length;
   return (
@@ -79,7 +84,7 @@ export function OtwList() {
       <div className="filters">
         <select value={competition} onChange={(e) => { setCompetition(e.target.value); setClub(''); }} aria-label="Compétition">
           <option value="">Toutes les ligues</option>
-          {competitions.map((c) => <option key={c} value={c}>{c}</option>)}
+          {competitions.map(([g, name]) => <option key={g} value={g}>{name}</option>)}
         </select>
         <select value={club} onChange={(e) => setClub(e.target.value)} aria-label="Club">
           <option value="">Tous les clubs</option>
