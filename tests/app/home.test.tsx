@@ -36,6 +36,6 @@ describe('accueil', () => {
   it('onglets : celui de la page courante est actif', () => {
     render(<NavTabs />);
     expect(screen.getByRole('link', { name: 'Trading' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Accueil' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Delflacito' })).not.toHaveAttribute('aria-current');
   });
 });

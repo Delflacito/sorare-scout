@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { DataFooter } from '@/components/DataFooter';
-import { NavTabs } from '@/components/NavTabs';
+import { NavTabs, SubTabs } from '@/components/NavTabs';
+import { PlayerSearch } from '@/components/PlayerSearch';
 import { TableSort } from '@/components/TableSort';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import './globals.css';
@@ -20,8 +21,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <header className="site">
           <Link href="/" className="brand">Sorare Scout</Link>
           <NavTabs />
+          <PlayerSearch />
           <ThemeToggle />
         </header>
+        <SubTabs />
         <div id="contenu" tabIndex={-1}>{children}</div>
         <DataFooter />
         <TableSort />
