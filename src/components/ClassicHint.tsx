@@ -8,19 +8,21 @@ export function ClassicHint({ positions }: { positions?: GenericPosition[] }) {
 }
 
 /** Pas de carte de la saison : « IS » barré s'il reste des Classic, rond barré rouge s'il n'existe aucune carte Limited. */
-export function CardStatusIcon({ status }: { status?: 'in_season' | 'classic' | 'none' | null }) {
+export function CardStatusIcon({ status, withLabel }: { status?: 'in_season' | 'classic' | 'none' | null; withLabel?: boolean }) {
   if (status === 'classic') {
     const text = 'Pas de carte de la saison (in-season) : seulement des cartes Classic';
-    return <span className="card-status is-off" title={text} aria-label={text}>IS</span>;
+    const icon = <span className="card-status is-off" title={text} aria-label={withLabel ? undefined : text}>IS</span>;
+    return withLabel ? <span className="pill-link card-status-pill">{icon} Que des cartes Classic</span> : icon;
   }
   if (status !== 'none') return null;
   const text = 'Attention : aucune carte Limited de ce joueur (ni de la saison, ni Classic)';
-  return (
-    <span className="card-status no-card" title={text} aria-label={text} role="img">
+  const icon = (
+    <span className="card-status no-card" title={text} aria-label={withLabel ? undefined : text} role={withLabel ? undefined : "img"}>
       <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
         <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <line x1="3.5" y1="12.5" x2="12.5" y2="3.5" stroke="currentColor" strokeWidth="1.8" />
       </svg>
     </span>
   );
+  return withLabel ? <span className="pill-link card-status-pill">{icon} Aucune carte</span> : icon;
 }

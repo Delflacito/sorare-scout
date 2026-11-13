@@ -56,8 +56,15 @@ function groupIcons(actions: Record<string, number>): { icon: string; count: num
  * filtrables par compétition et par lieu ; pastilles au pied des barres pour les actions décisives.
  * `games` : matchs de la saison, du plus récent au plus ancien.
  */
-export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: number | null }) {
+export function ScoreChart({ games: seasonGames, l15: seasonL15, byPosition = [] }: {
+  games: PlayerGameView[]; l15: number | null;
+  /** Mêmes matchs au barème d'un autre poste de carte (Classic) : le premier libellé est celui de la carte de la saison. */
+  byPosition?: { label: string; games: PlayerGameView[] }[];
+}) {
   const [hover, setHover] = useState<number | null>(null);
+  const [poste, setPoste] = useState(0);
+  const games = poste ? byPosition[poste].games : seasonGames;
+  const l15 = poste ? null : seasonL15;
   const [competition, setCompetition] = useState<CompetitionFilter>('all');
   const [venue, setVenue] = useState<VenueFilter>('all');
   const [available, setAvailable] = useState<number | null>(null);
@@ -73,7 +80,7 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
-  }, [competition, venue, available, games]);
+  }, [competition, venue, available, games, poste]);
   if (!games.length) return null;
   const others = [...new Set(games.filter((g) => !g.isLeague).map((g) => g.competition))];
   const ordered = filterGames(games, competition, venue).reverse();
@@ -112,6 +119,12 @@ export function ScoreChart({ games, l15 }: { games: PlayerGameView[]; l15: numbe
           <option value="league">Championnat</option>
           {others.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        {byPosition.length > 1 && (
+          <select aria-label="Barème de poste" value={poste} onChange={(e) => select(() => setPoste(Number(e.target.value)))}
+            title="Sorare note différemment selon le poste : scores recalculés avec le barème du poste choisi">
+            {byPosition.map((b, i) => <option key={b.label} value={i}>Barème {b.label}</option>)}
+          </select>
+        )}
         <div className="segmented" role="radiogroup" aria-label="Lieu">
           {([['all', 'Dom. & Ext.'], ['home', 'Domicile'], ['away', 'Extérieur']] as const).map(([v, label]) => (
             <button key={v} type="button" role="radio" aria-checked={venue === v} onClick={() => select(() => setVenue(v))}>{label}</button>

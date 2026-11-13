@@ -2,7 +2,7 @@ import { CardStatusIcon, ClassicHint } from '@/components/ClassicHint';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView } from '@/db/queries';
-import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel, type GenericPosition } from '@/domain/types';
+import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
@@ -79,7 +79,7 @@ function Hero({ player }: { player: PlayerDetail }) {
           {player.competition && <span className="pill-link">{player.competition}</span>}
           <span className="pill-link pill-card" title="Poste de sa carte de la saison">Carte : {cardLabel(player.cardPositions)}</span>
           <ClassicHint positions={player.classicPositions} />
-          <CardStatusIcon status={player.cardStatus} />
+          <CardStatusIcon status={player.cardStatus} withLabel />
         </div>
         <StatusBadges playingStatus={player.playingStatus} injury={player.injury} suspension={player.suspension} />
         <dl className="pcard-attrs">
@@ -140,17 +140,10 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
 }
 
 /** Forme : L5 / L15 / L40 et part de matchs joués ; mini-barres des 5 derniers matchs. */
-function FormCard({ player, games, rescored }: { player: PlayerDetail; games: PlayerGameView[]; rescored: boolean }) {
+function FormCard({ player, games }: { player: PlayerDetail; games: PlayerGameView[] }) {
   const s = player.summary;
   if (!s) return null;
-  // Autre barème de poste : moyennes recalculées sur les matchs joués (le résumé suit la carte de la saison).
-  const avg = (n: number) => {
-    const played = games.filter((g) => g.status !== 'absent').slice(0, n);
-    return played.length ? played.reduce((t, g) => t + g.score, 0) / played.length : 0;
-  };
-  const cols: [string, number, number][] = rescored
-    ? [['L5', avg(5), 5], ['L15', avg(15), 15], ['L40', avg(40), 40]]
-    : [['L5', s.l5, 5], ['L15', s.l15, 15], ['L40', s.l40, 40]];
+  const cols: [string, number, number][] = [['L5', s.l5, 5], ['L15', s.l15, 15], ['L40', s.l40, 40]];
   return (
     <section className="card">
       <h2 className="card-title">Forme <span>Score · % joué</span></h2>
@@ -358,11 +351,14 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
   const queries = getQueries();
   const [player, upcoming] = await Promise.all([queries.getPlayer(slug), queries.getUpcoming(slug, 5)]);
   if (!player) notFound();
-  // Filtre poste (joueurs à cartes de plusieurs postes) : scores recalculés au barème du poste choisi.
-  const postes: GenericPosition[] = [player.position, ...(player.classicPositions ?? [])];
-  const poste = oneOf(one((await searchParams)?.poste), postes) ?? player.position;
-  const rescored = poste !== player.position;
-  const games = await queries.getPlayerGames(slug, SEASON_GAMES, rescored ? poste : undefined);
+  const classic = player.classicPositions ?? [];
+  // Mêmes matchs au barème de chaque poste Classic, pour le sélecteur du graphique.
+  const [games, ...classicGames] = await Promise.all([
+    queries.getPlayerGames(slug, SEASON_GAMES), ...classic.map((p) => queries.getPlayerGames(slug, SEASON_GAMES, p))]);
+  const byPosition = classic.length ? [
+    { label: `${GENERIC_LABEL_FR[player.position]} (saison)`, games },
+    ...classic.map((p, i) => ({ label: `${GENERIC_LABEL_FR[p]} (Classic)`, games: classicGames[i] })),
+  ] : [];
   const sales = tab === 'marche' ? await queries.getPlayerSales(slug) : [];
   const splits = tab === 'apercu' ? (await queries.getSplits({ slugs: [slug] }))[0]?.splits : undefined;
   const season = new Date(seasonStart()).getUTCFullYear();
@@ -380,27 +376,12 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
         ))}
       </nav>
 
-      {postes.length > 1 && tab !== 'marche' && (
-        <nav className="chip-row" aria-label="Barème de poste">
-          <span className="muted">Barème de poste :</span>
-          {postes.map((p) => {
-            const q = new URLSearchParams({ ...(tab !== 'apercu' && { onglet: tab }), ...(p !== player.position && { poste: p }) }).toString();
-            return (
-              <Link key={p} href={`/joueurs/${slug}${q ? `?${q}` : ''}`} aria-current={poste === p ? "page" : undefined}
-                title={p === player.position ? 'Poste de la carte de la saison' : 'Poste d’une carte Classic : scores recalculés par Sorare avec ce barème'}>
-                {GENERIC_LABEL_FR[p]}{p !== player.position && ' (Classic)'}
-              </Link>
-            );
-          })}
-        </nav>
-      )}
-
       {tab === 'apercu' && (
         <>
           <NextMatch player={player} upcoming={upcoming} />
           {s ? (
             <div className="cards">
-              <FormCard player={player} games={games} rescored={rescored} />
+              <FormCard player={player} games={games} />
               <RegularityCard games={games} />
               <MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} />
             </div>
@@ -408,7 +389,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
             <p className="empty">Pas encore de match importé pour ce joueur</p>
           )}
           <SplitsCard s={splits} />
-          <ScoreChart games={games} l15={s?.l15 ?? null} />
+          <ScoreChart games={games} l15={s?.l15 ?? null} byPosition={byPosition} />
         </>
       )}
 
