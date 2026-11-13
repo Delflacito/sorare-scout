@@ -118,7 +118,7 @@ const md = [
 const all: Record<string, BacktestRow[]> = { last: [], five: [] };
 for (const [name, slugs] of GROUPS) {
   const ids = competitions.filter((c) => slugs.includes(c.slug)).map((c) => c.id as number);
-  for (const [key, n, title] of [['last', 1, 'dernière journée'], ['five', 5, '5 dernières journées']] as const) {
+  for (const [key, n, title] of [['last', 3, '3 dernières journées'], ['five', 5, '5 dernières journées']] as const) {
     const rows = ids.flatMap((id) => lastRounds(fixtures.filter((f) => f.competitionId === id), n)
       .flatMap((r) => backtestRound(fixtures, appearances, r))).filter((r) => r.started);
     all[key].push(...rows);
@@ -127,11 +127,11 @@ for (const [name, slugs] of GROUPS) {
     md.push(`## ${name} — ${title} (${rows.length} titulaires)`, '', ...table(rows), '');
   }
 }
-md.push('## Les quatre ensemble — dernière journée', '', ...table(all.last), '', '## Les quatre ensemble — 5 dernières journées', '', ...table(all.five), '');
+md.push('## Les quatre ensemble — 3 dernières journées', '', ...table(all.last), '', '## Les quatre ensemble — 5 dernières journées', '', ...table(all.five), '');
 
 mkdirSync('backtest-output', { recursive: true });
 writeFileSync('backtest-output/tier.md', md.join('\n'));
-writeFileSync('backtest-output/club-tier.md', [...clubMd, '## Les quatre ensemble — dernière journée', '', ...byClub(all.last),
+writeFileSync('backtest-output/club-tier.md', [...clubMd, '## Les quatre ensemble — 3 dernières journées', '', ...byClub(all.last),
   '## Les quatre ensemble — 5 dernières journées', '', ...byClub(all.five)].join('\n'));
 writeFileSync('backtest-output/tier-precision.md', [...tierMd, '## Les quatre ensemble', '', ...byTier(all.five)].join('\n'));
 console.log(md.join('\n'));
