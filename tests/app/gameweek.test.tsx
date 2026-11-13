@@ -12,7 +12,7 @@ vi.mock('@/db/queries', async (importOriginal) => ({
       { slug: 'om', name: 'OM', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'PSG', opponentSlug: 'psg', isHome: false, opponentRating: 90 }] },
       { slug: 'psg', name: 'PSG', pictureUrl: null, games: [{ date: '2099-01-01T20:00:00.000Z', opponent: 'OM', opponentSlug: 'om', isHome: true, opponentRating: 20 }] },
     ],
-    getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups,
+    getGameWeekFixtures, getGameWeekPlayers, getRoundMatchups, getSplits: async () => [],
     listCompetitions: async () => [{ slug: 'contender', name: 'Contender' }, { slug: 'ligue-1-fr', name: 'Ligue 1' }], // déjà regroupés par la requête
     getSquad: async () => [{ slug: 'gk', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 1 }, { slug: 'x', competition: 'ligue-1-fr', status: 'target', purchasePrice: 1 }],
   }),

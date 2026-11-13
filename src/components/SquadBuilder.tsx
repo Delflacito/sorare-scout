@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { putJson } from '@/lib/putJson';
 import Link from 'next/link';
 import type { MarketPlayerView } from '@/db/queries';
+import { SplitHint } from '@/components/Splits';
 import { GENERIC_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { fmtChange, fmtEur } from '@/lib/format';
 import { PlayerAvatar } from './Media';
@@ -358,6 +359,7 @@ export function SquadBuilder({ competitions, teams }: {
                       <div className="gw-who">
                         <div className="gw-name">{isManual(e) ? nameOf(e) : <Link href={`/joueurs/${e.slug}?onglet=marche`}>{nameOf(e)}</Link>}</div>
                         <div className="gw-meta">{isManual(e) ? 'Ajout manuel · pas encore suivi par le site' : p?.team ?? ''}{p?.cardPositions.length ? ` · ${posShort(p.cardPositions)}` : ''}
+                          <SplitHint s={p?.splits} />
                         </div>
                         <label className="squad-paid">Acheté
                           <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${nameOf(e)}`}
@@ -390,6 +392,7 @@ export function SquadBuilder({ competitions, teams }: {
                       <div className="gw-who">
                         <div className="gw-name"><Link href={`/joueurs/${e.slug}?onglet=marche`}>{p?.name ?? e.slug}</Link></div>
                         <div className="gw-meta">{p?.team ?? ''}{p?.cardPositions.length ? ` · ${posShort(p.cardPositions)}` : ''}
+                          <SplitHint s={p?.splits} />
                         </div>
                         <label className="squad-paid">Prix visé
                           <input key={`${e.slug}-${e.purchasePrice}`} className="price-input" inputMode="decimal" aria-label={`Prix visé pour ${p?.name ?? e.slug}`}

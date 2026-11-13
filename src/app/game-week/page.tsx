@@ -12,6 +12,10 @@ import { MyCardsToggle, OwnedMark } from '@/components/MyCards';
 import { STREAK_TIERS, streakTiersOf, type StreakTier } from '@/lib/roi';
 import { CONTENDER, CONTENDER_SLUGS } from '@/lib/competitions';
 import { PSEUDO } from '@/lib/squad';
+import { SplitHint } from '@/components/Splits';
+import type { PlayerSplits } from '@/domain/splits';
+
+type SplitsMap = Map<string, PlayerSplits>;
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +46,7 @@ function MatchLine({ p }: { p: GameWeekPlayer }) {
   );
 }
 
-function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
+function PlayerRow({ p, rank, splits }: { p: GameWeekPlayer; rank: number; splits: SplitsMap }) {
   return (
     <li className="gw-row">
       <span className="gw-rank" aria-label={`Rang ${rank}`}>{rank}</span>
@@ -53,6 +57,7 @@ function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
           <OwnedMark slug={p.slug} />
           <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
           <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
+          <SplitHint s={splits.get(p.slug)} />
           <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />
         </div>
         <MatchLine p={p} />
@@ -73,13 +78,13 @@ function PlayerRow({ p, rank }: { p: GameWeekPlayer; rank: number }) {
   );
 }
 
-function PositionCard({ title, players }: { title: string; players: GameWeekPlayer[] }) {
+function PositionCard({ title, players, splits }: { title: string; players: GameWeekPlayer[]; splits: SplitsMap }) {
   return (
     <section className="card gw-section" aria-labelledby={`gw-${title}`}>
       <h2 className="card-title" id={`gw-${title}`}>{title}<span>{players.length} joueur{players.length > 1 ? 's' : ''}</span></h2>
       {players.length === 0
         ? <p className="empty">Aucun joueur à ce poste pour ces filtres</p>
-        : <ol className="gw-list" aria-label={title}>{players.map((p, i) => <PlayerRow key={p.slug} p={p} rank={i + 1} />)}</ol>}
+        : <ol className="gw-list" aria-label={title}>{players.map((p, i) => <PlayerRow key={p.slug} p={p} rank={i + 1} splits={splits} />)}</ol>}
     </section>
   );
 }
@@ -167,6 +172,7 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   const owned = cartes ? [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))] : undefined;
   const players = await queries.getGameWeekPlayers(fixtures.map((f) => f.id),
     { competition, minStartRate: titu / 100, limit: owned ? 50 : PER_POSITION, sort, slugs: owned });
+  const splits: SplitsMap = new Map((await queries.getSplits({ slugs: [...new Set(players.map((p) => p.slug))] })).map((r) => [r.slug, r.splits]));
 
   return (
     <main className="gw">
@@ -223,7 +229,7 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
           <Lineup players={players} sort={sort} mine={!!cartes} tier={tier} />
           <div className="gw-grid">
             {SECTIONS.map(([pos, title]) => (
-              <PositionCard key={pos} title={title} players={players.filter((x) => x.position === pos)} />
+              <PositionCard key={pos} title={title} players={players.filter((x) => x.position === pos)} splits={splits} />
             ))}
           </div>
         </>

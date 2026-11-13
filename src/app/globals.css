@@ -746,3 +746,27 @@ th.th-sort { cursor: pointer; user-select: none; }
 th.th-sort:hover { color: var(--text); }
 th.th-sort[aria-sort='ascending']::after { content: ' ▲'; }
 th.th-sort[aria-sort='descending']::after { content: ' ▼'; }
+
+/* ---------- Profil lieu × adversaire ---------- */
+.split-hint { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  border-radius: 5px; font-size: 10px; cursor: help; flex: none; vertical-align: middle; color: var(--accent); background: var(--neutral-bg); }
+.split-hint.good { color: var(--hot); background: var(--hot-bg); }
+.split-hint.bad { color: var(--cold); background: var(--cold-bg); }
+.split-pop { display: none; position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: min(320px, 80vw); padding: 8px 10px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+  font-size: 12.5px; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; }
+.split-hint:hover .split-pop, .split-hint:focus .split-pop, .split-hint:focus-within .split-pop { display: grid; gap: 6px; }
+.split-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.split-notes li { padding-left: 14px; position: relative; }
+.split-notes li::before { position: absolute; left: 0; }
+.split-notes li.up::before { content: '▲'; color: var(--hot); font-size: 10px; top: 2px; }
+.split-notes li.down::before { content: '▼'; color: var(--cold); font-size: 10px; top: 2px; }
+.split-notes em { color: var(--muted); }
+.split-ctx { color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; }
+.splits-card .split-notes { margin: 4px 0 12px; font-size: 14px; }
+.split-cell { text-align: center; }
+.split-cell .score-pill { margin: 0 auto; }
+.split-sub { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.split-cell.thin { opacity: .45; }
+.split-cell.is-next { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 8px; }
+.profils-ctx { white-space: nowrap; }

@@ -7,6 +7,7 @@ import type { OwnedStatus } from '@/lib/beforeGw';
 import type { StreakPlan } from '@/lib/streakPlans';
 import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
+import { playerSplits, type PlayerSplits, type SplitGame } from '@/domain/splits';
 
 export const SORTS = ['projected', 'l5', 'l15', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
@@ -150,6 +151,8 @@ export interface MarketPlayerView {
   l15: number | null; floorInSeason: number | null; floorClassic: number | null; recentPrice: number | null; price: number | null;
   fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null; priceTrend7: number | null;
   lastAuction: { eur: number; date: string } | null;
+  /** Profil lieu × adversaire : seulement pour une liste de joueurs (effectif). */
+  splits?: PlayerSplits;
 }
 
 /** Statistiques de championnat d'une saison (Sorare). */
@@ -174,6 +177,12 @@ export interface PlayerGameView {
   actions: Record<string, number>;
   /** Équipe du joueur pour ce match (club ou sélection). */
   team: string; teamShortName: string | null; teamPictureUrl: string | null;
+}
+
+/** Joueur et son profil domicile / extérieur × niveau de l'adversaire (championnat, saison en cours). */
+export interface PlayerSplitRow {
+  slug: string; name: string; pictureUrl: string | null; position: GenericPosition; usualPosition: DetailedPosition | null;
+  team: string | null; teamPictureUrl: string | null; splits: PlayerSplits;
 }
 
 export interface TeamView { id: number; name: string; slug: string; competition: string | null }
@@ -239,7 +248,65 @@ export function createQueries(sql: postgres.Sql) {
     where f.status = 'scheduled' and f.date > now()
     order by t.id, f.date`;
 
+  // Classement actuel de chaque championnat (points, différence de buts, buts marqués), recalculé à chaque lecture.
+  const standings = () => sql`
+    with pts as (
+      select f.competition_id, v.team_id, sum(case when v.gf > v.ga then 3 when v.gf = v.ga then 1 else 0 end) as pts,
+        sum(v.gf - v.ga) as gd, sum(v.gf) as gf
+      from fixtures f join competitions c on c.id = f.competition_id and c.is_league
+      cross join lateral (values (f.home_team_id, f.home_goals, f.away_goals), (f.away_team_id, f.away_goals, f.home_goals)) v(team_id, gf, ga)
+      where f.status = 'played' and f.home_goals is not null and f.away_goals is not null
+      group by f.competition_id, v.team_id)
+    select competition_id, team_id, (row_number() over (partition by competition_id order by pts desc, gd desc, gf desc, team_id))::int as rank,
+      (count(*) over (partition by competition_id))::int as teams
+    from pts`;
+
   return {
+    /** Profils domicile / extérieur × tranche de l'adversaire : par liste de joueurs, ou par championnat (et poste). */
+    async getSplits(f: { slugs?: string[]; competition?: string; position?: GenericPosition }): Promise<PlayerSplitRow[]> {
+      if (f.slugs && !f.slugs.length) return [];
+      const players = await sql`
+        with next_fx as (${nextFixtures()}), st as (${standings()})
+        select p.id, p.sorare_slug, p.name, p.picture_url, p.position, s.usual_position, t.name as team, t.picture_url as team_picture,
+          n.is_home as next_home, ns.rank as next_rank, ns.teams as next_teams
+        from players p
+        join teams t on t.id = p.team_id
+        join competitions c on c.id = t.competition_id
+        left join player_summary s on s.player_id = p.id
+        left join next_fx n on n.team_id = t.id
+        left join fixtures nf on nf.id = n.fixture_id
+        left join st ns on ns.competition_id = nf.competition_id and ns.team_id = n.opponent_id
+        where true
+          ${f.slugs ? sql`and p.sorare_slug = any(${f.slugs})` : sql``}
+          ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
+          ${f.position ? sql`and p.position = ${f.position}` : sql``}`;
+      if (!players.length) return [];
+      const games = await sql`
+        with st as (${standings()})
+        select a.player_id, a.team_id = f.home_team_id as is_home, st.rank, st.teams,
+          a.sorare_score, a.decisive_score, a.all_around_score
+        from appearances a
+        join fixtures f on f.id = a.fixture_id and f.status = 'played'
+        join st on st.competition_id = f.competition_id
+          and st.team_id = case when a.team_id = f.home_team_id then f.away_team_id else f.home_team_id end
+        where a.player_id = any(${players.map((p) => p.id)}) and a.minutes > 0
+        order by f.date`;
+      const byPlayer = new Map<number, SplitGame[]>();
+      for (const g of games) {
+        const list = byPlayer.get(g.player_id) ?? [];
+        list.push({ isHome: g.is_home, rank: g.rank, teams: g.teams, score: g.sorare_score, decisive: g.decisive_score, allAround: g.all_around_score });
+        byPlayer.set(g.player_id, list);
+      }
+      return players.flatMap((p) => {
+        const next = p.next_rank === null ? null : { isHome: p.next_home, rank: p.next_rank, teams: p.next_teams };
+        const splits = playerSplits(byPlayer.get(p.id) ?? [], next);
+        return splits ? [{
+          slug: p.sorare_slug, name: p.name, pictureUrl: p.picture_url, position: p.position, usualPosition: p.usual_position,
+          team: p.team, teamPictureUrl: p.team_picture, splits,
+        }] : [];
+      });
+    },
+
     async searchPlayers(f: SearchFilters): Promise<PlayerListRow[]> {
       const rows = await sql`
         with next_fx as (${nextFixtures()})

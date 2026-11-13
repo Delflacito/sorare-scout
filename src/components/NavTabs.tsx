@@ -8,6 +8,7 @@ export const SECTIONS = [
   { href: '/game-week', label: 'Ma Game Week' },
   { href: '/journee', label: 'Journée' },
   { href: '/joueurs', label: 'Joueurs' },
+  { href: '/profils', label: 'Profils' },
   { href: '/trading', label: 'Trading' },
   { href: '/marche', label: 'Marché' },
   { href: '/effectif', label: 'Mon effectif' },

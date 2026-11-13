@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
   const queries = getQueries();
   if (slugs !== null) {
     const list = slugs.split(',').filter(Boolean).slice(0, 200);
-    return NextResponse.json(await queries.getMarketPlayers({ slugs: list }));
+    const [rows, splits] = await Promise.all([queries.getMarketPlayers({ slugs: list }), queries.getSplits({ slugs: list })]);
+    const bySlug = new Map(splits.map((r) => [r.slug, r.splits]));
+    return NextResponse.json(rows.map((r) => ({ ...r, splits: bySlug.get(r.slug) })));
   }
   const team = p.get('team');
   if (team) return NextResponse.json(await queries.getMarketPlayers({ team }));

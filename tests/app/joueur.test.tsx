@@ -10,7 +10,7 @@ const getPlayerSeasons = vi.fn<(slug: string) => Promise<PlayerSeasonView[]>>();
 const getPlayerSales = vi.fn<(slug: string) => Promise<SaleView[]>>();
 vi.mock('@/db/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/db/queries')>()),
-  getQueries: () => ({ getPlayer, getPlayerGames, getUpcoming, getCompetitionTotals, getPlayerSeasons, getPlayerSales }),
+  getQueries: () => ({ getSplits: async () => [], getPlayer, getPlayerGames, getUpcoming, getCompetitionTotals, getPlayerSeasons, getPlayerSales }),
 }));
 const notFound = vi.fn(() => { throw new Error('NEXT_NOT_FOUND'); });
 vi.mock('next/navigation', () => ({ notFound: () => notFound() }));

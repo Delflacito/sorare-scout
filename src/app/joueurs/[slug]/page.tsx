@@ -16,6 +16,7 @@ import { seasonStart } from '@/ingest/leagues';
 import { ageAt, fmtDate, fmtPct, fmtScore, indexClass, ratingClass, scoreTier, teamCode } from '@/lib/format';
 import { actionItems, describeActions } from '@/domain/actions';
 import { OtwButton } from '@/components/Otw';
+import { SplitsCard } from '@/components/Splits';
 import { one, oneOf, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
@@ -350,6 +351,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
   ]);
   if (!player) notFound();
   const sales = tab === 'marche' ? await queries.getPlayerSales(slug) : [];
+  const splits = tab === 'apercu' ? (await queries.getSplits({ slugs: [slug] }))[0]?.splits : undefined;
   const season = new Date(seasonStart()).getUTCFullYear();
   const s = player.summary;
 
@@ -377,6 +379,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           ) : (
             <p className="empty">Pas encore de match importé pour ce joueur</p>
           )}
+          <SplitsCard s={splits} />
           <ScoreChart games={games} l15={s?.l15 ?? null} />
         </>
       )}
