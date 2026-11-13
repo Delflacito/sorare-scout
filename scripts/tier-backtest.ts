@@ -38,6 +38,46 @@ function table(rows: BacktestRow[]): string[] {
   return lines;
 }
 
+const r1 = (x: number) => Math.round(x * 10) / 10;
+const fmt = (x: number) => String(r1(x)).replace('.', ',');
+const code = (count: number | undefined, t: number) => `${count === 4 ? 'Q' : 'T'}${t + 1}`;
+/** Écart moyen, biais (estimé − réel) et nombre de titulaires d'un groupe. */
+const cellOf = (rows: BacktestRow[]) => {
+  if (!rows.length) return '—';
+  const mae = rows.reduce((t, r) => t + Math.abs(r.projected - r.actual), 0) / rows.length;
+  const bias = rows.reduce((t, r) => t + r.projected - r.actual, 0) / rows.length;
+  return `${fmt(mae)} (${bias >= 0 ? '+' : '−'}${fmt(Math.abs(bias))}) · ${rows.length}`;
+};
+
+/** Précision du score potentiel actuel selon la tranche du club, de l'adversaire, et le croisement des deux. */
+function byTier(rows: BacktestRow[]): string[] {
+  const ok = rows.filter((r) => r.teamTier != null && r.oppTier != null);
+  const counts = [...new Set(ok.map((r) => r.tierCount!))].sort();
+  return counts.flatMap((count) => {
+    const sel = ok.filter((r) => r.tierCount === count);
+    const tiers = [...Array(count).keys()];
+    return [
+      ...(counts.length > 1 ? [`Championnats à ${count} tranches :`, ''] : []),
+      '| Tranche | Club du joueur | Adversaire |',
+      '|---|---|---|',
+      ...tiers.map((t) => `| ${code(count, t)} | ${cellOf(sel.filter((r) => r.teamTier === t))} | ${cellOf(sel.filter((r) => r.oppTier === t))} |`),
+      '',
+      `| Club ↓ / adversaire → | ${tiers.map((t) => code(count, t)).join(' | ')} |`,
+      `|---|${tiers.map(() => '---').join('|')}|`,
+      ...tiers.map((t) => `| ${code(count, t)} | ${tiers.map((o) => cellOf(sel.filter((r) => r.teamTier === t && r.oppTier === o))).join(' | ')} |`),
+      '',
+    ];
+  });
+}
+
+const tierMd = [
+  '# Précision du score potentiel selon les tranches du classement — 5 dernières journées',
+  '',
+  'Score potentiel actuel, titulaires ayant joué, classement de la veille de chaque journée (T1 = haut ; Q pour les quarts).',
+  'Chaque case : écart moyen avec le score réel (biais : + le score potentiel surestime, − il sous-estime) · nombre de titulaires.',
+  '',
+];
+
 const md = [
   '# Profil par tranche d’adversaire dans le score potentiel — test sur le passé',
   '',
@@ -54,6 +94,7 @@ for (const [name, slugs] of GROUPS) {
     const rows = ids.flatMap((id) => lastRounds(fixtures.filter((f) => f.competitionId === id), n)
       .flatMap((r) => backtestRound(fixtures, appearances, r))).filter((r) => r.started);
     all[key].push(...rows);
+    if (key === 'five') tierMd.push(`## ${name} (${rows.length} titulaires)`, '', ...byTier(rows));
     md.push(`## ${name} — ${title} (${rows.length} titulaires)`, '', ...table(rows), '');
   }
 }
@@ -61,5 +102,7 @@ md.push('## Les quatre ensemble — dernière journée', '', ...table(all.last),
 
 mkdirSync('backtest-output', { recursive: true });
 writeFileSync('backtest-output/tier.md', md.join('\n'));
+writeFileSync('backtest-output/tier-precision.md', [...tierMd, '## Les quatre ensemble', '', ...byTier(all.five)].join('\n'));
 console.log(md.join('\n'));
+console.log(tierMd.join('\n'));
 await sql.end();

@@ -1,6 +1,6 @@
 import type { CompletedFixture, AppearanceRow } from '@/db/repo';
 import { computeAggregates, projector } from './aggregates';
-import { standings, tierOf } from '@/domain/splits';
+import { standings, tierOf, tierSizes } from '@/domain/splits';
 import { shrinkTowards } from '@/domain/projection';
 import type { DetailedPosition } from '@/domain/types';
 
@@ -14,6 +14,8 @@ export interface BacktestRow {
   actual: number; base: number; projected: number; venueFactor: number; opponent: number;
   /** Réaction du joueur à la tranche de l'adversaire, relative à son poste (1 = comme tout le monde) ; null sans historique. */
   tier?: TierProfile | null;
+  /** Tranches (0 = haut) du club du joueur et de l'adversaire au classement de la veille ; nombre de tranches du championnat. */
+  teamTier?: number | null; oppTier?: number | null; tierCount?: number;
 }
 
 export interface TierProfile { ratio: number; games: number }
@@ -99,6 +101,11 @@ export function backtestRound(
   const agg = computeAggregates(history, appearances.filter((a) => historyIds.has(a.fixtureId)));
 
   const summaryOf = new Map(agg.summaries.map((s) => [s.playerId, s]));
+  const table = standings(history.filter((f) => (f.scope ?? 'league') === 'league'));
+  const tierAt = (competitionId: number, teamId: number) => {
+    const t = table.get(`${competitionId}|${teamId}`);
+    return t ? { tier: tierOf(t.rank, t.teams), count: tierSizes(t.teams).length } : null;
+  };
   const tierOfPlayer = tierProfiles(history, appearances.filter((a) => historyIds.has(a.fixtureId)), new Map(agg.summaries.map((s) => [s.playerId, s.usualPosition])));
   const project = projector(agg, amplification);
   const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
@@ -118,6 +125,9 @@ export function backtestRound(
       competitionId: f.competitionId, fixtureId: f.id, playerId: a.playerId, isHome, started: a.started,
       actual: a.score, base: s.base!, projected: p.projected!, venueFactor: p.venueFactor, opponent: p.opponent,
       tier: tierOfPlayer(a.playerId, f.competitionId, opponentId),
+      teamTier: tierAt(f.competitionId, a.teamId)?.tier ?? null,
+      oppTier: tierAt(f.competitionId, opponentId)?.tier ?? null,
+      tierCount: tierAt(f.competitionId, opponentId)?.count,
     });
   }
   return rows;
