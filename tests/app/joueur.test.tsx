@@ -75,9 +75,8 @@ describe('/joueurs/[slug]', () => {
     expect(screen.getByRole('link', { name: /Paris Saint-Germain/ })).toHaveAttribute('href', '/equipes/psg');
     expect(screen.getByText('Remplaçant')).toBeInTheDocument();
     expect(screen.getByText(/Blessé · Thigh Injury · retour prévu le 10\/11/)).toBeInTheDocument();
-    expect(screen.getByText('Portugal')).toBeInTheDocument();
-    expect(screen.getByText('Né le 19 juin 2002')).toBeInTheDocument();
-    expect(screen.getByText('Latéral gauche')).toBeInTheDocument();
+    expect(screen.queryByText('Né le 19 juin 2002')).not.toBeInTheDocument();
+    expect(screen.queryByText('Latéral gauche')).not.toBeInTheDocument();
     expect(screen.getByText('#25')).toBeInTheDocument();
     expect(screen.getByText('Carte : Défenseur / Milieu')).toBeInTheDocument();
     expect(screen.queryByText('Taille')).not.toBeInTheDocument();
@@ -171,6 +170,8 @@ describe('/joueurs/[slug]', () => {
 
   it('aperçu : prix Limited, valeur estimée et potentiel', async () => {
     render(await Page(params('nuno-mendes')));
+    expect(screen.queryByRole('region', { name: 'Marché Limited' })).not.toBeInTheDocument(); // replié par défaut
+    fireEvent.click(screen.getByRole('button', { name: 'Déplier : Marché' }));
     const card = screen.getByRole('region', { name: 'Marché Limited' });
     expect(within(card).getByText('24,5 €')).toBeInTheDocument();
     expect(within(card).getByText('6,20 €')).toBeInTheDocument();

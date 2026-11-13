@@ -5,9 +5,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 const key = (id: string) => `sorare-scout:fold:${id}`;
 
 /** Bloc repliable : flèche en haut à droite ; replié, il ne reste qu'une barre avec le titre. État retenu par navigateur. */
-export function Fold({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
-  useEffect(() => { try { if (localStorage.getItem(key(id)) === '0') setOpen(false); } catch {} }, [id]);
+export function Fold({ id, title, defaultOpen = true, children }: { id: string; title: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { try { const v = localStorage.getItem(key(id)); if (v) setOpen(v === '1'); } catch {} }, [id]);
   const toggle = () => {
     setOpen(!open);
     try { localStorage.setItem(key(id), open ? '0' : '1'); } catch {}

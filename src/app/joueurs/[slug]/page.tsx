@@ -3,7 +3,7 @@ import { CardStatusIcon, ClassicHint } from '@/components/ClassicHint';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getQueries, type PlayerDetail, type PlayerGameView, type UpcomingView } from '@/db/queries';
-import { GENERIC_LABEL_FR, POSITION_LABEL_FR, POSITION_NAME_FR, cardLabel } from '@/domain/types';
+import { GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel } from '@/domain/types';
 import { projectForFixture } from '@/domain/projection';
 import { ScoreChart } from '@/components/ScoreChart';
 import { Fold } from '@/components/Fold';
@@ -70,6 +70,14 @@ function Hero({ player, children }: { player: PlayerDetail; children?: ReactNode
           {first && <span className="pcard-first">{first}</span>}{first && ' '}
           <span className="pcard-last">{last}</span>
         </h1>
+        {(player.country || player.shirtNumber !== null) && (
+          <span className="pcard-id">
+            {player.country && (player.country.flagUrl
+              ? <img className="flag" src={player.country.flagUrl} alt={player.country.name} title={player.country.name} />
+              : player.country.name)}
+            {player.shirtNumber !== null && <span>#{player.shirtNumber}</span>}
+          </span>
+        )}
         <OtwButton slug={player.slug} name={player.name} />
         <div className="pcard-pills">
           {player.teamSlug ? (
@@ -85,18 +93,10 @@ function Hero({ player, children }: { player: PlayerDetail; children?: ReactNode
         </div>
         <StatusBadges playingStatus={player.playingStatus} injury={player.injury} suspension={player.suspension} />
         <dl className="pcard-attrs">
-          <Attr label="Rôle sur le terrain">{player.usualPosition ? POSITION_NAME_FR[player.usualPosition] : GENERIC_LABEL_FR[player.position]}</Attr>
-          {player.country && (
-            <Attr label="Nationalité">
-              {player.country.flagUrl && <img className="flag" src={player.country.flagUrl} alt="" />} {player.country.name}
-            </Attr>
-          )}
           {player.birthDate && (
             <Attr label="Âge"><span title={`Né le ${fmtBirth(player.birthDate)}`}>{ageAt(player.birthDate)} <small>ans</small></span></Attr>
           )}
-          {player.shirtNumber !== null && <Attr label="Maillot">#{player.shirtNumber}</Attr>}
         </dl>
-        {player.birthDate && <p className="pcard-born">Né le {fmtBirth(player.birthDate)}</p>}
         {children}
       </div>
       <div className="pcard-side">
@@ -142,28 +142,27 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
   );
 }
 
-/** Forme : L5 / L15 / L40 et part de matchs joués ; mini-barres des 5 derniers matchs. */
-function FormCard({ player, games }: { player: PlayerDetail; games: PlayerGameView[] }) {
+/** Forme compacte dans l'encart profil : L5 / L15 / L40 et part de matchs joués ; mini-barres des 5 derniers matchs. */
+function FormLine({ player, games }: { player: PlayerDetail; games: PlayerGameView[] }) {
   const s = player.summary;
   if (!s) return null;
   const cols: [string, number, number][] = [['L5', s.l5, 5], ['L15', s.l15, 15], ['L40', s.l40, 40]];
   return (
-    <section className="card">
-      <h2 className="card-title">Forme <span>Score · % joué</span></h2>
-      <div className="card-cols">
+    <div className="pcard-form" aria-label="Forme">
+      <div className="pcard-form-cols">
         {cols.map(([label, value, n]) => {
           const r = lastN(games, n);
           return (
             <div key={label} className="card-col" data-testid={`form-${label}`}>
               <div className="card-col-label">{label}</div>
-              <ScorePill score={value} size="lg" />
+              <ScorePill score={value} size="sm" />
               <div className="card-col-sub">{r.playedRate === null ? '—' : fmtPct(r.playedRate)}</div>
             </div>
           );
         })}
       </div>
-      <div className="card-foot">
-        <span className="card-kicker">5 derniers matchs</span>
+      <div className="pcard-form-foot">
+        <span className="card-kicker">5 derniers</span>
         <span className="mini-bars" aria-label={`5 derniers matchs : ${games.slice(0, 5).map((g) => (g.status === 'absent' ? 'absent' : Math.round(g.score))).join(', ')}`}>
           {[...games.slice(0, 5)].reverse().map((g) => (
             <i key={g.fixtureId} className={g.status === 'absent' ? 'absent' : scoreTier(g.score)}
@@ -171,7 +170,7 @@ function FormCard({ player, games }: { player: PlayerDetail; games: PlayerGameVi
           ))}
         </span>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -369,7 +368,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
 
   return (
     <main className="player-page">
-      <Hero player={player}>{tab === 'apercu' && <NextMatch player={player} upcoming={upcoming} />}</Hero>
+      <Hero player={player}>{tab === 'apercu' && <><FormLine player={player} games={games} /><NextMatch player={player} upcoming={upcoming} /></>}</Hero>
 
       <nav className="tabs" aria-label="Sections de la fiche">
         {TABS.map(([key, label]) => (
@@ -383,13 +382,12 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
         <>
           {s ? (
             <div className="cards">
-              <Fold id="forme" title="Forme"><FormCard player={player} games={games} /></Fold>
-              <Fold id="marche" title="Marché"><MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} /></Fold>
+              <Fold id="marche" title="Marché" defaultOpen={false}><MarketCard market={player.market} season={season} href={`/joueurs/${slug}?onglet=marche`} /></Fold>
             </div>
           ) : (
             <p className="empty">Pas encore de match importé pour ce joueur</p>
           )}
-          {splits && <Fold id="lieu" title="Lieu et adversaire"><SplitsCard s={splits} /></Fold>}
+          {splits && <Fold id="lieu" title="Lieu et adversaire" defaultOpen={false}><SplitsCard s={splits} /></Fold>}
           <Fold id="scores" title="Scores Sorare"><ScoreChart games={games} l15={s?.l15 ?? null} byPosition={byPosition} /></Fold>
           {s && <Fold id="regularite" title="Régularité"><RegularityCard games={games} /></Fold>}
         </>
