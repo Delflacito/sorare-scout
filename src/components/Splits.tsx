@@ -29,9 +29,10 @@ export const legend = (s: PlayerSplits) =>
 
 /**
  * Pastille qui ouvre, au survol ou au toucher, les traits marquants du joueur (lieu, niveau de l'adversaire, AA, décisif).
- * Rien n'est affiché quand le profil est lisse.
+ * Seuls les traits qui concernent le prochain match (lieu et niveau de l'adversaire) sont gardés ; sinon rien n'est affiché.
  */
-export function SplitHint({ s }: { s: PlayerSplits | undefined }) {
+export function SplitHint({ s: all }: { s: PlayerSplits | undefined }) {
+  const s = all && { ...all, notes: all.notes.filter((n) => n.next) };
   if (!s || !s.notes.length) return null;
   const tone = hintTone(s);
   const ctx = contextLabel(s);
