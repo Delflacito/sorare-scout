@@ -417,6 +417,8 @@ export function createQueries(sql: postgres.Sql) {
           join teams o on o.id = case when fx.home_team_id = t.id then fx.away_team_id else fx.home_team_id end
           where s.next_fixture_id = any(${fixtureIds}) and s.next_projected is not null and s.base is not null
             and not (${sql.unsafe(UNAVAILABLE)}) and coalesce(p.playing_status, '') <> 'NOT_PLAYING'
+            -- Sans aucune carte Limited, le joueur n'est pas alignable.
+            and p.card_status is distinct from 'none'
             ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
             ${f.position ? sql`and g.position = ${f.position}` : sql``}
             ${f.slugs ? sql`and p.sorare_slug = any(${f.slugs})` : sql``}
