@@ -742,3 +742,7 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .gw-row.no-rank:has(> .otw-btn) { grid-template-columns: 26px 40px minmax(0, 1fr) auto; }
 .gw-row.star-row:has(> .otw-btn) { grid-template-columns: 26px 40px minmax(0, 1fr) auto auto; }
 @media (max-width: 560px) { .gw-row.no-rank:has(> .otw-btn) { grid-template-columns: 26px 36px minmax(0, 1fr) auto; } .gw-row.star-row:has(> .otw-btn) { grid-template-columns: 26px 36px minmax(0, 1fr) auto auto; } }
+th.th-sort { cursor: pointer; user-select: none; }
+th.th-sort:hover { color: var(--text); }
+th.th-sort[aria-sort='ascending']::after { content: ' ▲'; }
+th.th-sort[aria-sort='descending']::after { content: ' ▼'; }
