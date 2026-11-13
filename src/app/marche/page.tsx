@@ -32,7 +32,23 @@ function ActualVsFair({ history, fair }: { history: ValueSeries; fair: number })
   );
 }
 
-function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView[]; competition?: string; yy: string; history: ValueSeries }) {
+/** Mes cartes d'un club : total payé et valeur actuelle (prix de référence, sinon plancher). */
+type ClubMine = Map<string, { paid: number; value: number }>;
+
+function mineByClub(owned: Owned, players: MarketPlayerView[]): ClubMine {
+  const m: ClubMine = new Map();
+  for (const p of players) {
+    const o = owned.get(p.slug);
+    if (!o || !p.teamSlug) continue;
+    const c = m.get(p.teamSlug) ?? { paid: 0, value: 0 };
+    c.paid += o.paid;
+    c.value += o.count * (p.price ?? p.floorInSeason ?? 0);
+    m.set(p.teamSlug, c);
+  }
+  return m;
+}
+
+function ClubsTable({ clubs, competition, yy, history, mine }: { clubs: ClubMarketView[]; competition?: string; yy: string; history: ValueSeries; mine: ClubMine | null }) {
   const total = sum(clubs.map((c) => c.totalFloor));
   return (
     <>
@@ -46,7 +62,7 @@ function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView
       <div className="table-wrap">
         <table aria-label="Valeur des cartes par club">
           <thead>
-            <tr><th>#</th><th>Club</th><th>Championnat</th><th>Cartes cotées</th><th>Valeur totale</th><th>Joueur le plus cher</th></tr>
+            <tr><th>#</th><th>Club</th><th>Championnat</th><th>Cartes cotées</th>{mine && <><th>Investi</th><th>Évolution</th></>}<th>Valeur totale</th><th>Joueur le plus cher</th></tr>
           </thead>
           <tbody>
             {clubs.map((c, i) => (
@@ -59,6 +75,13 @@ function ClubsTable({ clubs, competition, yy, history }: { clubs: ClubMarketView
                 </td>
                 <td>{c.competition}</td>
                 <td className="num">{c.priced} / {c.players}</td>
+                {mine && (() => {
+                  const m = mine.get(c.slug);
+                  if (!m) return <><td className="num muted">—</td><td /></>;
+                  const ch = m.paid > 0 ? m.value / m.paid - 1 : null;
+                  return <><td className="num">{fmtEur(m.paid)}</td>
+                    <td className={`num ${ch === null ? 'muted' : ch > 0 ? 'hot' : ch < 0 ? 'cold' : ''}`} title={`Valeur actuelle de mes cartes : ${fmtEur(m.value)}`}>{ch === null ? '—' : fmtChange(ch)}</td></>;
+                })()}
                 <td className="num strong">{fmtEur(c.totalFloor)}</td>
                 <td>{c.topPlayer ? <>{c.topPlayer} <span className="muted">· {fmtEur(c.topPrice!)}</span></> : '—'}</td>
               </tr>
@@ -184,8 +207,11 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
   const yy = String(new Date(seasonStart()).getUTCFullYear() % 100).padStart(2, '0');
   // Championnat choisi : courbe de la valeur estimée de tous ses clubs (pas de courbe pour « toutes les ligues »).
   const leagueView = async () => {
-    const [clubs, prices] = await Promise.all([queries.getClubsMarket(competition), competition ? queries.getDailyPrices({ competition }) : []]);
-    return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices)} />;
+    const [clubs, prices, squad] = await Promise.all([queries.getClubsMarket(competition), competition ? queries.getDailyPrices({ competition }) : [],
+      cartes ? queries.getSquad(cartes) : null]);
+    const owned = cartes ? ownedBySlug(squad) : null;
+    const mine = owned ? mineByClub(owned, await queries.getMarketPlayers({ slugs: [...owned.keys()] })) : null;
+    return <ClubsTable clubs={clubs} competition={competition} yy={yy} history={valueSeries(prices)} mine={mine} />;
   };
   const clubView = async (team: string) => {
     const [players, prices, squad] = await Promise.all([queries.getMarketPlayers({ team }), queries.getDailyPrices({ team }),
@@ -208,7 +234,7 @@ export default async function MarchePage({ searchParams }: { searchParams: Searc
         </select>
         <button type="submit">Appliquer</button>
       </form>
-      {clubTeam && <EnsurePseudo href={`/marche?club=${clubTeam.slug}${competition ? `&competition=${competition}` : ''}`} present={!!cartes} quiet />}
+      <EnsurePseudo href={clubTeam ? `/marche?club=${clubTeam.slug}${competition ? `&competition=${competition}` : ''}` : `/marche${competition ? `?competition=${competition}` : ''}`} present={!!cartes} quiet />
       {clubTeam && <p><Link href={competition ? `/marche?competition=${competition}` : '/marche'}>← Tous les clubs</Link></p>}
       {clubTeam
         ? await clubView(clubTeam.slug)

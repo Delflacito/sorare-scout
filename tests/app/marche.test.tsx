@@ -98,4 +98,15 @@ describe('/marche', () => {
     expect(screen.getByText('Investi dans le club').parentElement).toHaveTextContent('50 €3 cartes possédées · 1 prix d’achat inconnu');
     expect(screen.getByText('Valeur actuelle de mes cartes').parentElement).toHaveTextContent('92,5 €+85 % par rapport à l’investi');
   });
+  it('récapitulatif avec mes cartes : investi par club et évolution', async () => {
+    getClubsMarket.mockResolvedValue([
+      { slug: 'psv', name: 'PSV', pictureUrl: null, competition: 'Eredivisie', competitionSlug: 'eredivisie', players: 25, priced: 18, totalFloor: 640, topPlayer: 'Xavi', topPrice: 120, totalFair: 800 },
+    ]);
+    getMarketPlayers.mockResolvedValue([mp('a', 40, 10)]);
+    getSquad.mockResolvedValue([{ slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 50 }]);
+    render(await Page(params({ cartes: 'delflacito' })));
+    const row = within(screen.getByRole('table', { name: 'Valeur des cartes par club' })).getAllByRole('row')[1];
+    expect(within(row).getByText('50 €')).toBeInTheDocument();
+    expect(within(row).getByText('−20 %')).toBeInTheDocument();
+  });
 });

@@ -39,8 +39,10 @@ const priceOf = (p: MarketPlayerView) => p.floorInSeason ?? p.price;
 /** Liste OTW : joueurs ajoutés avec le « + », prix actuel (plancher de la saison, sinon prix de référence) et total. */
 export function OtwList() {
   const [slugs, setSlugs] = useState<string[] | null>(null);
-  const [players, setPlayers] = useState<MarketPlayerView[] | null>(null);
+  const [loaded, setPlayers] = useState<MarketPlayerView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [competition, setCompetition] = useState('');
+  const [club, setClub] = useState('');
   useEffect(() => {
     const s = read();
     setSlugs(s);
@@ -58,14 +60,29 @@ export function OtwList() {
   };
 
   if (error) return <p className="cold">{error}</p>;
-  if (!players) return <p aria-live="polite">Chargement…</p>;
-  if (!players.length) return <p className="empty">Aucun joueur dans la liste : ajoute-les avec le « + » dans Marché, Star ou Joueurs.</p>;
+  if (!loaded) return <p aria-live="polite">Chargement…</p>;
+  if (!loaded.length) return <p className="empty">Aucun joueur dans la liste : ajoute-les avec le « + » dans Marché, Star ou Joueurs.</p>;
+  let players = loaded;
+  const competitions = [...new Set(players.map((p) => p.competition).filter((c): c is string => !!c))].sort();
+  const clubs = [...new Set(players.filter((p) => !competition || p.competition === competition).map((p) => p.team).filter((t): t is string => !!t))].sort();
+  const all = players;
+  players = players.filter((p) => (!competition || p.competition === competition) && (!club || p.team === club));
   const total = players.reduce((t, p) => t + (priceOf(p) ?? 0), 0);
   const unpriced = players.filter((p) => priceOf(p) === null).length;
   return (
     <>
+      <div className="filters">
+        <select value={competition} onChange={(e) => { setCompetition(e.target.value); setClub(''); }} aria-label="Compétition">
+          <option value="">Toutes les ligues</option>
+          {competitions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={club} onChange={(e) => setClub(e.target.value)} aria-label="Club">
+          <option value="">Tous les clubs</option>
+          {clubs.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
       <div className="summary-tiles">
-        <div className="card"><div className="card-kicker">Joueurs</div><strong>{players.length}</strong></div>
+        <div className="card"><div className="card-kicker">Joueurs</div><strong>{players.length}{players.length !== all.length && <span className="muted"> / {all.length}</span>}</strong></div>
         <div className="card"><div className="card-kicker">Prix total</div><strong>{fmtEur(total)}</strong>
           {unpriced > 0 && <div className="muted small">+ {unpriced} joueur{unpriced > 1 ? 's' : ''} sans prix</div>}</div>
       </div>
