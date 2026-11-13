@@ -32,9 +32,19 @@ export function NavTabs() {
   const cur = current(path);
   return (
     <nav className="site-tabs" aria-label="Sections">
-      {SECTIONS.map((s) => (
-        <Link key={s.href} href={s.href} aria-current={s === cur ? 'page' : undefined}>{s.label}</Link>
-      ))}
+      {SECTIONS.map((s) => {
+        const tab = <Link key={s.href} href={s.href} aria-current={s === cur ? 'page' : undefined}>{s.label}</Link>;
+        if (!s.sub) return tab;
+        // Menu déroulant au survol (ou au clavier) : accès direct aux sous-onglets.
+        return (
+          <span key={s.href} className="tab-group">
+            {tab}
+            <span className="tab-menu">
+              {s.sub.map((t) => <Link key={t.href} href={t.href} aria-current={isAt(path, t.href) ? 'page' : undefined}>{t.label}</Link>)}
+            </span>
+          </span>
+        );
+      })}
     </nav>
   );
 }

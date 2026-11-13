@@ -47,6 +47,11 @@ header.site { display: flex; gap: 6px 20px; align-items: center; flex-wrap: wrap
 .site-tabs a:hover { color: var(--text); }
 .site-tabs a[aria-current='page'] { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
 @media (max-width: 560px) { header.site { padding-top: 8px; } .player-search input { width: 200px; min-height: 36px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.tab-group { position: relative; display: inline-flex; }
+.tab-menu { display: none; position: absolute; top: 100%; left: 0; z-index: 20; flex-direction: column; min-width: 160px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.site-tabs .tab-menu a { min-height: 36px; border-bottom: none; border-radius: 6px; }
+.site-tabs .tab-menu a:hover, .site-tabs .tab-menu a[aria-current='page'] { background: var(--neutral-bg); color: var(--text); }
+@media (hover: hover) and (min-width: 561px) { .site-tabs { overflow: visible; } .tab-group:hover .tab-menu, .tab-group:focus-within .tab-menu { display: flex; } }
 .sub-tabs { padding: 0 16px; margin: 0; }
 @media (max-width: 560px) { .player-search, .player-search input { width: 100%; } }
 header.site .brand { width: 100%; } .site-tabs a { padding: 8px 10px; } }
