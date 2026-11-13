@@ -21,3 +21,6 @@ jobs:
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Alerte ntfy avant la Game Week (cartes blessées, suspendues, incertaines) ; sans secret, pas d'envoi.
+          ALERT_PSEUDO: delflacito
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

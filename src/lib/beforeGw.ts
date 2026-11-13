@@ -1,3 +1,6 @@
+import type { Queries } from '@/db/queries';
+import { slugsOf } from './competitions';
+
 /** Carte possédée vue avant la Game Week : statut, titularisations et prochain match du club. */
 export interface OwnedStatus {
   slug: string; name: string; team: string; competition: string; competitionName: string;
@@ -41,4 +44,17 @@ export function beforeGw(owned: OwnedStatus[], kickoffs: Map<string, string>): L
   }
   for (const l of byLeague.values()) l.issues.sort((a, b) => order.indexOf(a.issue) - order.indexOf(b.issue) || a.name.localeCompare(b.name));
   return [...byLeague.values()].sort((a, b) => (a.firstKickoff ?? '9').localeCompare(b.firstKickoff ?? '9') || b.owned - a.owned);
+}
+
+/** À faire avant la Game Week pour les cartes possédées d'un pseudo (effectif enregistré). */
+export async function beforeGwFor(queries: Queries, pseudo: string): Promise<LeagueCheck[]> {
+  // Journée de chaque championnat séparément : leurs fenêtres de 4 jours ne commencent pas le même jour.
+  const [squad, competitions] = await Promise.all([queries.getSquad(pseudo), queries.listCompetitions()]);
+  const fixtures = (await Promise.all(competitions.flatMap((c) => slugsOf(c.slug)).map((c) => queries.getGameWeekFixtures(c))))
+    .flat().sort((a, b) => a.date.localeCompare(b.date));
+  const slugs = [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))];
+  const owned = await queries.getOwnedStatus(slugs, fixtures.map((f) => f.id));
+  const kickoffs = new Map<string, string>();
+  for (const f of fixtures) if (!kickoffs.has(f.competition)) kickoffs.set(f.competition, f.date); // le plus tôt (matchs triés)
+  return beforeGw(owned, kickoffs);
 }

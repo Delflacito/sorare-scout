@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { putJson } from '@/lib/putJson';
 import Link from 'next/link';
 import type { StreakFixture } from '@/db/queries';
 import { GENERIC_LABEL_FR } from '@/domain/types';
@@ -83,7 +84,7 @@ export function StreakPlanner({ days, pseudo }: { days: StreakDay[]; pseudo?: st
   const savePlans = (next: StreakPlan[], message: string) => {
     setPlans(next);
     if (!pseudo) return;
-    fetch(`/api/streak-plans?user=${encodeURIComponent(pseudo)}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plans: next }) })
+    putJson(`/api/streak-plans?user=${encodeURIComponent(pseudo)}`, { plans: next })
       .then((r) => setStatus(r.ok ? message : 'Échec de l’enregistrement, réessaie'))
       .catch(() => setStatus('Échec de l’enregistrement (réseau)'));
   };

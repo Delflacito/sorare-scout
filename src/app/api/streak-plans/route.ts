@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getQueries } from '@/db/queries';
 import { PSEUDO } from '@/lib/squad';
+import { checkCode } from '@/lib/writeCode';
 import { parsePlans } from '@/lib/streakPlans';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
 
 /** Remplace les sélections enregistrées de ce pseudo. */
 export async function PUT(req: NextRequest) {
+  if (!checkCode(req)) return NextResponse.json({ error: 'Code d’enregistrement requis' }, { status: 401 });
   const pseudo = pseudoOf(req);
   if (!pseudo) return NextResponse.json({ error: 'Pseudo Sorare invalide' }, { status: 400 });
   const plans = parsePlans(await req.json().then((b) => b?.plans, () => undefined));

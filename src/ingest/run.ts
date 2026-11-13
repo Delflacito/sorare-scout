@@ -10,6 +10,8 @@ import { importProfiles } from './profiles';
 import { importMarket, recomputeMarket } from './market';
 import { recomputeAggregates } from './aggregates';
 import { seasonStart } from './leagues';
+import { createQueries } from '@/db/queries';
+import { sendAlert } from './alert';
 
 config({ path: '.env.local', quiet: true });
 
@@ -38,6 +40,8 @@ async function main() {
     const market = await importMarket(deps, { deadline: Date.now() + 20 * 60_000, concurrency: 3 });
     const priced = await recomputeMarket(repo);
     console.log(`Marché : ${market.updated} joueurs, ${priced} cotés`);
+    // Une alerte ratée ne doit pas faire échouer l'import.
+    await sendAlert(createQueries(sql)).then((sent) => console.log(sent ? 'Alerte envoyée' : 'Pas d’alerte'), (e) => console.error(`Alerte non envoyée : ${(e as Error).message}`));
     await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors, ...market.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { putJson } from '@/lib/putJson';
 import Link from 'next/link';
 import { fmtChange, fmtEur } from '@/lib/format';
 import {
@@ -239,7 +240,7 @@ export function RoiTracker() {
     setSaved('saving');
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      fetch(`/api/roi?user=${encodeURIComponent(pseudo!)}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) })
+      putJson(`/api/roi?user=${encodeURIComponent(pseudo!)}`, next)
         .then((r) => setSaved(r.ok ? 'saved' : 'error')).catch(() => setSaved('error'));
     }, 600);
   };

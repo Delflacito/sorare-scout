@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { putJson } from '@/lib/putJson';
 import Link from 'next/link';
 import type { MarketPlayerView } from '@/db/queries';
 import { GENERIC_LABEL_FR, type GenericPosition } from '@/domain/types';
@@ -163,9 +164,9 @@ export function SquadBuilder({ competitions, teams }: {
   useEffect(() => {
     if (!syncedPseudo) return;
     const t = setTimeout(() => {
-      fetch(`/api/effectif/enregistre?user=${encodeURIComponent(syncedPseudo)}`, {
-        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries }),
-      }).catch(() => setImportMessage('Modification non enregistrée en ligne (réseau)'));
+      putJson(`/api/effectif/enregistre?user=${encodeURIComponent(syncedPseudo)}`, { entries })
+        .then((r) => { if (!r.ok) setImportMessage('Modification non enregistrée en ligne (code d’enregistrement refusé ou erreur)'); })
+        .catch(() => setImportMessage('Modification non enregistrée en ligne (réseau)'));
     }, 600);
     return () => clearTimeout(t);
   }, [entries, syncedPseudo]);

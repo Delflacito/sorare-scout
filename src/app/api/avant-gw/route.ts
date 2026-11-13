@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getQueries } from '@/db/queries';
-import { beforeGw } from '@/lib/beforeGw';
+import { beforeGwFor } from '@/lib/beforeGw';
 import { PSEUDO } from '@/lib/squad';
-import { slugsOf } from '@/lib/competitions';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,14 +9,5 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const pseudo = req.nextUrl.searchParams.get('user')?.trim().toLowerCase() ?? '';
   if (!PSEUDO.test(pseudo)) return NextResponse.json({ error: 'Pseudo Sorare invalide' }, { status: 400 });
-  const queries = getQueries();
-  // Journée de chaque championnat séparément : leurs fenêtres de 4 jours ne commencent pas le même jour.
-  const [squad, competitions] = await Promise.all([queries.getSquad(pseudo), queries.listCompetitions()]);
-  const fixtures = (await Promise.all(competitions.flatMap((c) => slugsOf(c.slug)).map((c) => queries.getGameWeekFixtures(c))))
-    .flat().sort((a, b) => a.date.localeCompare(b.date));
-  const slugs = [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))];
-  const owned = await queries.getOwnedStatus(slugs, fixtures.map((f) => f.id));
-  const kickoffs = new Map<string, string>();
-  for (const f of fixtures) if (!kickoffs.has(f.competition)) kickoffs.set(f.competition, f.date); // le plus tôt (matchs triés)
-  return NextResponse.json({ leagues: beforeGw(owned, kickoffs) });
+  return NextResponse.json({ leagues: await beforeGwFor(getQueries(), pseudo) });
 }

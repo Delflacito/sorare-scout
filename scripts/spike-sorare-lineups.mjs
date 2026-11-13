@@ -55,6 +55,12 @@ async function sample(name, query) {
   out.samples.leagues = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 }
 
+// Récompenses gagnées par un manager (streaks, classements) : existent-elles dans l'API publique, pour remplir le ROI sans saisie ?
+await probe('recompenses-user', (c) => `{ user(slug: "delflacito") { ${c} } }`,
+  ['rewards', 'so5Rewards', 'so5Lineups', 'footballSo5Rewards', 'claimedRewards', 'unclaimedSo5Rewards', 'wonRewards', 'streakRewards', 'managerProgression', 'earnings', 'totalRewards', 'footballUserProfile', 'profile']);
+await probe('recompenses-so5', (c) => `{ so5 { ${c} } }`, ['so5Rewards', 'so5Lineups', 'so5Leaderboards', 'so5Fixture', 'streaks', 'so5Rankings', 'myRewards']);
+await probe('recompenses-football', (c) => `{ football { ${c} } }`, ['rewards', 'so5', 'streaks', 'managerStreaks', 'userRewards']);
+
 mkdirSync('spike-output', { recursive: true });
 writeFileSync('spike-output/sorare-probe.json', JSON.stringify(out, null, 2));
 console.log('écrit spike-output/sorare-probe.json');
