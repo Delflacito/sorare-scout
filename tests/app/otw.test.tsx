@@ -13,6 +13,7 @@ describe('OTW', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [p('a', 10, 12), p('b', null, 5)] })));
     render(<OtwList />);
     expect(await screen.findByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total15 €');
+    expect(screen.getByRole('link', { name: 'Voir A sur Sorare (nouvel onglet)' })).toHaveAttribute('href', 'https://sorare.com/football/players/a');
     fireEvent.change(screen.getByRole('combobox', { name: 'Club' }), { target: { value: 'Ajax' } });
     expect(screen.getByRole('table', { name: 'Liste OTW' })).toHaveTextContent('Total5,00 €');
     fireEvent.click(screen.getByRole('button', { name: 'Retirer B' }));

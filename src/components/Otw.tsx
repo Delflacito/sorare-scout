@@ -95,7 +95,9 @@ export function OtwList() {
                 <td><span className="player-cell"><PlayerAvatar name={p.name} url={p.pictureUrl} size={32} /><Link href={`/joueurs/${p.slug}?onglet=marche`}>{p.name}</Link></span></td>
                 <td>{p.team ?? '—'}</td>
                 <td className="num strong">{priceOf(p) === null ? '—' : fmtEur(priceOf(p)!)}</td>
-                <td><button type="button" className="chip" onClick={() => remove(p.slug)} aria-label={`Retirer ${p.name}`}>Retirer</button></td>
+                <td><a href={`https://sorare.com/football/players/${p.slug}`} target="_blank" rel="noopener noreferrer"
+                  aria-label={`Voir ${p.name} sur Sorare (nouvel onglet)`}>Sorare ↗</a>{' '}
+                  <button type="button" className="chip" onClick={() => remove(p.slug)} aria-label={`Retirer ${p.name}`}>Retirer</button></td>
               </tr>
             ))}
           </tbody>
