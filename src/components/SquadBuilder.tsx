@@ -15,6 +15,8 @@ import { competitionGroup } from '@/lib/competitions';
  */
 export interface SquadEntry {
   slug: string; competition: string; status: 'owned' | 'target'; purchasePrice: number | null; fromSorare?: boolean;
+  /** Prix d'achat saisi à la main : gardé à chaque mise à jour depuis Sorare. */
+  manualPrice?: boolean;
   /** Ajout à la main d'un joueur que le site ne suit pas encore (slug « manuel:… ») : remplacé dès que le joueur apparaît. */
   name?: string;
 }
@@ -53,8 +55,10 @@ export function mergeImport(entries: SquadEntry[], imported: { slug: string; com
     ...entries.filter((e) => !owned.has(key(e)) && !e.fromSorare),
     ...imported.map((e) => {
       const before = prev.get(key(e));
-      const manual = before?.status === 'owned' && !before.fromSorare ? before.purchasePrice : null;
-      return { ...e, status: 'owned' as const, purchasePrice: manual ?? e.purchasePrice, fromSorare: true };
+      const owned = before?.status === 'owned';
+      // Prix saisi à la main (ou connu alors que Sorare n'en donne pas) : conservé.
+      const manual = owned && (before.manualPrice || !before.fromSorare || e.purchasePrice === null) ? before.purchasePrice : null;
+      return { ...e, status: 'owned' as const, purchasePrice: manual ?? e.purchasePrice, fromSorare: true, ...(owned && before.manualPrice ? { manualPrice: true } : {}) };
     }),
   ];
 }
@@ -356,7 +360,7 @@ export function SquadBuilder({ competitions, teams }: {
                         </div>
                         <label className="squad-paid">Acheté
                           <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${nameOf(e)}`}
-                            defaultValue={paid ?? ''} placeholder="?" onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value) })} /> €
+                            defaultValue={paid ?? ''} placeholder="?" onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value), manualPrice: true })} /> €
                         </label>
                       </div>
                       <div className="gw-score squad-money">

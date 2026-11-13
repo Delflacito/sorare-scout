@@ -48,6 +48,12 @@ describe('import depuis Sorare', () => {
       { slug: 'd', competition: 'eredivisie', status: 'owned', purchasePrice: 12, fromSorare: true },
       { slug: 'f', competition: 'eredivisie', status: 'owned', purchasePrice: null, fromSorare: true },
     ]);
+    // Prix saisi à la main sur une carte importée : gardé, même quand Sorare en donne un autre ou aucun.
+    const again = mergeImport([
+      { slug: 'g', competition: 'eredivisie', status: 'owned', purchasePrice: 15, fromSorare: true, manualPrice: true },
+      { slug: 'h', competition: 'eredivisie', status: 'owned', purchasePrice: 8, fromSorare: true },
+    ], [{ slug: 'g', competition: 'eredivisie', purchasePrice: 20 }, { slug: 'h', competition: 'eredivisie', purchasePrice: null }]);
+    expect(again.map((e) => e.purchasePrice)).toEqual([15, 8]);
   });
 });
 
@@ -125,7 +131,7 @@ describe('Mon effectif', () => {
     await waitFor(() => expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('22,5 €'));
     expect(screen.getByText('Valeur actuelle').nextSibling).toHaveTextContent('30 €');
     expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toEqual([
-      { slug: 'xavi', competition: 'eredivisie', status: 'owned', purchasePrice: 22.5 },
+      { slug: 'xavi', competition: 'eredivisie', status: 'owned', purchasePrice: 22.5, manualPrice: true },
     ]);
     // retirer depuis la liste du club
     fireEvent.click(within(list).getByRole('button', { name: 'Dans mes cartes ✕' }));
