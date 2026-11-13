@@ -795,3 +795,13 @@ th.th-sort[aria-sort='descending']::after { content: ' ▼'; }
 .split-tags li.is-next { border-color: currentColor; }
 .split-legend { color: var(--muted); font-size: 11px; }
 .splits-card .split-tags { margin: 4px 0 12px; }
+/* Écrans tactiles : cibles plus grandes, au-dessus du lien « toute la ligne » vers la fiche joueur. */
+@media (pointer: coarse) {
+  .split-hint { width: 28px; height: 28px; font-size: 12px; z-index: 2; }
+  .split-hint::before { content: ''; position: absolute; inset: -8px; }
+  .otw-btn { width: 2.1rem; height: 2.1rem; z-index: 2; }
+  .card-status, .owned-mark, .gw-name abbr { position: relative; z-index: 2; }
+  .gw-name { gap: 8px; }
+  .site-tabs .tab-menu a { min-height: 44px; padding: 10px 14px; }
+  .tab-menu { min-width: 200px; }
+}
