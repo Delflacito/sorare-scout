@@ -175,6 +175,9 @@ const toGame = (g: RawGame): SorareGame => ({
   homeGoals: g.homeGoals, awayGoals: g.awayGoals, status: gameStatus(g.statusTyped),
 });
 
+/** Un match dont l'adversaire n'est pas encore connu (play-offs) est ignoré au lieu de faire échouer tout le club. */
+const toGames = (gs: RawGame[]) => gs.filter((g) => g.homeTeam && g.awayTeam).map(toGame);
+
 export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof fetch = fetch) {
   async function query<T>(q: string, variables: Record<string, unknown>): Promise<T> {
     const res = await fetchWithRetry(
@@ -224,14 +227,14 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
     async clubGames(clubSlug: string): Promise<SorareGame[]> {
       const d = await query<{ football: { club: { latestGames: { nodes: RawGame[] }; upcomingGames: RawGame[] } } }>(
         CLUB_GAMES_QUERY, { slug: clubSlug });
-      return [...d.football.club.latestGames.nodes, ...d.football.club.upcomingGames].map(toGame);
+      return toGames([...d.football.club.latestGames.nodes, ...d.football.club.upcomingGames]);
     },
 
     async nationalTeamGames(slug: string): Promise<SorareGame[]> {
       const d = await query<{ football: { nationalTeam: { latestGames: { nodes: RawGame[] }; upcomingGames: RawGame[] } | null } }>(
         NATIONAL_TEAM_GAMES_QUERY, { slug });
       const t = d.football.nationalTeam;
-      return t ? [...t.latestGames.nodes, ...t.upcomingGames].map(toGame) : [];
+      return t ? toGames([...t.latestGames.nodes, ...t.upcomingGames]) : [];
     },
 
     /** Identité et statistiques de championnat par saison ; les joueurs introuvables sont ignorés. */

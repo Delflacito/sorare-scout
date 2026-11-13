@@ -1,13 +1,19 @@
 # Sorare Scout
 
-Analyse des joueurs Sorare Football (Ligue 1, Premier League, LaLiga, Serie A, Bundesliga), avec un indicateur
-central : **le score Sorare concédé par chaque équipe à chaque poste précis** (latéral gauche, axe, ailier…),
-calculé d'après le placement réel des joueurs dans les compositions des matchs récents.
+Outil personnel pour Sorare Football : scores potentiels, marché des cartes Limited, effectif et rentabilité.
+Championnats suivis : voir `src/ingest/leagues.ts`. Indicateur central : **le score Sorare concédé par chaque équipe à chaque
+poste précis**, calculé d'après le placement réel des joueurs dans les compositions.
 
-- `/joueurs` : explorateur (recherche, filtres ligue / poste / poste précis, tri L5 · L15 · L40 · % titu · indice adversaire)
-- `/joueurs/<slug>` : fiche joueur (scores récents, temps de jeu, Decisive / All-Around, prochain match et ce que l'adversaire concède à son poste)
-- `/equipes/<slug>` : terrain coloré des points concédés par poste (fenêtre 5 ou 10 matchs)
+- `/` : à faire avant la Game Week (cartes blessées, suspendues, incertaines) et raccourcis
+- `/game-week`, `/journee` : meilleurs scores potentiels et ce que chaque adversaire concède
+- `/joueurs`, `/joueurs/<slug>`, `/equipes/<slug>`, `/matchs/<id>` : explorateur et fiches
+- `/trading`, `/marche` : cartes sous-évaluées, hausses attendues, prix par club
+- `/effectif`, `/star`, `/otw`, `/roi`, `/streak` : mes cartes, collections, liste d'achats, rentabilité, préparation des streaks
 - `/admin/imports` : état du dernier import
+
+Les signaux (valeur estimée, score potentiel, projection Sorare) sont notés chaque jour dans `daily_snapshot` pour être
+vérifiés après coup. Tests sur le passé : workflows « Backtest » et « Streaks » (résultats sur les branches
+`backtest-results` et `streak-results`).
 
 Conception : `docs/superpowers/specs/2026-10-28-sorare-analyse-joueurs-design.md`.
 
@@ -40,11 +46,11 @@ Actions) vérifie la clé et sonde le schéma ; il publie ses résultats sur la 
 npm run ingest   # clubs (promotions / relégations), matchs, compos, scores, agrégats
 ```
 
-Le premier import récupère l'historique de la saison (environ 1 800 matchs sur les 5 championnats, une requête par
-match). Un match dont la compo n'est pas encore publiée est retenté aux imports suivants, puis abandonné après 5 essais.
+Le premier import récupère l'historique de la saison (une requête par match). Un match dont la compo n'est pas encore publiée est retenté aux imports suivants, puis abandonné après 5 essais.
 Les erreurs éventuelles sont visibles dans `/admin/imports`.
 
-Import automatique : le workflow `.github/workflows/ingest.yml` tourne chaque jour à 05:17 UTC. Créer dans GitHub
+Import automatique : le workflow `.github/workflows/ingest.yml` est planifié chaque jour (GitHub le démarre avec plusieurs heures de retard,
+l'heure demandée en tient compte) ; `market.yml` rafraîchit les prix une seconde fois. Créer dans GitHub
 (Settings → Secrets and variables → Actions) les secrets `SORARE_API_KEY` et `DATABASE_URL`.
 
 ## Site

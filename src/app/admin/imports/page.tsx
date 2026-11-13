@@ -17,7 +17,7 @@ export default async function ImportsPage() {
       {run ? (
         <div className="card">
           <p>
-            <strong>{STATUS_LABEL[run.status]}</strong> — démarré le {fmtDateTime(run.startedAt)}
+            <strong>{run.status === 'ok' && run.errors.length ? 'Réussi avec des erreurs' : STATUS_LABEL[run.status]}</strong> — démarré le {fmtDateTime(run.startedAt)}
             {run.finishedAt && <>, terminé le {fmtDateTime(run.finishedAt)}</>} — {run.fixturesImported} match(s) importé(s)
           </p>
           {run.errors.length > 0 && (

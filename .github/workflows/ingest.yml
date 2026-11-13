@@ -2,7 +2,9 @@ name: Import quotidien
 concurrency: ingest
 on:
   schedule:
-    - cron: '17 5 * * *'
+    # GitHub démarre les tâches planifiées avec 7 à 8 h de retard (mesuré en novembre 2026) : demandé la veille au soir
+    # pour des données prêtes le matin.
+    - cron: '17 21 * * *'
   workflow_dispatch:
 jobs:
   ingest:

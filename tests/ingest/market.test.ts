@@ -89,7 +89,7 @@ describeDb('importMarket', () => {
       calls.push(slugs);
       return slugs.map((slug) => ({
         slug, floorInSeason: 12.5, floorClassic: slug === 'greenwood' ? 4 : null,
-        sales: [{ date: '2026-10-28T10:00:00Z', eur: 11, seasonYear: 2026, auction: true, dealType: 'TokenAuction' }, { date: '2026-10-27T10:00:00Z', eur: 3, seasonYear: 2023, auction: false, dealType: 'TokenOffer' }],
+        sales: [{ date: '2026-10-28T10:00:00Z', eur: 11, seasonYear: 2026, auction: true, dealType: 'TokenAuction' }, { date: '2026-10-28T10:00:00Z', eur: 11, seasonYear: 2026, auction: true, dealType: 'TokenAuction' }, { date: '2026-10-27T10:00:00Z', eur: 3, seasonYear: 2023, auction: false, dealType: 'TokenOffer' }],
       }));
     },
   }) as unknown as SorareClient;
@@ -108,6 +108,9 @@ describeDb('importMarket', () => {
     expect(await recomputeMarket(repo)).toBe(4);
     const [m] = await sql`select reference_price, fair_price from player_market pm join players p on p.id = pm.player_id where p.sorare_slug = 'greenwood'`;
     expect(m).toEqual({ reference_price: 12.5, fair_price: null }); // 4 joueurs cotés : pas assez pour estimer
+    await recomputeMarket(repo); // deuxième calcul le même jour : une seule ligne de journal par joueur
+    const [{ n }] = await sql`select count(*)::int as n from daily_snapshot where day = current_date and reference_price = 12.5`;
+    expect(n).toBe(4);
   });
 
   it('taux de change indisponible : erreur signalée, rien d’autre', async () => {

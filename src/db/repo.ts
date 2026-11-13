@@ -405,7 +405,9 @@ function createBaseRepo(sql: Sql) {
       const sales = markets.flatMap((m) => (idOf.has(m.slug) ? m.sales.map((x) => ({
         player_id: idOf.get(m.slug)!, sold_at: x.date, price_eur: x.eur, in_season: x.seasonYear === season, auction: x.auction ?? false, deal_type: x.dealType ?? null,
       })) : []));
-      for (const chunk of chunks(sales)) await sql`insert into card_sales ${sql(chunk)} on conflict (player_id, sold_at, price_eur) do update set auction = excluded.auction, deal_type = excluded.deal_type`;
+      // Deux cartes du même joueur vendues au même instant et au même prix : une seule ligne, sinon tout le lot est rejeté.
+      const unique = [...new Map(sales.map((x) => [`${x.player_id}|${x.sold_at}|${x.price_eur}`, x])).values()];
+      for (const chunk of chunks(unique)) await sql`insert into card_sales ${sql(chunk)} on conflict (player_id, sold_at, price_eur) do update set auction = excluded.auction, deal_type = excluded.deal_type`;
       // 120 jours : de quoi tracer l'évolution de la valeur des clubs depuis le début de saison.
       await sql`delete from card_sales where sold_at < now() - interval '120 days'`;
     },
@@ -443,6 +445,17 @@ function createBaseRepo(sql: Sql) {
         player_id: r.playerId, reference_price: r.referencePrice, recent_price: r.recentPrice, price_trend7: r.priceTrend7,
         sales30: r.sales30, fair_price: r.fairPrice, value_ratio: r.valueRatio, potential_price: r.potentialPrice, potential_gain: r.potentialGain,
       })))}`;
+    },
+
+    /** Journal du jour (un point par joueur coté, le dernier calcul du jour l'emporte) : sert à vérifier après coup les signaux. */
+    async snapshotMarket(): Promise<void> {
+      await sql`
+        insert into daily_snapshot (player_id, day, reference_price, fair_price, value_ratio, next_fixture_id, next_projected, sorare_projection)
+        select pm.player_id, current_date, pm.reference_price, pm.fair_price, pm.value_ratio, s.next_fixture_id, s.next_projected, p.sorare_projection
+        from player_market pm join players p on p.id = pm.player_id left join player_summary s on s.player_id = pm.player_id
+        on conflict (player_id, day) do update set reference_price = excluded.reference_price, fair_price = excluded.fair_price,
+          value_ratio = excluded.value_ratio, next_fixture_id = excluded.next_fixture_id, next_projected = excluded.next_projected,
+          sorare_projection = excluded.sorare_projection`;
     },
 
     /** Club actuel de chaque joueur. */

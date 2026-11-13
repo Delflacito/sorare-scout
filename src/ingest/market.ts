@@ -76,5 +76,7 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
 export async function recomputeMarket(repo: Repo): Promise<number> {
   const rows = computeMarket(await repo.marketInputs());
   await repo.replacePlayerMarket(rows);
+  // Le journal ne doit pas bloquer l'import (table absente tant que la migration 0022 n'est pas appliquée).
+  await repo.snapshotMarket().catch((e) => console.error(`Journal quotidien non enregistré : ${(e as Error).message}`));
   return rows.length;
 }

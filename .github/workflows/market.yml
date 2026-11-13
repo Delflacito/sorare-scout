@@ -3,7 +3,8 @@ name: Marché des cartes
 concurrency: market
 on:
   schedule:
-    - cron: '23 16 * * *'
+    # Démarre en pratique 4 à 8 h après l'heure demandée : vise l'après-midi.
+    - cron: '23 8 * * *'
   workflow_dispatch:
     inputs:
       ventes:

@@ -85,7 +85,7 @@ function gwKey(d: Date): string {
 // Par championnat : journées dans l'ordre, et pour chaque club ses matchs (pour la forme et la disponibilité).
 interface Gw { key: string; fixtureOfTeam: Map<number, number> }
 const gwsByLeague = new Map<string, Gw[]>();
-const teamGames = new Map<number, { fixture: number; gw: string }[]>();
+const teamGames = new Map<number, { fixture: number; gw: string; league: string }[]>();
 for (const f of fixtures) {
   const key = gwKey(f.date);
   const list = gwsByLeague.get(f.league) ?? [];
@@ -93,11 +93,27 @@ for (const f of fixtures) {
   if (!gw) { gw = { key, fixtureOfTeam: new Map() }; list.push(gw); }
   for (const t of [f.home, f.away]) {
     if (!gw.fixtureOfTeam.has(t)) gw.fixtureOfTeam.set(t, f.id);
-    teamGames.set(t, [...(teamGames.get(t) ?? []), { fixture: f.id, gw: key }]);
+    teamGames.set(t, [...(teamGames.get(t) ?? []), { fixture: f.id, gw: key, league: f.league }]);
   }
   gwsByLeague.set(f.league, list);
 }
 for (const list of gwsByLeague.values()) list.sort((a, b) => a.key.localeCompare(b.key));
+
+// Hors échantillon : l'équipe est choisie sur la première moitié des journées du championnat et jouée sur la seconde.
+// Choisir et tester sur les mêmes matchs gonfle les gains (on achèterait ceux qui viennent de surperformer).
+// STREAK_INSAMPLE=1 : ancien calcul, choix et test sur toute la saison.
+const HOLDOUT = process.env.STREAK_INSAMPLE !== '1';
+const cutOf = new Map([...gwsByLeague].map(([league, list]) => [league, HOLDOUT && list.length ? list[list.length >> 1].key : '']));
+for (const [league, list] of gwsByLeague) gwsByLeague.set(league, list.filter((g) => g.key >= cutOf.get(league)!));
+const isTest = (g: { gw: string; league: string }) => g.gw >= cutOf.get(g.league)!;
+/** Moyenne servant à choisir l'équipe : matchs du club avant la coupure (toute la saison sans coupure). */
+const selectionAvg = new Map<number, number>();
+for (const p of players) {
+  const g = (teamGames.get(p.team) ?? []).filter((x) => !HOLDOUT || !isTest(x)).map((x) => scores.get(`${x.fixture}:${p.id}`) ?? 0);
+  selectionAvg.set(p.id, g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0);
+}
+const seasonLength = new Map([...teamGames].map(([t, g]) => [t, g.length]));
+for (const [t, g] of teamGames) teamGames.set(t, g.filter(isTest)); // à partir d'ici : seulement les matchs joués par l'équipe choisie
 
 /** Scores de la saison d'un joueur, un par match de championnat de son club (0 s'il n'a pas joué). */
 const seasonGames = new Map<number, number[]>();
@@ -105,8 +121,7 @@ for (const p of players) seasonGames.set(p.id, (teamGames.get(p.team) ?? []).map
 /** Pour chaque match du club, le joueur est-il entré en jeu (sinon : blessé, suspendu, non retenu, banc) ? */
 const seasonPlayed = new Map<number, boolean[]>();
 for (const p of players) seasonPlayed.set(p.id, (teamGames.get(p.team) ?? []).map((g) => played.has(`${g.fixture}:${p.id}`)));
-const avgOf = (p: (typeof players)[number]) => { const g = seasonGames.get(p.id)!; return g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0; };
-for (const p of players) p.l15 = avgOf(p); // la sélection se fait sur la moyenne de saison, plus stable que la forme
+for (const p of players) p.l15 = selectionAvg.get(p.id)!; // la sélection se fait sur une moyenne longue, plus stable que la forme
 
 // ——— Effectif acheté pour un budget ———
 type Card = (typeof players)[number];
@@ -192,14 +207,15 @@ function realized(totals: number[], tiers: Tier[]) {
 const now = Date.now();
 const results: Record<string, unknown>[] = [];
 const md: string[] = ['# Rentabilité des streaks rejouée sur la saison', '',
+  HOLDOUT ? 'Hors échantillon : équipes choisies sur la première moitié des journées, gains mesurés sur la seconde (peu de journées : chiffres bruités, mais sans biais de sélection).' : 'Dans l’échantillon (STREAK_INSAMPLE=1) : équipes choisies et testées sur les mêmes matchs, gains surestimés.', '',
   `Calcul du ${new Date().toISOString().slice(0, 10)}. Prix d'achat : planchers actuels. Bonus de carte ${BONUSES.map((b) => `${b * 100} %`).join(' / ')}, capitaine +50 %.`,
-  `« Journées pour amortir » : journées de streaks pour couvrir la perte à la revente (${(1 - RESALE) * 100} % du prix). Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes : calendrier de chaque championnat moins les journées jouées.`, ''];
+  `« Journées pour amortir » : journées de streaks pour couvrir la perte à la revente (${Math.round((1 - RESALE) * 100)} % du prix). Revente supposée en fin de saison : ${RESALE * 100} % du prix d'achat. Journées restantes : calendrier de chaque championnat moins les journées jouées.`, ''];
 for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
   if (gws.length < 4) continue;
   const remaining = await remainingRounds(league);
   // Joueurs réguliers (L15 ≥ 35, matchs manqués comptés à 0) avec une carte de la saison en vente.
-  const pool = players.filter((p) => p.league === league && p.price !== null && p.l15 >= 30 && seasonGames.get(p.id)!.length >= 5);
+  const pool = players.filter((p) => p.league === league && p.price !== null && p.l15 >= 30 && (seasonLength.get(p.team) ?? 0) >= 5);
   // Profil du championnat : parmi les 30 meilleures moyennes, chance de dépasser 60, 70, 80, 90 sur un match.
   const top = [...pool].sort((a, b) => b.l15 - a.l15).slice(0, 30).flatMap((p) => seasonGames.get(p.id)!);
   const share = (x: number) => Math.round((top.filter((v) => v >= x).length / (top.length || 1)) * 100);
@@ -253,7 +269,7 @@ for (const [league, { name, tiers }] of Object.entries(LEAGUES)) {
   const gws = gwsByLeague.get(league) ?? [];
   if (gws.length < 4) continue;
   const remaining = await remainingRounds(league);
-  const pool = players.filter((p) => p.league === league && p.price !== null && seasonGames.get(p.id)!.length >= 5);
+  const pool = players.filter((p) => p.league === league && p.price !== null && (seasonLength.get(p.team) ?? 0) >= 5);
   const clubs = [...new Set(pool.map((p) => p.team))];
   const evaluate = (label: string, clubIds: number[], budget: number, bonus: number) => {
     const team = bestFive(pool.filter((p) => clubIds.includes(p.team)), budget, bonus);
