@@ -15,6 +15,7 @@ import { SalesChart } from '@/components/SalesChart';
 import { seasonStart } from '@/ingest/leagues';
 import { ageAt, fmtDate, fmtPct, fmtScore, indexClass, ratingClass, scoreTier, teamCode } from '@/lib/format';
 import { actionItems, describeActions } from '@/domain/actions';
+import { OtwButton } from '@/components/Otw';
 import { one, oneOf, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +66,7 @@ function Hero({ player }: { player: PlayerDetail }) {
           {first && <span className="pcard-first">{first}</span>}{first && ' '}
           <span className="pcard-last">{last}</span>
         </h1>
+        <OtwButton slug={player.slug} name={player.name} />
         <div className="pcard-pills">
           {player.teamSlug ? (
             <Link href={`/equipes/${player.teamSlug}`} className="pill-link">

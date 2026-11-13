@@ -737,7 +737,7 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .plan-score { font-variant-numeric: tabular-nums; }
 .plan-when { margin-left: auto; font-size: 13px; }
 .plan-summary p { margin: 4px 0 0; }
-.otw-btn { width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700; flex: none; }
+.otw-btn { position: relative; z-index: 1; cursor: pointer; vertical-align: middle; width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700; flex: none; }
 .otw-btn.on { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .gw-row.no-rank:has(> .otw-btn) { grid-template-columns: 26px 40px minmax(0, 1fr) auto; }
 .gw-row.star-row:has(> .otw-btn) { grid-template-columns: 26px 40px minmax(0, 1fr) auto auto; }
