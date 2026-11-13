@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, USER_CARDS_QUERY, playerProfilesQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, USER_CARDS_QUERY, playerProfilesQuery, positionScoresQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -26,11 +26,17 @@ export const SORARE_COMPETITIONS = {
 
 export interface SorareClub { slug: string; name: string; shortName: string | null; pictureUrl: string | null; competitionSlug: string }
 /** Statut actuel d'un joueur (STARTER, REGULAR, SUBSTITUTE, NOT_PLAYING…), blessure, suspension, projection Sorare du prochain match. */
+export interface SorarePositionScore {
+  playerSlug: string; gameId: string; position: GenericPosition; score: number; decisive: number; allAround: number;
+}
+
 export interface SorarePlayerStatus {
   slug: string; pictureUrl: string | null; playingStatus: string | null;
   injury: { kind: string | null; expectedEnd: string | null } | null;
   suspension: { reason: string | null; end: string | null } | null;
   projection: number | null;
+  /** Saisons (année de début) dont il existe des cartes Limited du joueur. */
+  limitedSeasons?: number[];
   nationalTeam: { slug: string; name: string; pictureUrl: string | null } | null;
   /** Poste principal Sorare et postes où ses cartes peuvent être alignées. */
   position: GenericPosition | null;
@@ -39,6 +45,7 @@ export interface SorarePlayerStatus {
 interface RawPlayerStatus {
   slug: string; squaredPictureUrl: string | null; playingStatus: string | null;
   position?: GenericPosition | null; cardPositions?: GenericPosition[] | null;
+  cardSupply?: { season: { startYear: number }; limited: number }[] | null;
   activeInjuries: { kind: string | null; expectedEndDate: string | null }[] | null;
   activeSuspensions: { reason: string | null; endDate: string | null }[] | null;
   nextClassicFixtureProjectedScore: number | null;
@@ -220,8 +227,23 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
             : null,
           position: p.position ?? null,
           cardPositions: p.cardPositions ?? (p.position ? [p.position] : []),
+          limitedSeasons: p.cardSupply ? p.cardSupply.filter((c) => c.limited > 0).map((c) => c.season.startYear) : undefined,
         };
       });
+    },
+
+    /** Score de chaque match récent au barème de chaque poste demandé, par joueur. */
+    async positionScores(slugs: string[], positions: GenericPosition[], last = 40): Promise<SorarePositionScore[]> {
+      type Raw = { slug: string } & Record<string, { score: number | null; anyGame: { id: string } | null; detailedScore: RawScore['detailedScore'] }[] | string>;
+      const d = await query<{ players: (Raw | null)[] }>(positionScoresQuery(positions, last), { slugs });
+      return d.players.flatMap((p) => !p ? [] : positions.flatMap((position, i) =>
+        (p[`p${i}`] as Exclude<Raw[string], string> ?? []).flatMap((g) => {
+          if (!g.anyGame) return [];
+          const details = g.detailedScore ?? [];
+          const sum = (xs: typeof details) => Math.round(xs.reduce((a, x) => a + x.totalScore, 0) * 10) / 10;
+          return [{ playerSlug: p.slug, gameId: g.anyGame.id, position, score: g.score ?? 0,
+            decisive: sum(details.filter((x) => x.stat === 'level_score')), allAround: sum(details.filter((x) => !NOT_ALL_AROUND.has(x.category))) }];
+        })));
     },
 
     async clubGames(clubSlug: string): Promise<SorareGame[]> {

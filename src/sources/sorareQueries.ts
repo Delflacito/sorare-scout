@@ -45,6 +45,7 @@ export const CLUB_PLAYERS_QUERY = `query ClubPlayers($slug: String!) {
     activeInjuries { kind expectedEndDate }
     activeSuspensions { reason endDate }
     nextClassicFixtureProjectedScore
+    cardSupply { season { startYear } limited }
     activeNationalTeam { slug name pictureUrl }
   } } } }
 }`;
@@ -107,3 +108,15 @@ export const USER_CARDS_QUERY = `query UserCards($slug: String!, $after: String,
     nodes { seasonYear anyPlayer { slug displayName ... on Player { activeClub { ... on Club { domesticLeague { slug } } } } } ownershipHistory { transferType amounts { eurCents usdCents gbpCents wei } } }
   } }
 }`;
+
+/**
+ * Scores des derniers matchs de plusieurs joueurs, recalculés avec le barème de chaque poste demandé (Sorare note
+ * différemment un milieu et un attaquant pour le même match). Alias `p0`, `p1`… dans l'ordre de `positions`.
+ */
+export function positionScoresQuery(positions: string[], last: number): string {
+  return `query PositionScores($slugs: [String!]!) {
+  players(slugs: $slugs) { ... on Player { slug
+    ${positions.map((pos, i) => `p${i}: playerGameScores(last: ${last}, position: ${pos}) { score anyGame { id } detailedScore { category stat totalScore } }`).join('\n    ')}
+  } }
+}`;
+}

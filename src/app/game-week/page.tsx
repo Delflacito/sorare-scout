@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getQueries, type GameWeekPlayer, type GameWeekSort } from '@/db/queries';
-import { ClassicHint } from '@/components/ClassicHint';
+import { CardStatusIcon, ClassicHint } from '@/components/ClassicHint';
 import { GENERIC_LABEL_FR, POSITION_LABEL_FR, type GenericPosition } from '@/domain/types';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
 import { ScorePill } from '@/components/ScorePill';
@@ -59,6 +59,7 @@ function PlayerRow({ p, rank, splits }: { p: GameWeekPlayer; rank: number; split
           <Link href={`/joueurs/${p.slug}`}>{p.name}</Link>
           <ClubLogo name={p.team} url={p.teamPictureUrl} size={16} />
           <SplitHint s={splits.get(p.slug)} />
+          <CardStatusIcon status={p.cardStatus} />
           <StatusBadges compact playingStatus={p.playingStatus} injury={null} suspension={null} />
         </div>
         <MatchLine p={p} />

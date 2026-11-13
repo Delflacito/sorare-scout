@@ -1,6 +1,6 @@
 import type { Repo } from '@/db/repo';
 import type { SorareClient } from '@/sources/sorare';
-import { LEAGUES, type League } from './leagues';
+import { LEAGUES, seasonStart, type League } from './leagues';
 
 export interface PlayerStatusesDeps { sorare: SorareClient; repo: Repo }
 
@@ -13,6 +13,7 @@ export async function importPlayerStatuses(deps: PlayerStatusesDeps, leagues: Le
   const errors: string[] = [];
   const nationalTeams = new Map<string, number>();
   const listed: string[] = [];
+  const season = new Date(seasonStart()).getUTCFullYear();
   for (const league of leagues) {
     const competitionId = await deps.repo.upsertCompetition({ slug: league.sorareSlug, name: league.name });
     for (const team of await deps.repo.teamsByCompetition(competitionId)) {
@@ -26,7 +27,8 @@ export async function importPlayerStatuses(deps: PlayerStatusesDeps, leagues: Le
             nationalTeamId = nationalTeams.get(nt.slug) ?? await deps.repo.ensureTeam({ name: nt.name, sorareSlug: nt.slug, pictureUrl: nt.pictureUrl, kind: 'national' });
             nationalTeams.set(nt.slug, nationalTeamId);
           }
-          rows.push({ ...p, nationalTeamId, teamId: team.id });
+          const cardStatus = !p.limitedSeasons ? null : p.limitedSeasons.includes(season) ? 'in_season' as const : p.limitedSeasons.length ? 'classic' as const : 'none' as const;
+          rows.push({ ...p, nationalTeamId, teamId: team.id, cardStatus });
           listed.push(p.slug);
         }
         updated += await deps.repo.updatePlayerStatuses(rows);

@@ -1,3 +1,4 @@
+import { CardStatusIcon } from '@/components/ClassicHint';
 import Link from 'next/link';
 import { getQueries, PAGE_SIZE, SORTS, type PlayerListRow, type Sort } from '@/db/queries';
 import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
@@ -44,6 +45,7 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
           <StatusBadges compact playingStatus={r.playingStatus}
             injury={r.injuryKind ? { kind: r.injuryKind, end: null } : null}
             suspension={r.suspensionReason ? { reason: r.suspensionReason, end: null } : null} />
+          <CardStatusIcon status={r.cardStatus} />
         </div>
         <div className="gw-match">
           {r.team && <ClubLogo name={r.team} url={r.teamPictureUrl} size={16} />}

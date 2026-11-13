@@ -29,6 +29,8 @@ export interface SearchFilters {
   offset: number;
 }
 
+export type CardStatus = 'in_season' | 'classic' | 'none';
+
 export interface PlayerListRow {
   slug: string; name: string; position: GenericPosition; team: string | null; teamSlug: string | null; competition: string | null;
   usualPosition: DetailedPosition | null; l5: number; l15: number; l40: number; startRate: number;
@@ -44,6 +46,8 @@ export interface PlayerListRow {
   cardPositions: GenericPosition[];
   /** Autres postes, accessibles seulement via une carte Classic. */
   classicPositions?: GenericPosition[];
+  /** Cartes Limited existantes : saison en cours, Classic seulement, aucune (null = pas encore relevé). */
+  cardStatus?: CardStatus | null;
 }
 
 export interface GameWeekFixture {
@@ -61,6 +65,8 @@ export interface GameWeekPlayer {
   cardPositions: GenericPosition[];
   /** Autres postes, accessibles seulement via une carte Classic. */
   classicPositions?: GenericPosition[];
+  /** Cartes Limited existantes : saison en cours, Classic seulement, aucune (null = pas encore relevé). */
+  cardStatus?: CardStatus | null;
 }
 /** Concédé par l'adversaire à chaque poste (5 derniers matchs), vu depuis une équipe qui joue la journée. */
 export interface RoundMatchup {
@@ -119,6 +125,8 @@ export interface PlayerDetail {
   cardPositions: GenericPosition[];
   /** Autres postes, accessibles seulement via une carte Classic. */
   classicPositions?: GenericPosition[];
+  /** Cartes Limited existantes : saison en cours, Classic seulement, aucune (null = pas encore relevé). */
+  cardStatus?: CardStatus | null;
   market: PlayerMarketView | null;
   /** Photo détourée de la carte Sorare (à défaut, la photo carrée). */
   bodyPictureUrl: string | null;
@@ -139,6 +147,8 @@ export interface TradingRow {
   slug: string; name: string; pictureUrl: string | null; team: string | null; teamPictureUrl: string | null; cardPositions: GenericPosition[];
   /** Autres postes, accessibles seulement via une carte Classic. */
   classicPositions?: GenericPosition[];
+  /** Cartes Limited existantes : saison en cours, Classic seulement, aucune (null = pas encore relevé). */
+  cardStatus?: CardStatus | null;
   usualPosition: DetailedPosition | null; l5: number; l15: number; startRate: number;
   price: number; fairPrice: number | null; valueRatio: number | null; priceTrend7: number | null; sales30: number;
   potentialPrice: number | null; potentialGain: number | null; nextProjected: number | null;
@@ -157,7 +167,9 @@ export interface MarketPlayerView {
   slug: string; name: string; pictureUrl: string | null; team: string | null; teamSlug: string | null; teamPictureUrl: string | null;
   competition: string | null; competitionSlug: string | null; cardPositions: GenericPosition[];
   /** Autres postes, accessibles seulement via une carte Classic. */
-  classicPositions?: GenericPosition[]; usualPosition: DetailedPosition | null;
+  classicPositions?: GenericPosition[];
+  /** Cartes Limited existantes : saison en cours, Classic seulement, aucune (null = pas encore relevé). */
+  cardStatus?: CardStatus | null; usualPosition: DetailedPosition | null;
   l15: number | null; floorInSeason: number | null; floorClassic: number | null; recentPrice: number | null; price: number | null;
   fairPrice: number | null; valueRatio: number | null; potentialPrice: number | null; potentialGain: number | null; priceTrend7: number | null;
   lastAuction: { eur: number; date: string } | null;
@@ -324,7 +336,7 @@ export function createQueries(sql: postgres.Sql) {
           s.usual_position, s.l5, s.l15, s.l40, s.start_rate5,
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
           p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
-          s.next_projected, array[p.position] as card_positions, p.floor_in_season,
+          s.next_projected, array[p.position] as card_positions, p.card_status, p.floor_in_season,
           (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season order by cs.sold_at desc limit 1) as last_sale
         from players p
         join player_summary s on s.player_id = p.id
@@ -352,7 +364,7 @@ export function createQueries(sql: postgres.Sql) {
         nextIndex: r.next_index, nextLowSample: r.low_sample,
         pictureUrl: r.picture_url, teamPictureUrl: r.team_picture_url, playingStatus: r.playing_status,
         injuryKind: r.injury_kind, suspensionReason: r.suspension_reason, sorareProjection: r.sorare_projection,
-        nextProjected: r.next_projected, cardPositions: r.card_positions, floorInSeason: r.floor_in_season, lastSale: r.last_sale,
+        nextProjected: r.next_projected, cardPositions: r.card_positions, cardStatus: r.card_status, floorInSeason: r.floor_in_season, lastSale: r.last_sale,
       }));
     },
 
@@ -391,7 +403,7 @@ export function createQueries(sql: postgres.Sql) {
           select p.sorare_slug, p.name, g.position, s.usual_position, t.name as team, t.picture_url as team_picture, p.picture_url,
             o.name as opponent, o.picture_url as opponent_picture, fx.home_team_id = t.id as is_home, fx.date,
             s.next_projected, s.start_rate5, s.l15, s.base, p.playing_status, p.sorare_projection,
-            array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions,
+            array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions, p.card_status,
             row_number() over (partition by g.position order by
               ${f.sort === 'boost' ? sql`s.next_projected - s.base` : sql`s.next_projected`} desc, p.name) as rank
           from player_summary s
@@ -413,7 +425,7 @@ export function createQueries(sql: postgres.Sql) {
         team: r.team, teamPictureUrl: r.team_picture, pictureUrl: r.picture_url,
         opponent: r.opponent, opponentPictureUrl: r.opponent_picture, isHome: r.is_home, date: (r.date as Date).toISOString(),
         projected: r.next_projected, startRate: r.start_rate5, l15: r.l15, base: r.base, playingStatus: r.playing_status, sorareProjection: r.sorare_projection,
-        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [],
+        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [], cardStatus: r.card_status,
       }));
     },
 
@@ -508,7 +520,7 @@ export function createQueries(sql: postgres.Sql) {
           p.injury_kind, p.injury_end::text as injury_end, p.suspension_reason, p.suspension_end::text as suspension_end, p.sorare_projection,
           p.birth_date::text as birth_date, p.country_code, p.country_name, p.country_flag_url,
           p.first_name, p.last_name, p.height, p.shirt_number, p.body_picture_url,
-          array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions,
+          array[p.position] as card_positions, array(select x from unnest(p.card_positions) x where x <> p.position) as classic_positions, p.card_status,
           p.floor_in_season, p.floor_classic, pm.reference_price, pm.recent_price, pm.price_trend7, pm.sales30, pm.fair_price,
           pm.value_ratio, pm.potential_price, pm.potential_gain, p.market_updated_at,
           (select json_build_object('eur', cs.price_eur, 'date', cs.sold_at) from card_sales cs
@@ -553,7 +565,7 @@ export function createQueries(sql: postgres.Sql) {
         birthDate: r.birth_date,
         country: r.country_code ? { code: r.country_code, name: r.country_name, flagUrl: r.country_flag_url } : null,
         firstName: r.first_name, lastName: r.last_name, height: r.height, shirtNumber: r.shirt_number, bodyPictureUrl: r.body_picture_url,
-        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [],
+        cardPositions: r.card_positions, classicPositions: r.classic_positions ?? [], cardStatus: r.card_status,
         market: r.market_updated_at ? {
           floorInSeason: r.floor_in_season, floorClassic: r.floor_classic, referencePrice: r.reference_price, recentPrice: r.recent_price,
           priceTrend7: r.price_trend7, sales30: r.sales30 ?? 0, fairPrice: r.fair_price, valueRatio: r.value_ratio,
@@ -636,15 +648,19 @@ export function createQueries(sql: postgres.Sql) {
      * Derniers matchs complets du joueur : ceux où il a une participation, plus ceux de son club actuel où il était absent.
      * Du plus récent au plus ancien.
      */
-    async getPlayerGames(slug: string, limit: number): Promise<PlayerGameView[]> {
+    /** `position` : barème d'un autre poste de carte (scores recalculés par Sorare), sinon celui de la carte de la saison. */
+    async getPlayerGames(slug: string, limit: number, position?: GenericPosition): Promise<PlayerGameView[]> {
       const rows = await sql`
         with p as (select id, team_id from players where sorare_slug = ${slug}),
         games as (
           select f.id, f.date, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals, f.competition_id,
             coalesce(a.team_id, (select team_id from p)) as team_id,
-            a.sorare_score, a.minutes, a.started, a.detailed_position, a.decisive_score, a.all_around_score, a.decisive_actions
+            coalesce(ps.score, a.sorare_score) as sorare_score, a.minutes, a.started, a.detailed_position,
+            coalesce(ps.decisive_score, a.decisive_score) as decisive_score, coalesce(ps.all_around_score, a.all_around_score) as all_around_score,
+            a.decisive_actions
           from fixtures f
           left join appearances a on a.fixture_id = f.id and a.player_id = (select id from p)
+          left join position_scores ps on ps.fixture_id = f.id and ps.player_id = a.player_id and ps.position = ${position ?? null}
           where f.status = 'played' and f.lineups_imported
             and (a.player_id is not null or (select team_id from p) in (f.home_team_id, f.away_team_id))
         )

@@ -21,6 +21,7 @@ export interface PlayerStatusInput {
   teamId?: number | null;
   position?: GenericPosition | null;
   cardPositions?: GenericPosition[];
+  cardStatus?: 'in_season' | 'classic' | 'none' | null;
 }
 export interface PlayerInput { name: string; sorareSlug: string; position: GenericPosition; teamId: number }
 export interface FixtureInput {
@@ -201,16 +202,45 @@ function createBaseRepo(sql: Sql) {
           injury_kind = v.injury_kind, injury_end = v.injury_end, suspension_reason = v.suspension_reason, suspension_end = v.suspension_end,
           sorare_projection = v.projection, national_team_id = v.national_team_id, status_updated_at = now(),
           team_id = coalesce(v.team_id, p.team_id), position = coalesce(v.position, p.position),
-          card_positions = coalesce(v.card_positions, p.card_positions)
+          card_positions = coalesce(v.card_positions, p.card_positions), card_status = coalesce(v.card_status, p.card_status)
         from jsonb_to_recordset(${sql.json(rows.map((r) => ({
           slug: r.slug, picture_url: r.pictureUrl, playing_status: r.playingStatus,
           injury_kind: r.injury?.kind ?? null, injury_end: r.injury?.expectedEnd ?? null,
           suspension_reason: r.suspension?.reason ?? null, suspension_end: r.suspension?.end ?? null,
           projection: r.projection, national_team_id: r.nationalTeamId ?? null, team_id: r.teamId ?? null,
-          position: r.position ?? null, card_positions: r.cardPositions?.length ? r.cardPositions : null,
+          position: r.position ?? null, card_positions: r.cardPositions?.length ? r.cardPositions : null, card_status: r.cardStatus ?? null,
         })))}) as v(slug text, picture_url text, playing_status text, injury_kind text, injury_end date, suspension_reason text,
-          suspension_end date, projection double precision, national_team_id integer, team_id integer, position text, card_positions text[])
+          suspension_end date, projection double precision, national_team_id integer, team_id integer, position text, card_positions text[], card_status text)
         where p.sorare_slug = v.slug`;
+      return res.count;
+    },
+
+    /** Joueurs à plusieurs postes de carte ayant joué cette saison, avec leurs postes. */
+    async multiPositionPlayers(): Promise<{ slug: string; positions: GenericPosition[] }[]> {
+      const rows = await sql`select p.sorare_slug, p.card_positions from players p
+        where cardinality(p.card_positions) > 1 and exists (select 1 from player_summary s where s.player_id = p.id)`;
+      return rows.map((r) => ({ slug: r.sorare_slug, positions: r.card_positions }));
+    },
+
+    /**
+     * Enregistre les scores par poste, puis aligne les apparitions sur le poste de la carte de la saison : toutes les
+     * moyennes et projections du site suivent ainsi le barème de cette carte.
+     */
+    async savePositionScores(rows: { playerSlug: string; gameId: string; position: GenericPosition; score: number; decisive: number; allAround: number }[]): Promise<number> {
+      if (!rows.length) return 0;
+      const res = await sql`
+        insert into position_scores (player_id, fixture_id, position, score, decisive_score, all_around_score)
+        select p.id, f.id, v.position, v.score, v.decisive, v.all_around
+        from jsonb_to_recordset(${sql.json(rows.map((r) => ({ slug: r.playerSlug, game: r.gameId, position: r.position, score: r.score, decisive: r.decisive, all_around: r.allAround })))})
+          as v(slug text, game text, position text, score double precision, decisive double precision, all_around double precision)
+        join players p on p.sorare_slug = v.slug join fixtures f on f.sorare_game_id = v.game
+        on conflict (player_id, fixture_id, position) do update set score = excluded.score,
+          decisive_score = excluded.decisive_score, all_around_score = excluded.all_around_score`;
+      await sql`
+        update appearances a set sorare_score = ps.score, decisive_score = ps.decisive_score, all_around_score = ps.all_around_score
+        from position_scores ps join players p on p.id = ps.player_id
+        where ps.player_id = a.player_id and ps.fixture_id = a.fixture_id and ps.position = p.position
+          and (a.sorare_score, a.decisive_score, a.all_around_score) is distinct from (ps.score, ps.decisive_score, ps.all_around_score)`;
       return res.count;
     },
 

@@ -86,6 +86,18 @@ describe('client Sorare', () => {
     ]);
   });
 
+  it('scores par poste : un alias par poste, décisif et all-around tirés du détail', async () => {
+    const game = (score: number) => ({ score, anyGame: { id: 'Game:g1' }, detailedScore: [
+      { category: 'UNKNOWN', stat: 'level_score', totalScore: 35 }, { category: 'PASSING', stat: 'x', totalScore: score - 35 }] });
+    const f = fakeFetch([[/PositionScores/, { data: { players: [{ slug: 'moleiro', p0: [game(32.1)], p1: [game(27.7)] }, null] } }]]);
+    const rows = await createSorareClient('k', f.impl).positionScores(['moleiro', 'inconnu'], ['Forward', 'Midfielder'], 5);
+    expect(f.requests[0].body.query).toMatch(/p1: playerGameScores\(last: 5, position: Midfielder\)/);
+    expect(rows).toEqual([
+      { playerSlug: 'moleiro', gameId: 'Game:g1', position: 'Forward', score: 32.1, decisive: 35, allAround: -2.9 },
+      { playerSlug: 'moleiro', gameId: 'Game:g1', position: 'Midfielder', score: 27.7, decisive: 35, allAround: -7.3 },
+    ]);
+  });
+
   it('profils : naissance, nationalité, saisons jouées (une requête pour plusieurs joueurs)', async () => {
     const f = fakeFetch([[/PlayerProfiles/, fixture('player-profiles')]]);
     const profiles = await createSorareClient('k', f.impl).playerProfiles(['kylian-mbappe-lottin', 'inconnu'], [2026, 2025, 2024]);

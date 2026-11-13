@@ -334,6 +334,9 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
   font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #5b7cfa, #b06ef7); }
 .season-chip.classic { background: var(--neutral-bg); color: var(--text); border: 1px solid var(--border); }
 .classic-hint { display: inline-flex; align-items: center; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600; background: var(--warning-bg); color: var(--warning); border: 1px solid currentColor; cursor: help; }
+.card-status { display: inline-flex; align-items: center; cursor: help; }
+.card-status.is-off { padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 800; color: var(--warning); border: 1px solid currentColor; text-decoration: line-through; text-decoration-thickness: 2px; }
+.card-status.no-card { color: var(--critical); }
 .market-estimates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .market-estimates strong { display: block; font-size: 22px; margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
 .badge-pill.neutral { background: var(--neutral-bg); color: var(--ink-2); }
