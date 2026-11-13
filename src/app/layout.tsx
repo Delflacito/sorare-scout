@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { DataFooter } from '@/components/DataFooter';
-import { NavTabs, SubTabs } from '@/components/NavTabs';
+import { NavTabs } from '@/components/NavTabs';
 import { PlayerSearch } from '@/components/PlayerSearch';
 import { TableSort } from '@/components/TableSort';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -24,7 +24,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <PlayerSearch />
           <ThemeToggle />
         </header>
-        <SubTabs />
         <div id="contenu" tabIndex={-1}>{children}</div>
         <DataFooter />
         <TableSort />
