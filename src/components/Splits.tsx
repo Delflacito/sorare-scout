@@ -42,8 +42,23 @@ export function SplitHint({ s: all }: { s: PlayerSplits | undefined }) {
       {tone === 'good' ? '▲' : tone === 'bad' ? '▼' : '◆'}
       <span className="split-pop" role="tooltip">
         <NoteTags s={s} />
-        {ctx && <span className="split-ctx">Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} · max ${fmtScore(c.max)} · ${fmtDecisive(s.goalkeeper, c.decisive)} (${c.games} m.)` : ' · pas encore joué'}</span>}
+        {ctx && (
+          <span className="split-ctx">
+            <span>Prochain <strong>{ctx}</strong>{c ? ` · moy. ${fmtScore(c.score)} · max ${fmtScore(c.max)}` : ' · pas encore joué'}</span>
+            {c && <CellStats c={c} gk={s.goalkeeper} />}
+          </span>
+        )}
       </span>
+    </span>
+  );
+}
+
+/** Pastille du nombre de matchs, à gauche de l'AA et de l'indicateur décisif empilés. */
+function CellStats({ c, gk }: { c: SplitCell; gk: boolean }) {
+  return (
+    <span className="split-stats">
+      <span className="split-games" title={`${c.games} match${c.games > 1 ? 's' : ''}`}>{c.games} m.</span>
+      <span className="split-lines"><span>AA {fmtScore(c.allAround)}</span><span>{fmtDecisive(gk, c.decisive)}</span></span>
     </span>
   );
 }
@@ -54,8 +69,7 @@ function Cell({ c, next, gk }: { c: SplitCell | null; next?: boolean; gk: boolea
       {c ? (
         <>
           <ScorePill score={c.score} size="sm" />
-          <span className="split-sub">AA {fmtScore(c.allAround)} · {fmtDecisive(gk, c.decisive)}</span>
-          <span className="split-sub">{c.games} m.</span>
+          <CellStats c={c} gk={gk} />
         </>
       ) : '—'}
     </td>
