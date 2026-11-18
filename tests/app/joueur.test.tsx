@@ -113,6 +113,12 @@ describe('/joueurs/[slug]', () => {
     expect(screen.queryByText('Titularisations')).not.toBeInTheDocument();
   });
 
+  it('aperçu : forme lue chez Sorare quand elle est importée', async () => {
+    getPlayer.mockResolvedValue({ ...player, averages: { l5: 71, l10: 64, l15: 60, l20: 58, l50: 55 } });
+    render(await Page(params('nuno-mendes')));
+    expect(within(screen.getByTestId('form-L10')).getByText('64')).toBeInTheDocument();
+  });
+
   it('statistiques : temps de jeu et performance', async () => {
     render(await Page(params('nuno-mendes', 'statistiques')));
     expect(screen.getByRole('link', { name: 'Statistiques' })).toHaveAttribute('aria-current', 'page');

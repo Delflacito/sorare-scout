@@ -147,17 +147,19 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
 }
 
 /** Forme compacte dans l'encart profil : L5 / L10 / L20 / L50 et part de matchs joués ; mini-barres des 5 derniers matchs. */
-function FormLine({ games }: { games: PlayerGameView[] }) {
-  if (!games.length) return null;
+function FormLine({ player, games }: { player: PlayerDetail; games: PlayerGameView[] }) {
+  if (!games.length && !player.averages) return null;
   return (
     <div className="pcard-form" aria-label="Forme">
       <div className="pcard-form-cols">
         {WINDOWS.map(([label, n]) => {
           const r = lastN(games, n);
+          // Moyenne Sorare (remonte au-delà de la saison) ; à défaut, celle des matchs de la saison en base.
+          const average = player.averages ? player.averages[`l${n}`] : r.average;
           return (
             <div key={label} className="card-col" data-testid={`form-${label}`}>
               <div className="card-col-label">{label}</div>
-              {r.average === null ? <div className="card-col-sub">—</div> : <ScorePill score={r.average} size="sm" />}
+              {average === null ? <div className="card-col-sub">—</div> : <ScorePill score={average} size="sm" />}
               <div className="card-col-sub">{r.playedRate === null ? '—' : fmtPct(r.playedRate)}</div>
             </div>
           );
@@ -370,7 +372,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
 
   return (
     <main className="player-page">
-      <Hero player={player}>{tab === 'apercu' && <><FormLine games={games} /><NextMatch player={player} upcoming={upcoming} /></>}</Hero>
+      <Hero player={player}>{tab === 'apercu' && <><FormLine player={player} games={games} /><NextMatch player={player} upcoming={upcoming} /></>}</Hero>
 
       <nav className="tabs" aria-label="Sections de la fiche">
         {TABS.map(([key, label]) => (

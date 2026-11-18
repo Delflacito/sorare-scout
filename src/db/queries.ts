@@ -113,6 +113,8 @@ export interface PlayerSummaryView {
 export interface PlayerDetail {
   slug: string; name: string; position: GenericPosition; team: string | null; teamSlug: string | null; competition: string | null;
   usualPosition: DetailedPosition | null; summary: PlayerSummaryView | null;
+  /** L5…L50 de Sorare : x derniers matchs joués, saisons précédentes comprises (null tant que l'import ne les a pas lus). */
+  averages?: Record<'l5' | 'l10' | 'l15' | 'l20' | 'l50', number | null> | null;
   positions: { position: DetailedPosition; count: number }[];
   next: { opponent: string; opponentSlug: string; isHome: boolean; date: string } | null;
   nextConceded: ConcededView | null;
@@ -551,6 +553,8 @@ export function createQueries(sql: postgres.Sql) {
           where a.player_id = ${r.id} and a.started and a.detailed_position is not null
           order by f.date desc limit 10
         ) recent group by detailed_position order by count desc`;
+      // shortcut: table créée par l'import (migration 0024) ; tant qu'elle manque, la fiche retombe sur les matchs de la saison.
+      const [averages] = await sql`select l5, l10, l15, l20, l50 from player_averages where player_id = ${r.id}`.catch(() => []);
       const [conceded] = r.opponent_id && r.usual_position
         ? await sql`select * from team_conceded_by_position
             where team_id = ${r.opponent_id} and detailed_position = ${r.usual_position} and window_size = 5`
@@ -563,6 +567,7 @@ export function createQueries(sql: postgres.Sql) {
           startRate15: r.start_rate15, avgMinutes15: r.avg_minutes15, decisive5: r.decisive5, allAround5: r.all_around5,
           decisive15: r.decisive15, allAround15: r.all_around15,
         },
+        averages: averages ? { l5: averages.l5, l10: averages.l10, l15: averages.l15, l20: averages.l20, l50: averages.l50 } : null,
         positions: positions.map((x) => ({ position: x.detailed_position, count: x.count })),
         next: r.next_opponent
           ? { opponent: r.next_opponent, opponentSlug: r.next_opponent_slug, isHome: r.is_home, date: (r.next_date as Date).toISOString() }
