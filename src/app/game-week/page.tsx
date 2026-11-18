@@ -67,7 +67,7 @@ function PlayerRow({ p, rank, splits }: { p: GameWeekPlayer; rank: number; split
           <span>{fmtDate(p.date)}</span>
           <ClassicHint positions={p.classicPositions} />
           {p.usualPosition && <span className="gw-meta-pos" title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
-          <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(p.base)}</span>
+          <span><abbr title="Moyenne des 15 dernières notes (matchs joués)">L15</abbr> {fmtScore(p.base)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(p.startRate)}</span>
           {p.sorareProjection !== null && <span className="gw-meta-sorare"><abbr title="Projection officielle de Sorare">Sorare</abbr> {Math.round(p.sorareProjection)}</span>}
         </div>

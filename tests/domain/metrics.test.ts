@@ -7,17 +7,17 @@ const pg = (id: string, score: number, extra: Partial<PlayerGame> = {}): PlayerG
 const games5 = [tg('f1', 1), tg('f2', 2), tg('f3', 3), tg('f4', 4), tg('f5', 5)];
 
 describe('lastN', () => {
-  it('match sans participation compte 0', () => {
-    const r = lastN(games5, [pg('f1', 60), pg('f3', 40), pg('f5', 50)], 5);
-    expect(r.average).toBe(30);
-    expect(r.games).toBe(5);
+  it('moyenne des notes : un match sans jouer ne compte pas', () => {
+    const r = lastN(games5, [pg('f1', 60), pg('f3', 40), pg('f5', 50), pg('f4', 0, { minutes: 0 })], 5);
+    expect(r.average).toBe(50);
+    expect(r.games).toBe(3);
   });
   it('fenêtre plus grande que l’historique', () => {
-    expect(lastN(games5, [pg('f1', 50)], 10).games).toBe(5);
+    expect(lastN(games5, [pg('f1', 50)], 10).games).toBe(1);
   });
-  it('garde les n plus récents', () => {
-    const r = lastN(games5, [pg('f1', 100), pg('f5', 40)], 2);
-    expect(r.average).toBe(20);
+  it('garde les n dernières notes, même au-delà des n derniers matchs d’équipe', () => {
+    const r = lastN(games5, [pg('f1', 100), pg('f2', 80), pg('f5', 40)], 2);
+    expect(r.average).toBe(60);
   });
   it('transfert : matchs de deux clubs successifs', () => {
     const games = [tg('a1', 1, 'A'), tg('a2', 2, 'A'), tg('b1', 3, 'B'), tg('b2', 4, 'B'), tg('b3', 5, 'B')];

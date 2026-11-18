@@ -38,13 +38,17 @@ const fmtVenue = (factor: number) => {
   return pct > 0 ? `+${pct} %` : pct < 0 ? `−${-pct} %` : '0 %';
 };
 
-/** Derniers matchs d'équipe (absences comprises) : moyenne des matchs joués, part de matchs joués, buts et passes. */
+const WINDOWS = [['L5', 5], ['L10', 10], ['L20', 20], ['L50', 50]] as const;
+
+/** Moyenne des n dernières notes (matchs joués), part de matchs joués sur les n derniers matchs d'équipe, buts et passes. */
 function lastN(games: PlayerGameView[], n: number) {
   const recent = games.slice(0, n);
   const played = recent.filter((g) => g.status !== 'absent');
+  const notes = games.filter((g) => g.status !== 'absent').slice(0, n);
   const sum = (stat: string) => recent.reduce((t, g) => t + (g.actions[stat] ?? 0), 0);
   return {
     games: recent.length, played: played.length,
+    average: notes.length ? notes.reduce((t, g) => t + g.score, 0) / notes.length : null,
     playedRate: recent.length ? played.length / recent.length : null,
     goals: sum('goals'), assists: sum('goal_assist'),
   };
@@ -142,20 +146,18 @@ function NextMatch({ player, upcoming }: { player: PlayerDetail; upcoming: Upcom
   );
 }
 
-/** Forme compacte dans l'encart profil : L5 / L15 / L40 et part de matchs joués ; mini-barres des 5 derniers matchs. */
-function FormLine({ player, games }: { player: PlayerDetail; games: PlayerGameView[] }) {
-  const s = player.summary;
-  if (!s) return null;
-  const cols: [string, number, number][] = [['L5', s.l5, 5], ['L15', s.l15, 15], ['L40', s.l40, 40]];
+/** Forme compacte dans l'encart profil : L5 / L10 / L20 / L50 et part de matchs joués ; mini-barres des 5 derniers matchs. */
+function FormLine({ games }: { games: PlayerGameView[] }) {
+  if (!games.length) return null;
   return (
     <div className="pcard-form" aria-label="Forme">
       <div className="pcard-form-cols">
-        {cols.map(([label, value, n]) => {
+        {WINDOWS.map(([label, n]) => {
           const r = lastN(games, n);
           return (
             <div key={label} className="card-col" data-testid={`form-${label}`}>
               <div className="card-col-label">{label}</div>
-              <ScorePill score={value} size="sm" />
+              {r.average === null ? <div className="card-col-sub">—</div> : <ScorePill score={r.average} size="sm" />}
               <div className="card-col-sub">{r.playedRate === null ? '—' : fmtPct(r.playedRate)}</div>
             </div>
           );
@@ -195,14 +197,14 @@ function RegularityCard({ games }: { games: PlayerGameView[] }) {
   );
 }
 
-/** Performance : buts et passes décisives sur les 5, 15 et 40 derniers matchs. */
+/** Performance : buts et passes décisives sur les 5, 10, 20 et 50 derniers matchs. */
 function PerformanceCard({ games }: { games: PlayerGameView[] }) {
   if (!games.length) return null;
   return (
     <section className="card">
       <h2 className="card-title">Performance <span>Buts + passes</span></h2>
       <div className="card-cols">
-        {([['L5', 5], ['L15', 15], ['L40', 40]] as const).map(([label, n]) => {
+        {WINDOWS.map(([label, n]) => {
           const r = lastN(games, n);
           return (
             <div key={label} className="card-col">
@@ -368,7 +370,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
 
   return (
     <main className="player-page">
-      <Hero player={player}>{tab === 'apercu' && <><FormLine player={player} games={games} /><NextMatch player={player} upcoming={upcoming} /></>}</Hero>
+      <Hero player={player}>{tab === 'apercu' && <><FormLine games={games} /><NextMatch player={player} upcoming={upcoming} /></>}</Hero>
 
       <nav className="tabs" aria-label="Sections de la fiche">
         {TABS.map(([key, label]) => (

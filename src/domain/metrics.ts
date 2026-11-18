@@ -48,8 +48,9 @@ function recent(teamGames: TeamGame[], played: PlayerGame[], n: number): (Player
     .map((g) => byFixture.get(g.fixtureId));
 }
 
+/** Moyenne des n dernières notes (matchs réellement joués) : un match sans jouer ne compte pas, comme le L5/L15 de Sorare. */
 export function lastN(teamGames: TeamGame[], played: PlayerGame[], n: number) {
-  const scores = recent(teamGames, played, n).map((p) => p?.score ?? 0);
+  const scores = recent(teamGames, played.filter((p) => p.minutes > 0), Infinity).filter((p) => p !== undefined).slice(0, n).map((p) => p.score);
   const average = mean(scores);
   const stdDev = Math.sqrt(mean(scores.map((s) => (s - average) ** 2)));
   return { average, stdDev, games: scores.length };

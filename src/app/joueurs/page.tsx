@@ -64,8 +64,8 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
         </div>
         <div className="gw-meta">
           <span><abbr title="Moyenne des 5 derniers matchs">L5</abbr> {fmtScore(r.l5)}</span>
-          <span><abbr title="Moyenne des 15 derniers matchs">L15</abbr> {fmtScore(r.l15)}</span>
-          <span className="gw-meta-pos"><abbr title="Moyenne des 40 derniers matchs">L40</abbr> {fmtScore(r.l40)}</span>
+          <span><abbr title="Moyenne des 15 dernières notes (matchs joués)">L15</abbr> {fmtScore(r.l15)}</span>
+          <span className="gw-meta-pos"><abbr title="Moyenne des 40 dernières notes (matchs joués)">L40</abbr> {fmtScore(r.l40)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(r.startRate)}</span>
           <span title="Carte de la saison la moins chère en vente">Plancher {r.floorInSeason === null ? '—' : fmtEur(r.floorInSeason)}</span>
           <span title="Dernière vente d’une carte de la saison">Dernier achat {r.lastSale === null ? '—' : fmtEur(r.lastSale)}</span>

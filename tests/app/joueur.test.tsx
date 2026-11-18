@@ -105,7 +105,9 @@ describe('/joueurs/[slug]', () => {
   it('aperçu : carte Forme', async () => {
     render(await Page(params('nuno-mendes')));
     const l5 = screen.getByTestId('form-L5');
-    expect(within(l5).getByText('62')).toHaveClass('t55');
+    // moyenne des 3 notes (70, 44, 81,5), le match sans jouer ne compte pas
+    expect(within(l5).getByText('65')).toBeInTheDocument();
+    expect(screen.getByTestId('form-L50')).toBeInTheDocument();
     // 4 derniers matchs d'équipe, 3 joués
     expect(within(l5).getByText('75 %')).toBeInTheDocument();
     expect(screen.queryByText('Titularisations')).not.toBeInTheDocument();
