@@ -21,18 +21,24 @@ export function PlayerSearch() {
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [q]);
 
-  const go = (value: string) => {
-    const hit = hits.find((h) => h.name === value) ?? (value === q ? hits[0] : undefined);
+  const open = (hit: Hit | undefined) => {
     if (hit) { setQ(''); setHits([]); router.push(`/joueurs/${hit.slug}`); }
   };
 
+  // Liste dessinée par le site plutôt qu'une <datalist> : Safari iOS n'ouvre pas la fiche au toucher d'une suggestion.
   return (
-    <form role="search" className="player-search" onSubmit={(e) => { e.preventDefault(); go(q); }}>
-      <input type="search" list="player-search-hits" placeholder="Rechercher un joueur…" aria-label="Rechercher un joueur"
-        value={q} onChange={(e) => { setQ(e.target.value); if (hits.some((h) => h.name === e.target.value)) go(e.target.value); }} />
-      <datalist id="player-search-hits">
-        {hits.map((h) => <option key={h.slug} value={h.name}>{h.team ?? ''}</option>)}
-      </datalist>
+    <form role="search" className="player-search" onSubmit={(e) => { e.preventDefault(); open(hits[0]); }}>
+      <input type="search" placeholder="Rechercher un joueur…" aria-label="Rechercher un joueur" autoComplete="off"
+        value={q} onChange={(e) => setQ(e.target.value)} />
+      {hits.length > 0 && (
+        <ul className="player-search-hits" aria-label="Suggestions">
+          {hits.map((h) => (
+            <li key={h.slug}>
+              <button type="button" onClick={() => open(h)}>{h.name}{h.team && <small>{h.team}</small>}</button>
+            </li>
+          ))}
+        </ul>
+      )}
     </form>
   );
 }
