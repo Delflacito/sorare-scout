@@ -141,3 +141,15 @@ export function regularity(scores: number[], thresholds: readonly number[] = REG
   if (!scores.length) return null;
   return thresholds.map((t) => ({ threshold: t, rate: scores.filter((s) => s >= t).length / scores.length }));
 }
+
+export const AVERAGE_WINDOWS = [5, 10, 15, 20, 50] as const;
+
+/**
+ * L5…L50 de Sorare : moyenne des x derniers matchs joués (minutes > 0), du plus récent au plus ancien.
+ * Fenêtre non remplie : moyenne des matchs disponibles ; aucun match joué → null.
+ */
+export function playedAverages(games: { score: number; minutes: number }[]) {
+  const played = games.filter((g) => g.minutes > 0).map((g) => g.score);
+  const avg = (n: number) => { const xs = played.slice(0, n); return xs.length ? mean(xs) : null; };
+  return { l5: avg(5), l10: avg(10), l15: avg(15), l20: avg(20), l50: avg(50), played: played.length };
+}

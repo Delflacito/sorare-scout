@@ -216,6 +216,27 @@ function createBaseRepo(sql: Sql) {
     },
 
     /** Joueurs à plusieurs postes de carte ayant joué cette saison, avec leurs postes. */
+    /** Joueurs suivis, ceux dont les moyennes Sorare sont absentes ou les plus anciennes d'abord. */
+    async averagesQueue(): Promise<string[]> {
+      const rows = await sql`select p.sorare_slug from players p
+        join player_summary s on s.player_id = p.id left join player_averages a on a.player_id = p.id
+        order by a.updated_at nulls first`;
+      return rows.map((r) => r.sorare_slug);
+    },
+
+    async savePlayerAverages(rows: { slug: string; l5: number | null; l10: number | null; l15: number | null; l20: number | null; l50: number | null; played: number }[]): Promise<number> {
+      if (!rows.length) return 0;
+      const res = await sql`
+        insert into player_averages (player_id, l5, l10, l15, l20, l50, played, updated_at)
+        select p.id, v.l5, v.l10, v.l15, v.l20, v.l50, v.played, now()
+        from jsonb_to_recordset(${sql.json(rows)})
+          as v(slug text, l5 double precision, l10 double precision, l15 double precision, l20 double precision, l50 double precision, played integer)
+        join players p on p.sorare_slug = v.slug
+        on conflict (player_id) do update set l5 = excluded.l5, l10 = excluded.l10, l15 = excluded.l15, l20 = excluded.l20,
+          l50 = excluded.l50, played = excluded.played, updated_at = now()`;
+      return res.count;
+    },
+
     async multiPositionPlayers(): Promise<{ slug: string; positions: GenericPosition[] }[]> {
       const rows = await sql`select p.sorare_slug, p.card_positions from players p
         where cardinality(p.card_positions) > 1 and exists (select 1 from player_summary s where s.player_id = p.id)`;

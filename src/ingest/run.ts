@@ -11,6 +11,7 @@ import { importMarket, recomputeMarket } from './market';
 import { recomputeAggregates } from './aggregates';
 import { importPositionScores } from './positionScores';
 import { seasonStart } from './leagues';
+import { importAverages } from './averages';
 import { createQueries } from '@/db/queries';
 import { sendAlert } from './alert';
 
@@ -24,6 +25,8 @@ async function main() {
   const repo = createRepo(sql);
   const deps = { repo, sorare: createSorareClient(process.env.SORARE_API_KEY) };
   const deadline = Date.now() + BUDGET_MINUTES * 60_000;
+  // shortcut: seule migration appliquée par l'import (idempotente) ; les autres restent à appliquer à la main.
+  await sql.file('supabase/migrations/0024_player_averages.sql');
   const runId = await repo.startRun();
   try {
     // Chaque jour : suit les promotions / relégations.
@@ -40,13 +43,16 @@ async function main() {
     const byPosition = await importPositionScores(deps, { deadline: Date.now() + 10 * 60_000 });
     console.log(`Scores par poste : ${byPosition.saved}`);
     const agg = await recomputeAggregates(repo);
+    // L5…L50 de Sorare (matchs joués, en remontant au-delà de la saison) : 15 minutes au plus, repris le lendemain.
+    const averages = await importAverages(deps, { deadline: Date.now() + 15 * 60_000 });
+    console.log(`Moyennes L5…L50 : ${averages.saved}`);
     // Marché après les agrégats : la valeur estimée et le potentiel s'appuient sur les résumés et le prochain match.
     const market = await importMarket(deps, { deadline: Date.now() + 20 * 60_000, concurrency: 3 });
     const priced = await recomputeMarket(repo);
     console.log(`Marché : ${market.updated} joueurs, ${priced} cotés`);
     // Une alerte ratée ne doit pas faire échouer l'import.
     await sendAlert(createQueries(sql)).then((sent) => console.log(sent ? 'Alerte envoyée' : 'Pas d’alerte'), (e) => console.error(`Alerte non envoyée : ${(e as Error).message}`));
-    await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors, ...byPosition.errors, ...market.errors]);
+    await repo.finishRun(runId, 'ok', result.fixturesImported, [...result.errors, ...statuses.errors, ...profiles.errors, ...byPosition.errors, ...averages.errors, ...market.errors]);
     console.log(`Clubs : ${clubs}, matchs importés : ${result.fixturesImported}, joueurs : ${agg.players}, lignes concédées : ${agg.conceded}`);
     for (const e of result.errors) console.log(`  erreur : ${e}`);
   } catch (e) {

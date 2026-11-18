@@ -1,6 +1,6 @@
 import type { GenericPosition } from '@/domain/types';
 import { fetchWithRetry } from './http';
-import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, USER_CARDS_QUERY, playerProfilesQuery, positionScoresQuery } from './sorareQueries';
+import { CLUBS_QUERY, CLUB_GAMES_QUERY, CLUB_PLAYERS_QUERY, EXCHANGE_RATES_QUERY, GAME_DETAIL_QUERY, NATIONAL_TEAM_GAMES_QUERY, PLAYER_FLOORS_QUERY, PLAYER_OFFERS_QUERY, PLAYER_SALES_QUERY, USER_CARDS_QUERY, playerProfilesQuery, positionScoresQuery, recentScoresQuery } from './sorareQueries';
 
 export const SORARE_URL = 'https://api.sorare.com/graphql';
 
@@ -244,6 +244,18 @@ export function createSorareClient(apiKey: string | undefined, fetchImpl: typeof
           return [{ playerSlug: p.slug, gameId: g.anyGame.id, position, score: g.score ?? 0,
             decisive: sum(details.filter((x) => x.stat === 'level_score')), allAround: sum(details.filter((x) => !NOT_ALL_AROUND.has(x.category))) }];
         })));
+    },
+
+    /** Dernières notes de chaque joueur (matchs joués ou non), du plus récent au plus ancien. */
+    async recentScores(slugs: string[], last = 60): Promise<{ slug: string; games: { date: string; score: number; minutes: number }[] }[]> {
+      type Raw = { slug: string; playerGameScores: { score: number | null; anyGame: { date: string } | null; anyPlayerGameStats: { minsPlayed?: number | null } | null }[] | null };
+      const d = await query<{ players: (Raw | null)[] }>(recentScoresQuery(last), { slugs });
+      return d.players.flatMap((p) => !p ? [] : [{
+        slug: p.slug,
+        games: (p.playerGameScores ?? []).flatMap((g) => g.anyGame
+          ? [{ date: g.anyGame.date, score: g.score ?? 0, minutes: g.anyPlayerGameStats?.minsPlayed ?? 0 }] : [])
+          .sort((a, b) => Date.parse(b.date) - Date.parse(a.date)),
+      }]);
     },
 
     async clubGames(clubSlug: string): Promise<SorareGame[]> {

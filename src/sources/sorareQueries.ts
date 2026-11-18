@@ -120,3 +120,12 @@ export function positionScoresQuery(positions: string[], last: number): string {
   } }
 }`;
 }
+
+/** Dernières notes de plusieurs joueurs, toutes compétitions, avec date et minutes (pour écarter les matchs non joués). */
+export function recentScoresQuery(last: number): string {
+  return `query RecentScores($slugs: [String!]!) {
+  players(slugs: $slugs) { ... on Player { slug
+    playerGameScores(last: ${last}) { score anyGame { date } anyPlayerGameStats { ... on PlayerGameStats { minsPlayed } } }
+  } }
+}`;
+}

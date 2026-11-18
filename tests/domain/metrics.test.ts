@@ -1,4 +1,4 @@
-import { lastN, playingTime, regularity, scoreBreakdown, concededByPosition, concededOverall, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
+import { playedAverages, lastN, playingTime, regularity, scoreBreakdown, concededByPosition, concededOverall, type TeamGame, type PlayerGame, type ConcededObs } from '@/domain/metrics';
 
 const tg = (id: string, day: number, teamId = 'A'): TeamGame => ({ fixtureId: id, date: `2026-10-${String(day).padStart(2, '0')}T20:00:00Z`, teamId });
 const pg = (id: string, score: number, extra: Partial<PlayerGame> = {}): PlayerGame => ({
@@ -101,5 +101,18 @@ describe('régularité', () => {
   it('part des matchs au-dessus de 40, 50 et 60 points', () => {
     expect(regularity([30, 45, 55, 65])).toEqual([{ threshold: 40, rate: 0.75 }, { threshold: 50, rate: 0.5 }, { threshold: 60, rate: 0.25 }]);
     expect(regularity([])).toBeNull();
+  });
+});
+
+describe('playedAverages', () => {
+  it('moyenne des x derniers matchs joués, les matchs non joués écartés', () => {
+    const games = [{ score: 80, minutes: 90 }, { score: 0, minutes: 0 }, { score: 40, minutes: 20 }, ...Array(20).fill({ score: 50, minutes: 90 })];
+    const r = playedAverages(games);
+    expect(r.l5).toBe((80 + 40 + 50 * 3) / 5);
+    expect(r.l50).toBe((80 + 40 + 50 * 20) / 22);
+    expect(r.played).toBe(22);
+  });
+  it('aucun match joué → null', () => {
+    expect(playedAverages([{ score: 0, minutes: 0 }]).l10).toBeNull();
   });
 });
