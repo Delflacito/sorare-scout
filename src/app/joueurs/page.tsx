@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 
 const GENERIC = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
 const SORT_LABEL: Record<Sort, string> = {
-  projected: 'Score potentiel', nextIndex: 'Adversaire le plus facile', l5: 'L5', l15: 'L15', l40: 'L40', startRate: '% titu',
+  projected: 'Score potentiel', nextIndex: 'Adversaire le plus facile', l5: 'L5', l10: 'L10', l40: 'L40', startRate: '% titu',
 };
 
 /** Facilité du prochain adversaire à ce poste : points qu'il concède par rapport à la moyenne de la ligue. */
@@ -64,7 +64,7 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
         </div>
         <div className="gw-meta">
           <span><abbr title="Moyenne des 5 derniers matchs">L5</abbr> {fmtScore(r.l5)}</span>
-          <span><abbr title="Moyenne des 15 dernières notes (matchs joués)">L15</abbr> {fmtScore(r.l15)}</span>
+          <span><abbr title="Moyenne des 10 derniers matchs joués (saisons précédentes comprises)">L10</abbr> {r.l10 === null ? '—' : fmtScore(r.l10)}</span>
           <span className="gw-meta-pos"><abbr title="Moyenne des 40 dernières notes (matchs joués)">L40</abbr> {fmtScore(r.l40)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(r.startRate)}</span>
           <span title="Carte de la saison la moins chère en vente">Plancher {r.floorInSeason === null ? '—' : fmtEur(r.floorInSeason)}</span>

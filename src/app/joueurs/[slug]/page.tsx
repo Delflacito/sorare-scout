@@ -285,7 +285,7 @@ function UpcomingTable({ upcoming }: { upcoming: UpcomingView }) {
         </table>
       </div>
       <p className="note">
-        Score potentiel s’il joue = niveau L15 {upcoming.base === null ? '—' : fmtScore(upcoming.base)} (matchs joués)
+        Score potentiel s’il joue = niveau habituel {upcoming.base === null ? '—' : fmtScore(upcoming.base)} (matchs joués)
         × lieu (sa moyenne à domicile / à l’extérieur, ramenée vers l’avantage du championnat s’il a peu de matchs)
         × adversaire (40 % points concédés au poste, 60 % qualité générale ; adversaire moyen = ×1).
         Qualité adverse : note 1–100, 100 = adversaire le plus fort.
@@ -392,7 +392,7 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
             <p className="empty">Pas encore de match importé pour ce joueur</p>
           )}
           {splits && <Fold id="lieu" title="Lieu et adversaire" defaultOpen={false}><SplitsCard s={splits} /></Fold>}
-          <Fold id="scores" title="Scores Sorare"><ScoreChart games={games} l15={s?.l15 ?? null} byPosition={byPosition} /></Fold>
+          <Fold id="scores" title="Scores Sorare"><ScoreChart games={games} l10={player.averages?.l10 ?? null} byPosition={byPosition} /></Fold>
           {s && <Fold id="regularite" title="Régularité"><RegularityCard games={games} /></Fold>}
         </>
       )}
@@ -412,9 +412,9 @@ export default async function JoueurPage({ params, searchParams }: { params: Pro
           <SalesChart sales={sales} season={season} />
           <p className="note">
             Plancher : carte Limited la moins chère en vente ({String(season % 100).padStart(2, '0')} = saison en cours, C = Classic).
-            Valeur estimée : prix moyen payé sur le marché pour un joueur de même niveau (L15), même forme (L5), même temps de jeu,
+            Valeur estimée : prix moyen payé sur le marché pour un joueur de même niveau, même forme (L5), même temps de jeu,
             même âge, même championnat et même poste ; un prix bien en dessous signale une carte sous-évaluée.
-            Prix potentiel : prix attendu si le joueur marque son score potentiel au prochain match (son L5 et son L15 montent ou baissent d’autant).
+            Prix potentiel : prix attendu si le joueur marque son score potentiel au prochain match (son niveau et sa forme montent ou baissent d’autant).
             Estimations indicatives, le marché ne suit pas toujours.
           </p>
         </>

@@ -13,7 +13,7 @@ const { default: Page } = await import('@/app/trading/page');
 
 const row: TradingRow = {
   slug: 'xavi-simons', name: 'Xavi Simons', pictureUrl: null, team: 'PSV', teamPictureUrl: null, cardPositions: ['Midfielder', 'Forward'],
-  usualPosition: 'AM', l5: 72, l15: 60, startRate: 1, price: 30, fairPrice: 50, valueRatio: 0.6, priceTrend7: 0.08, sales30: 12,
+  usualPosition: 'AM', l5: 72, l10: 60, startRate: 1, price: 30, fairPrice: 50, valueRatio: 0.6, priceTrend7: 0.08, sales30: 12,
   potentialPrice: 34.5, potentialGain: 0.15, nextProjected: 78, nextOpponent: 'Ajax', nextOpponentPictureUrl: null, nextIsHome: true,
   nextDate: '2099-01-01T20:00:00.000Z',
 };

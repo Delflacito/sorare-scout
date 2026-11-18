@@ -29,7 +29,7 @@ const fixture: GameWeekFixture = {
 const player = (slug: string, position: GameWeekPlayer['position'], projected: number): GameWeekPlayer => ({
   slug, name: slug, position, usualPosition: null, team: 'Paris Saint-Germain', teamPictureUrl: null, pictureUrl: null,
   opponent: 'Olympique de Marseille', opponentPictureUrl: 'https://t/om.png', isHome: true, date: fixture.date,
-  projected, startRate: 0.8, l15: 60, base: 60, playingStatus: 'STARTER', sorareProjection: 55, cardPositions: [position],
+  projected, startRate: 0.8, l10: 60, base: 60, playingStatus: 'STARTER', sorareProjection: 55, cardPositions: [position],
 });
 const matchup = (team: string, rating: number, st: number): RoundMatchup => ({
   fixtureId: 9, date: fixture.date, team, teamSlug: team, teamPictureUrl: null, opponent: `adv-${team}`, opponentSlug: 'x',

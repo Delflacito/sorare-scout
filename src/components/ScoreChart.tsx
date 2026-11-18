@@ -52,19 +52,19 @@ function groupIcons(actions: Record<string, number>): { icon: string; count: num
 }
 
 /**
- * Scores des derniers matchs, du plus ancien (gauche) au plus récent (droite), avec le L15 en repère,
+ * Scores des derniers matchs, du plus ancien (gauche) au plus récent (droite), avec le L10 en repère,
  * filtrables par compétition et par lieu ; pastilles au pied des barres pour les actions décisives.
  * `games` : matchs de la saison, du plus récent au plus ancien.
  */
-export function ScoreChart({ games: seasonGames, l15: seasonL15, byPosition = [] }: {
-  games: PlayerGameView[]; l15: number | null;
+export function ScoreChart({ games: seasonGames, l10: seasonL10, byPosition = [] }: {
+  games: PlayerGameView[]; l10: number | null;
   /** Mêmes matchs au barème d'un autre poste de carte (Classic) : le premier libellé est celui de la carte de la saison. */
   byPosition?: { label: string; games: PlayerGameView[] }[];
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [poste, setPoste] = useState(0);
   const games = poste ? byPosition[poste].games : seasonGames;
-  const l15 = poste ? null : seasonL15;
+  const l10 = poste ? null : seasonL10;
   const [competition, setCompetition] = useState<CompetitionFilter>('all');
   const [venue, setVenue] = useState<VenueFilter>('all');
   const [available, setAvailable] = useState<number | null>(null);
@@ -190,10 +190,10 @@ export function ScoreChart({ games: seasonGames, l15: seasonL15, byPosition = []
                 </g>
               );
             })}
-            {l15 !== null && (
+            {l10 !== null && (
               <g pointerEvents="none">
-                <line x1={LEFT} x2={width - RIGHT + 4} y1={y(l15)} y2={y(l15)} className="ref" />
-                <text x={width - RIGHT + 8} y={y(l15) + 4} className="ref-label">{`L15 ${fmt(l15)}`}</text>
+                <line x1={LEFT} x2={width - RIGHT + 4} y1={y(l10)} y2={y(l10)} className="ref" />
+                <text x={width - RIGHT + 8} y={y(l10) + 4} className="ref-label">{`L10 ${fmt(l10)}`}</text>
               </g>
             )}
           </svg>

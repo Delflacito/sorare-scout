@@ -6,7 +6,7 @@ import type { MarketPlayerView } from '@/db/queries';
 
 const player = (slug: string, price: number | null, potentialPrice: number | null = null): MarketPlayerView => ({
   slug, name: slug.toUpperCase(), pictureUrl: null, team: 'PSV', teamSlug: 'psv', teamPictureUrl: null, competition: 'Eredivisie',
-  competitionSlug: 'eredivisie', cardPositions: ['Forward'], usualPosition: 'ST', l15: 55, floorInSeason: price, floorClassic: null,
+  competitionSlug: 'eredivisie', cardPositions: ['Forward'], usualPosition: 'ST', l10: 55, floorInSeason: price, floorClassic: null,
   recentPrice: price, price, fairPrice: null, valueRatio: null, potentialPrice, potentialGain: potentialPrice && price ? potentialPrice / price - 1 : null,
   priceTrend7: null, lastAuction: price ? { eur: price - 2, date: '2026-10-28T10:00:00.000Z' } : null,
 });

@@ -127,11 +127,12 @@ describe('/joueurs/[slug]', () => {
     expect(screen.queryByRole('link', { name: 'Historique' })).not.toBeInTheDocument();
   });
 
-  it('graphique : une colonne par match, légende, ligne du L15, info-bulle au survol', async () => {
+  it('graphique : une colonne par match, légende, ligne du L10, info-bulle au survol', async () => {
+    getPlayer.mockResolvedValue({ ...player, averages: { l5: 71, l10: 64, l15: 60, l20: 58, l50: 55 } });
     render(await Page(params('nuno-mendes')));
     const chart = screen.getByRole('img', { name: /Scores Sorare des 4 derniers matchs/ });
     expect(within(chart).getAllByTestId('score-bar')).toHaveLength(4);
-    expect(within(chart).getByText('L15 58.1')).toBeInTheDocument();
+    expect(within(chart).getByText('L10 64.0')).toBeInTheDocument();
     fireEvent.mouseEnter(within(chart).getAllByTestId('score-hit')[3]);
     expect(screen.getByRole('tooltip')).toHaveTextContent('70.0');
     expect(screen.getByRole('tooltip')).toHaveTextContent('Titulaire · 90 min');

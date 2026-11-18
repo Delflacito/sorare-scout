@@ -12,7 +12,7 @@ const { default: Page } = await import('@/app/joueurs/page');
 
 const row: PlayerListRow = {
   slug: 'nuno-mendes', name: 'Nuno Mendes', position: 'Defender', team: 'Paris Saint-Germain', teamSlug: 'psg', competition: 'Ligue 1',
-  usualPosition: 'LB', l5: 62.4, l15: 58.1, l40: 50, startRate: 0.8,
+  usualPosition: 'LB', l5: 62.4, l10: 58.1, l40: 50, startRate: 0.8,
   nextOpponent: 'Olympique de Marseille', nextOpponentSlug: 'om', nextIsHome: true, nextIndex: 1.234, nextLowSample: false,
   pictureUrl: 'https://p/nuno.png', teamPictureUrl: 'https://t/psg.png', playingStatus: 'SUBSTITUTE',
   injuryKind: 'Thigh Injury', suspensionReason: null, sorareProjection: 41, nextProjected: 71.3, cardPositions: ['Defender', 'Midfielder'], floorInSeason: 42, lastSale: null,
@@ -59,8 +59,8 @@ describe('/joueurs', () => {
 
   it('transmet les filtres de l’URL', async () => {
     searchPlayers.mockResolvedValue([]);
-    await Page({ searchParams: Promise.resolve({ position: 'Defender', q: 'nuno', sort: 'l15', page: '2', team: 'om' }) });
-    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, available: undefined, sort: 'l15', offset: 50 });
+    await Page({ searchParams: Promise.resolve({ position: 'Defender', q: 'nuno', sort: 'l10', page: '2', team: 'om' }) });
+    expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, available: undefined, sort: 'l10', offset: 50 });
   });
 
   it('seuil de titularisation choisi : transmis à la recherche et gardé par les autres pastilles', async () => {

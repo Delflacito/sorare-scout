@@ -31,7 +31,7 @@ function Boost({ p }: { p: GameWeekPlayer }) {
   const pct = p.base ? Math.round((diff / p.base) * 100) : 0;
   const sign = diff >= 0 ? '+' : '−';
   return (
-    <span className={`gw-boost ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`} title="Écart avec le niveau habituel (L15)">
+    <span className={`gw-boost ${pct >= 10 ? 'hot' : pct <= -10 ? 'cold' : ''}`} title="Écart avec le niveau habituel">
       {sign}{fmtScore(Math.abs(diff))} <span className="gw-boost-pct">({sign}{Math.abs(pct)} %)</span>
     </span>
   );
@@ -67,7 +67,7 @@ function PlayerRow({ p, rank, splits }: { p: GameWeekPlayer; rank: number; split
           <span>{fmtDate(p.date)}</span>
           <ClassicHint positions={p.classicPositions} />
           {p.usualPosition && <span className="gw-meta-pos" title="Poste occupé sur le terrain">{POSITION_LABEL_FR[p.usualPosition]}</span>}
-          <span><abbr title="Moyenne des 15 dernières notes (matchs joués)">L15</abbr> {fmtScore(p.base)}</span>
+          <span><abbr title="Moyenne des 10 derniers matchs joués (saisons précédentes comprises)">L10</abbr> {p.l10 === null ? '—' : fmtScore(p.l10)}</span>
           <span><abbr title="Part des matchs commencés comme titulaire">Titu</abbr> {fmtPct(p.startRate)}</span>
           {p.sorareProjection !== null && <span className="gw-meta-sorare"><abbr title="Projection officielle de Sorare">Sorare</abbr> {Math.round(p.sorareProjection)}</span>}
         </div>
@@ -218,10 +218,10 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
         <details className="gw-help">
           <summary>Comment lire ce classement</summary>
           {sort === 'boost'
-            ? 'Matchs qui s’annoncent nettement au-dessus du niveau habituel (score potentiel − L15). '
+            ? 'Matchs qui s’annoncent nettement au-dessus du niveau habituel (score potentiel − niveau habituel). '
             : 'Score potentiel : ce que chaque joueur devrait marquer selon son niveau, l’adversaire et le lieu. '}
           Blessés et suspendus exclus{titu > 0 && `, ainsi que les joueurs titulaires moins de ${titu} % du temps sur les 5 derniers matchs de leur club`}.
-          {' '}Sous le score : écart avec le niveau habituel (L15).
+          {' '}Sous le score : écart avec le niveau habituel.
         </details>
       </div>
 

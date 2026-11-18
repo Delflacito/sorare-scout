@@ -16,7 +16,7 @@ const { NavTabs } = await import('@/components/NavTabs');
 
 const gw = (slug: string, projected: number, position: GameWeekPlayer['position'] = 'Forward') => ({
   slug, name: slug, position, usualPosition: null, team: 'PSV', teamPictureUrl: null, pictureUrl: null, opponent: 'Ajax', opponentPictureUrl: null,
-  isHome: true, date: '2099-01-01T20:00:00.000Z', projected, startRate: 1, l15: 60, base: 60, playingStatus: null, sorareProjection: null,
+  isHome: true, date: '2099-01-01T20:00:00.000Z', projected, startRate: 1, l10: 60, base: 60, playingStatus: null, sorareProjection: null,
   cardPositions: [position],
 }) as GameWeekPlayer;
 

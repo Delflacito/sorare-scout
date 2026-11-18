@@ -144,7 +144,7 @@ function ClubPlayers({ players, yy, history, owned }: { players: MarketPlayerVie
         <table aria-label="Prix des cartes du club">
           <thead>
             <tr>
-              <th>Joueur</th><th>Carte</th><th>L15</th><th>Plancher {yy}</th><th>Plancher C</th><th>Dernière enchère</th><th>5 dern. ventes</th>
+              <th>Joueur</th><th>Carte</th><th>L10</th><th>Plancher {yy}</th><th>Plancher C</th><th>Dernière enchère</th><th>5 dern. ventes</th>
               <th>Valeur estimée</th><th>Écart</th><th>Potentiel GW</th>
             </tr>
           </thead>
@@ -167,7 +167,7 @@ function ClubPlayers({ players, yy, history, owned }: { players: MarketPlayerVie
                     {cardLabel(p.cardPositions)}
                     {p.usualPosition && <span className="muted small"> · {POSITION_LABEL_FR[p.usualPosition]}</span>}
                   </td>
-                  <td className="num">{p.l15 === null ? '—' : fmtScore(p.l15)}</td>
+                  <td className="num">{p.l10 === null ? '—' : fmtScore(p.l10)}</td>
                   <td className="num strong">{p.floorInSeason === null ? '—' : fmtEur(p.floorInSeason)}</td>
                   <td className="num">{p.floorClassic === null ? '—' : fmtEur(p.floorClassic)}</td>
                   <td className="num">{p.lastAuction === null ? '—' : fmtEur(p.lastAuction.eur)}</td>

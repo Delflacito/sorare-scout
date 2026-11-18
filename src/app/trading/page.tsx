@@ -13,12 +13,12 @@ const VIEWS: [TradingView, string][] = [['sous', 'Sous-évalués'], ['sur', 'Sur
 const GENERIC = Object.keys(GENERIC_LABEL_FR) as GenericPosition[];
 const LIMIT = 50;
 
-/** Forme : L5 nettement au-dessus (↗) ou en dessous (↘) du L15. */
+/** Forme : L5 nettement au-dessus (↗) ou en dessous (↘) du L10. */
 function Form({ r }: { r: TradingRow }) {
-  const d = r.l5 - r.l15;
+  const d = r.l10 === null ? 0 : r.l5 - r.l10;
   const arrow = d >= 5 ? '↗' : d <= -5 ? '↘' : '→';
   return (
-    <td className={`num ${d >= 5 ? 'hot' : d <= -5 ? 'cold' : ''}`} title={`L5 ${fmtScore(r.l5)} · L15 ${fmtScore(r.l15)}`}>
+    <td className={`num ${d >= 5 ? 'hot' : d <= -5 ? 'cold' : ''}`} title={`L5 ${fmtScore(r.l5)} · L10 ${r.l10 === null ? '—' : fmtScore(r.l10)}`}>
       {arrow} {Math.round(r.l5)}
     </td>
   );
@@ -58,7 +58,7 @@ function ValueTable({ rows, view }: { rows: TradingRow[]; view: 'sous' | 'sur' }
         <thead>
           <tr>
             <th>#</th><th>Joueur</th><th>Carte</th><th>Prix</th><th>Valeur estimée</th><th><abbr title="Écart entre le prix et la valeur estimée (positif = carte moins chère que sa valeur)">Écart</abbr></th>
-            <th><abbr title="L5 comparé au L15 : ↗ en forme, ↘ en baisse">Forme</abbr></th><th><abbr title="Évolution du prix des ventes sur 7 jours">Prix 7 j</abbr></th><th>Prochain match</th><th>Potentiel GW</th>
+            <th><abbr title="L5 comparé au L10 : ↗ en forme, ↘ en baisse">Forme</abbr></th><th><abbr title="Évolution du prix des ventes sur 7 jours">Prix 7 j</abbr></th><th>Prochain match</th><th>Potentiel GW</th>
           </tr>
         </thead>
         <tbody>
@@ -91,7 +91,7 @@ function GwTable({ rows }: { rows: TradingRow[] }) {
       <table aria-label="Hausse attendue avant la Game Week">
         <thead>
           <tr>
-            <th>#</th><th>Joueur</th><th>Match</th><th>Score potentiel</th><th>L15</th>
+            <th>#</th><th>Joueur</th><th>Match</th><th>Score potentiel</th><th>L10</th>
             <th>Prix actuel</th><th>Prix potentiel</th><th>Plus-value</th>
           </tr>
         </thead>
@@ -102,7 +102,7 @@ function GwTable({ rows }: { rows: TradingRow[] }) {
               <td><PlayerCell r={r} /></td>
               <td><NextMatch r={r} /></td>
               <td><ScorePill score={r.nextProjected} /></td>
-              <td className="num">{fmtScore(r.l15)}</td>
+              <td className="num">{r.l10 === null ? '—' : fmtScore(r.l10)}</td>
               <td className="num">{fmtEur(r.price)}</td>
               <td className="num strong">{r.potentialPrice === null ? '—' : fmtEur(r.potentialPrice)}</td>
               <td className="num">
@@ -165,9 +165,9 @@ export default async function TradingPage({ searchParams }: { searchParams: Sear
           </>
         ) : (
           <>
-            Écart entre le prix (carte de la saison la moins chère en vente) et la valeur estimée d’après le profil du joueur (L15, forme,
+            Écart entre le prix (carte de la saison la moins chère en vente) et la valeur estimée d’après le profil du joueur (niveau, forme,
             All-Around, temps de jeu, statut Sorare, buts et passes de la saison passée, sélection, âge, poste, championnat, force et
-            cote de son club), calculée sur tout le marché. Forme ↗ : L5 au-dessus du L15 ; Prix 7 j : évolution
+            cote de son club), calculée sur tout le marché. Forme ↗ : L5 au-dessus du L10 ; Prix 7 j : évolution
             des ventes sur une semaine. Une carte sous-évaluée en forme et dont le prix commence à monter est la piste la plus solide.
           </>
         )}
