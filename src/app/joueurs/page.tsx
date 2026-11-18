@@ -1,6 +1,6 @@
 import { CardStatusIcon } from '@/components/ClassicHint';
 import Link from 'next/link';
-import { getQueries, PAGE_SIZE, SORTS, type PlayerListRow, type Sort } from '@/db/queries';
+import { getQueries, PAGE_SIZE, SORTS, AVERAGE_FILTERS, type PlayerListRow, type Sort } from '@/db/queries';
 import { DETAILED_POSITIONS, GENERIC_LABEL_FR, POSITION_LABEL_FR, cardLabel, type GenericPosition } from '@/domain/types';
 import { fmtEur, fmtPct, fmtScore, indexClass } from '@/lib/format';
 import { ClubLogo, PlayerAvatar } from '@/components/Media';
@@ -10,6 +10,7 @@ import { NotOwnedToggle, OwnedMark } from '@/components/MyCards';
 import { PSEUDO } from '@/lib/squad';
 import { OtwButton } from '@/components/Otw';
 import { Venue } from '@/components/Venue';
+import { RangeField } from '@/components/RangeField';
 import { START_RATE_LEVELS, one, oneOf, startRateLabel, startRateParam, type SearchParams } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,15 @@ function PlayerRow({ r }: { r: PlayerListRow }) {
   );
 }
 
+/** Filtre de moyenne lu dans l'URL (moy, min, max) ; ignoré sans moyenne choisie. */
+function averageParam(moy: string | undefined, min: string | undefined, max: string | undefined) {
+  const window = oneOf(moy, AVERAGE_FILTERS);
+  if (!window) return undefined;
+  const clamp = (v: string | undefined, d: number) => { const n = Number(v); return v && Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : d; };
+  const [lo, hi] = [clamp(min, 0), clamp(max, 100)];
+  return { window, min: Math.min(lo, hi), max: Math.max(lo, hi) };
+}
+
 export default async function JoueursPage({ searchParams }: { searchParams: SearchParams }) {
   const p = await searchParams;
   const sansRaw = one(p.sans)?.toLowerCase();
@@ -92,6 +102,7 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
     detailedPosition: oneOf(one(p.detailedPosition), DETAILED_POSITIONS),
     available: one(p.dispo) === '1' || undefined,
     minStartRate: startRateParam(one(p.titu), 0) / 100 || undefined,
+    average: averageParam(one(p.moy), one(p.min), one(p.max)),
     sort: oneOf(one(p.sort), SORTS) ?? 'projected',
     offset: (pageNum - 1) * PAGE_SIZE,
     sans,
@@ -102,15 +113,15 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
   const [rows, competitions, teams] = await Promise.all([queries.searchPlayers(excludeSlugs ? { ...filters, excludeSlugs } : filters), queries.listCompetitions(), queries.listTeams()]);
   // Lien qui garde les filtres en cours et en change certains (retour en page 1 sauf demande).
   const href = (o: Partial<Omit<typeof filters, 'offset'>> & { page?: number } = {}) => {
-    const { available, minStartRate, offset: _, ...rest } = { ...filters, page: undefined, ...o };
+    const { available, minStartRate, average, offset: _, ...rest } = { ...filters, page: undefined, ...o };
     const qs = new URLSearchParams(Object.entries({
-      ...rest, sort: rest.sort === 'projected' ? undefined : rest.sort, dispo: available ? '1' : undefined,
+      ...rest, moy: average?.window, min: average && String(average.min), max: average && String(average.max), sort: rest.sort === 'projected' ? undefined : rest.sort, dispo: available ? '1' : undefined,
       titu: minStartRate ? String(Math.round(minStartRate * 100)) : undefined, page: rest.page && rest.page > 1 ? String(rest.page) : undefined,
     }).filter(([, v]) => v) as [string, string][]);
     return `/joueurs${qs.size ? `?${qs}` : ''}`;
   };
-  const activeFilters = [filters.sans, filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available, filters.minStartRate].filter(Boolean).length;
-  const advanced = [filters.team, filters.detailedPosition, filters.available].filter(Boolean).length;
+  const activeFilters = [filters.sans, filters.q, filters.position, filters.competition, filters.team, filters.detailedPosition, filters.available, filters.minStartRate, filters.average].filter(Boolean).length;
+  const advanced = [filters.team, filters.detailedPosition, filters.available, filters.average].filter(Boolean).length;
 
   return (
     <main className="gw">
@@ -138,6 +149,15 @@ export default async function JoueursPage({ searchParams }: { searchParams: Sear
                 <option value="">Tous les postes sur le terrain</option>
                 {DETAILED_POSITIONS.map((d) => <option key={d} value={d}>{POSITION_LABEL_FR[d]}</option>)}
               </select>
+              <fieldset className="average-filter">
+                <legend>Moyenne Sorare (derniers matchs joués)</legend>
+                <select name="moy" defaultValue={filters.average?.window ?? ''} aria-label="Moyenne">
+                  <option value="">Toutes moyennes</option>
+                  {AVERAGE_FILTERS.map((w) => <option key={w} value={w}>{w.toUpperCase()}</option>)}
+                </select>
+                <RangeField name="min" label="Min" defaultValue={filters.average?.min ?? 0} />
+                <RangeField name="max" label="Max" defaultValue={filters.average?.max ?? 100} />
+              </fieldset>
               <label className="check">
                 <input type="checkbox" name="dispo" value="1" defaultChecked={filters.available} /> Masquer blessés et suspendus
               </label>

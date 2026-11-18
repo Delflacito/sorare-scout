@@ -10,6 +10,8 @@ import type { DailyPrice } from '@/domain/market';
 import type { SquadEntry } from '@/components/SquadBuilder';
 import { playerSplits, tierOf, type PlayerSplits, type SplitGame } from '@/domain/splits';
 
+export const AVERAGE_FILTERS = ['l5', 'l10', 'l20', 'l50'] as const;
+export type AverageWindow = (typeof AVERAGE_FILTERS)[number];
 export const SORTS = ['projected', 'l5', 'l10', 'l40', 'startRate', 'nextIndex'] as const;
 export type Sort = (typeof SORTS)[number];
 export const PAGE_SIZE = 50;
@@ -26,6 +28,8 @@ export interface SearchFilters {
   available?: boolean;
   /** Part minimale de titularisations sur les 5 derniers matchs (0 à 1). */
   minStartRate?: number;
+  /** Moyenne Sorare (x derniers matchs joués) comprise entre min et max. */
+  average?: { window: AverageWindow; min: number; max: number };
   sort: Sort;
   offset: number;
 }
@@ -364,6 +368,7 @@ export function createQueries(sql: postgres.Sql) {
           ${f.detailedPosition ? sql`and s.usual_position = ${f.detailedPosition}` : sql``}
           ${f.available ? sql`and not (${sql.unsafe(UNAVAILABLE)})` : sql``}
           ${f.minStartRate ? sql`and s.start_rate5 >= ${f.minStartRate}` : sql``}
+          ${f.average ? sql`and (select pa.${sql(f.average.window)} from player_averages pa where pa.player_id = p.id) between ${f.average.min} and ${f.average.max}` : sql``}
           ${f.excludeSlugs?.length ? sql`and p.sorare_slug <> all(${f.excludeSlugs})` : sql``}
         order by ${SORT_SQL[f.sort]} desc nulls last, p.name
         limit ${PAGE_SIZE} offset ${f.offset}`;

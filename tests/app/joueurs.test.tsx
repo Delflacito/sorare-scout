@@ -63,6 +63,14 @@ describe('/joueurs', () => {
     expect(searchPlayers).toHaveBeenCalledWith({ q: 'nuno', position: 'Defender', competition: undefined, team: 'om', detailedPosition: undefined, available: undefined, sort: 'l10', offset: 50 });
   });
 
+  it('filtre de moyenne : fenêtre, min et max (inversés si besoin)', async () => {
+    searchPlayers.mockResolvedValue([]);
+    await Page({ searchParams: Promise.resolve({ moy: 'l10', min: '60', max: '45' }) });
+    expect(searchPlayers).toHaveBeenLastCalledWith(expect.objectContaining({ average: { window: 'l10', min: 45, max: 60 } }));
+    await Page({ searchParams: Promise.resolve({ moy: 'l99', min: '60' }) });
+    expect(searchPlayers).toHaveBeenLastCalledWith(expect.objectContaining({ average: undefined }));
+  });
+
   it('seuil de titularisation choisi : transmis à la recherche et gardé par les autres pastilles', async () => {
     searchPlayers.mockResolvedValue([row]);
     render(await Page({ searchParams: Promise.resolve({ titu: '80' }) }));

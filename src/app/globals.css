@@ -521,6 +521,10 @@ table.games th:first-child, table.games td:first-child { padding-left: 12px; }
 .player-search .reset { justify-self: start; min-height: 32px; display: inline-flex; align-items: center; font-size: 14px; color: var(--muted); }
 .gw-match > .muted { white-space: nowrap; }
 .more-filters summary { display: inline-flex; align-items: center; min-height: 36px; cursor: pointer; color: var(--accent); font-weight: 600; font-size: 14px; }
+.average-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.average-filter legend { padding: 0 4px; font-size: 14px; color: var(--muted); }
+.range-field { display: grid; gap: 2px; font-size: 14px; min-width: 140px; }
+.range-field input { padding: 0; min-height: 32px; accent-color: var(--accent); }
 .more-filters[open] summary { margin-bottom: 6px; }
 .sort-row { align-items: center; }
 .sort-row > span { font-size: 13px; white-space: nowrap; margin-right: 2px; }
