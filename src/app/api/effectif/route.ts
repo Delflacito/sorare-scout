@@ -27,5 +27,6 @@ export async function GET(req: NextRequest) {
   const known = byPlayer.size ? await getQueries().getMarketPlayers({ slugs: [...byPlayer.keys()] }) : [];
   const entries = known.filter((p) => p.competitionSlug)
     .map((p) => ({ slug: p.slug, competition: competitionGroup(p.competitionSlug!), purchasePrice: byPlayer.get(p.slug) ?? null }));
-  return NextResponse.json({ entries, cards: cards.length, classic: cards.filter((c) => c.seasonYear !== season).length, untracked: byPlayer.size - entries.length });
+  return NextResponse.json({ entries, cards: cards.length, classic: cards.filter((c) => c.seasonYear !== season).length,
+    classicSlugs: [...new Set(cards.filter((c) => c.seasonYear !== season).map((c) => c.playerSlug))], untracked: byPlayer.size - entries.length });
 }
