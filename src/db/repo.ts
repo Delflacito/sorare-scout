@@ -160,7 +160,7 @@ function createBaseRepo(sql: Sql) {
     async upsertPlayer(p: PlayerInput): Promise<number> {
       const [r] = await sql`
         insert into players (name, sorare_slug, position, team_id) values (${p.name}, ${p.sorareSlug}, ${p.position}, ${p.teamId})
-        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
+        on conflict (sorare_slug) do update set name = excluded.name, position = coalesce(players.card_positions[1], excluded.position),
           team_id = coalesce(players.team_id, excluded.team_id)
         returning id`;
       return r.id;
@@ -172,7 +172,7 @@ function createBaseRepo(sql: Sql) {
       const unique = [...new Map(players.map((p) => [p.sorareSlug, p])).values()];
       const rows = await sql`
         insert into players ${sql(unique.map((p) => ({ name: p.name, sorare_slug: p.sorareSlug, position: p.position, team_id: p.teamId })))}
-        on conflict (sorare_slug) do update set name = excluded.name, position = excluded.position,
+        on conflict (sorare_slug) do update set name = excluded.name, position = coalesce(players.card_positions[1], excluded.position),
           team_id = coalesce(players.team_id, excluded.team_id)
         returning id, sorare_slug`;
       return new Map(rows.map((r) => [r.sorare_slug as string, r.id as number]));
@@ -196,12 +196,14 @@ function createBaseRepo(sql: Sql) {
     /** Statut actuel des joueurs déjà connus ; renvoie le nombre de joueurs mis à jour. */
     async updatePlayerStatuses(rows: PlayerStatusInput[]): Promise<number> {
       if (!rows.length) return 0;
+      // Poste = celui de la carte de la saison : Sorare range cardPositions de la plus récente à la plus ancienne
+      // (Olise : position Midfielder, cardPositions [Forward, Midfielder], cartes 2025-2026 Attaquant).
       // Une seule requête par lot (un aller-retour par joueur prenait plusieurs minutes depuis GitHub).
       const res = await sql`
         update players p set picture_url = coalesce(v.picture_url, p.picture_url), playing_status = v.playing_status,
           injury_kind = v.injury_kind, injury_end = v.injury_end, suspension_reason = v.suspension_reason, suspension_end = v.suspension_end,
           sorare_projection = v.projection, national_team_id = v.national_team_id, status_updated_at = now(),
-          team_id = coalesce(v.team_id, p.team_id), position = coalesce(v.position, p.position),
+          team_id = coalesce(v.team_id, p.team_id), position = coalesce(v.card_positions[1], v.position, p.position),
           card_positions = coalesce(v.card_positions, p.card_positions), card_status = coalesce(v.card_status, p.card_status)
         from jsonb_to_recordset(${sql.json(rows.map((r) => ({
           slug: r.slug, picture_url: r.pictureUrl, playing_status: r.playingStatus,

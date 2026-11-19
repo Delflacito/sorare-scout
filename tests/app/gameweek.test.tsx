@@ -55,7 +55,7 @@ describe('/game-week', () => {
     expect(within(screen.getByRole('list', { name: 'Attaquants' })).getByText('81.0')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Gardiens' })).not.toBeInTheDocument();
     expect(within(row).getByText(/\+12\.4/)).toHaveClass('hot');
-    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, minStartRate: 0.6, limit: 10, sort: 'projected' });
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, minStartRate: 0.6, limit: 20, sort: 'projected' });
   });
 
   it('équipe type : le meilleur de chaque poste, plus un extra de champ', async () => {
@@ -103,7 +103,7 @@ describe('/game-week', () => {
 
   it('onglet « Plus gros boosts » : classement par gain sur le niveau habituel', async () => {
     render(await GameWeek(params({ vue: 'boost' })));
-    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, minStartRate: 0.6, limit: 10, sort: 'boost' });
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: undefined, minStartRate: 0.6, limit: 20, sort: 'boost' });
     expect(screen.getByRole('link', { name: 'Plus gros boosts' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Meilleurs scores' })).toHaveAttribute('href', '/game-week');
   });
@@ -111,7 +111,7 @@ describe('/game-week', () => {
   it('filtres : compétition et seuil de titularisation', async () => {
     await GameWeek(params({ competition: 'ligue-1-fr', titu: '0' }));
     expect(getGameWeekFixtures).toHaveBeenCalledWith('ligue-1-fr');
-    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: 'ligue-1-fr', minStartRate: 0, limit: 10, sort: 'projected' });
+    expect(getGameWeekPlayers).toHaveBeenCalledWith([9], { competition: 'ligue-1-fr', minStartRate: 0, limit: 20, sort: 'projected' });
   });
 
   it('aucun match programmé', async () => {

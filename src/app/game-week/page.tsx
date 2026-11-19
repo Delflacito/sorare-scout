@@ -11,7 +11,7 @@ import { START_RATE_LEVELS, one, startRateLabel, startRateParam, type SearchPara
 import { OtwButton } from '@/components/Otw';
 import { MyCardsToggle, OwnedMark } from '@/components/MyCards';
 import { STREAK_TIERS, streakTiersOf, type StreakTier } from '@/lib/roi';
-import { CONTENDER, CONTENDER_SLUGS } from '@/lib/competitions';
+import { BIG4, BIG4_NAME, CONTENDER, slugsOf } from '@/lib/competitions';
 import { PSEUDO } from '@/lib/squad';
 import { SplitHint } from '@/components/Splits';
 import type { PlayerSplits } from '@/domain/splits';
@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic';
 const SECTIONS: [GenericPosition, string][] = [
   ['Goalkeeper', 'Gardiens'], ['Defender', 'Défenseurs'], ['Midfielder', 'Milieux'], ['Forward', 'Attaquants'],
 ];
-const PER_POSITION = 10;
+const PER_POSITION = 20;
 
 /** Écart entre le score potentiel et le niveau habituel, en points et en %. */
 function Boost({ p }: { p: GameWeekPlayer }) {
@@ -166,9 +166,9 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
   };
   const queries = getQueries();
   const [competitions, squad] = await Promise.all([queries.listCompetitions(), cartes ? queries.getSquad(cartes) : null]);
-  // Journée propre à chaque championnat Contender : leurs premiers matchs ne tombent pas le même jour.
-  const fixtures = competition === CONTENDER
-    ? (await Promise.all(CONTENDER_SLUGS.map((c) => queries.getGameWeekFixtures(c)))).flat().sort((a, b) => a.date.localeCompare(b.date))
+  // Journée propre à chaque championnat d'un groupe (Contender, Big 4) : leurs premiers matchs ne tombent pas le même jour.
+  const fixtures = competition === CONTENDER || competition === BIG4
+    ? (await Promise.all(slugsOf(competition).map((c) => queries.getGameWeekFixtures(c)))).flat().sort((a, b) => a.date.localeCompare(b.date))
     : await queries.getGameWeekFixtures(competition);
   // Mes cartes : seulement les joueurs possédés (toutes leurs lignes, pour composer l'équipe avec ce qu'on a).
   const owned = cartes ? [...new Set((squad ?? []).filter((e) => e.status === 'owned').map((e) => e.slug))] : undefined;
@@ -183,12 +183,13 @@ export default async function GameWeekPage({ searchParams }: { searchParams: Sea
           <h1>Ma Game Week</h1>
           <p className="subtitle">{fixtures.length ? roundLabel(fixtures) : 'Aucun match programmé'}</p>
         </div>
-        <Link href={competition && competition !== CONTENDER ? `/journee?competition=${competition}` : '/journee'} className="gw-head-link">Adversaires poste par poste →</Link>
+        <Link href={competition && competition !== CONTENDER && competition !== BIG4 ? `/journee?competition=${competition}` : '/journee'} className="gw-head-link">Adversaires poste par poste →</Link>
       </div>
 
       <div className="gw-toolbar">
         <nav className="chip-row" aria-label="Championnat">
           <Link href={href({ competition: undefined })} aria-current={competition ? undefined : 'page'}>Toutes les ligues</Link>
+          <Link href={href({ competition: BIG4 })} aria-current={competition === BIG4 ? 'page' : undefined} title="Ligue 1, Bundesliga, LaLiga et Premier League">{BIG4_NAME}</Link>
           {competitions.map((c) => (
             <Link key={c.slug} href={href({ competition: c.slug })} aria-current={competition === c.slug ? 'page' : undefined}>{c.name}</Link>
           ))}

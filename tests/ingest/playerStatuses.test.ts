@@ -72,6 +72,16 @@ describeDb('importPlayerStatuses', () => {
     ]);
   });
 
+  it('poste = celui de la carte de la saison (premier de cardPositions), même après un import de matchs', async () => {
+    const sorare = {
+      clubPlayers: async (s: string) => (s === 'psg' ? [status('vitinha', { position: 'Midfielder', cardPositions: ['Forward', 'Midfielder'] })] : []),
+    } as unknown as SorareClient;
+    await importPlayerStatuses({ sorare, repo }, [league]);
+    await repo.upsertPlayer({ name: 'Vitinha', sorareSlug: 'vitinha', position: 'Midfielder', teamId: (await sql`select id from teams where sorare_slug = 'psg'`)[0].id });
+    const [{ position }] = await sql`select position from players where sorare_slug = 'vitinha'`;
+    expect(position).toBe('Forward');
+  });
+
   it('effectif d’un club indisponible : personne n’est détaché', async () => {
     const sorare = { clubPlayers: async (s: string) => { if (s === 'om') throw new Error('timeout'); return []; } } as unknown as SorareClient;
     await importPlayerStatuses({ sorare, repo }, [league]);
