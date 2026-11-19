@@ -14,6 +14,7 @@ import { STREAK_TIERS, streakTiersOf, type StreakTier } from '@/lib/roi';
 import { BIG4, BIG4_NAME, CONTENDER, slugsOf } from '@/lib/competitions';
 import { PSEUDO } from '@/lib/squad';
 import { SplitHint } from '@/components/Splits';
+import { ScrollList } from '@/components/ScrollList';
 import type { PlayerSplits } from '@/domain/splits';
 
 type SplitsMap = Map<string, PlayerSplits>;
@@ -24,7 +25,7 @@ const SECTIONS: [GenericPosition, string][] = [
   ['Goalkeeper', 'Gardiens'], ['Defender', 'Défenseurs'], ['Midfielder', 'Milieux'], ['Forward', 'Attaquants'],
 ];
 const PER_POSITION = 20;
-/** Joueurs visibles d'emblée par poste ; les suivants sont repliés. */
+/** Joueurs visibles d'emblée par poste ; les suivants en faisant défiler la liste. */
 const SHOWN = 10;
 
 /** Écart entre le score potentiel et le niveau habituel, en points et en %. */
@@ -88,15 +89,7 @@ function PositionCard({ title, players, splits }: { title: string; players: Game
       <h2 className="card-title" id={`gw-${title}`}>{title}<span>{players.length} joueur{players.length > 1 ? 's' : ''}</span></h2>
       {players.length === 0
         ? <p className="empty">Aucun joueur à ce poste pour ces filtres</p>
-        : <>
-          <ol className="gw-list" aria-label={title}>{players.slice(0, SHOWN).map((p, i) => <PlayerRow key={p.slug} p={p} rank={i + 1} splits={splits} />)}</ol>
-          {players.length > SHOWN && (
-            <details className="gw-help gw-more">
-              <summary>Voir les {players.length - SHOWN} suivants</summary>
-              <ol className="gw-list" aria-label={`${title} (suite)`}>{players.slice(SHOWN).map((p, i) => <PlayerRow key={p.slug} p={p} rank={SHOWN + i + 1} splits={splits} />)}</ol>
-            </details>
-          )}
-        </>}
+        : <ScrollList visible={SHOWN} label={title}>{players.map((p, i) => <PlayerRow key={p.slug} p={p} rank={i + 1} splits={splits} />)}</ScrollList>}
     </section>
   );
 }
