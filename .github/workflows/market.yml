@@ -1,10 +1,8 @@
 name: Marché des cartes
-# Second rafraîchissement des prix dans la journée (le premier a lieu pendant l'import quotidien).
+# Rafraîchissement complet des prix, lancé à la main seulement : l'import quotidien met déjà à jour une partie du marché,
+# et le passage automatique de l'après-midi (~50 min) faisait dépasser le quota gratuit de GitHub Actions.
 concurrency: market
 on:
-  schedule:
-    # Démarre en pratique 4 à 8 h après l'heure demandée : vise l'après-midi.
-    - cron: '23 8 * * *'
   workflow_dispatch:
     inputs:
       ventes:

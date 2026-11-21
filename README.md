@@ -50,7 +50,7 @@ Le premier import récupère l'historique de la saison (une requête par match).
 Les erreurs éventuelles sont visibles dans `/admin/imports`.
 
 Import automatique : le workflow `.github/workflows/ingest.yml` est planifié chaque jour (GitHub le démarre avec plusieurs heures de retard,
-l'heure demandée en tient compte) ; `market.yml` rafraîchit les prix une seconde fois. Créer dans GitHub
+l'heure demandée en tient compte) ; `market.yml` rafraîchit tous les prix, lancé à la main (Actions → Marché des cartes → Run workflow). Créer dans GitHub
 (Settings → Secrets and variables → Actions) les secrets `SORARE_API_KEY` et `DATABASE_URL`.
 
 ## Site

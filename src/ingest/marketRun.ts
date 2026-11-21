@@ -1,4 +1,4 @@
-// Rafraîchissement du marché en cours de journée : npm run market
+// Rafraîchissement complet du marché, lancé à la main : npm run market
 import { config } from 'dotenv';
 import { getSql } from '@/db/client';
 import { createRepo } from '@/db/repo';
