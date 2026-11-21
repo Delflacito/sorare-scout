@@ -16,7 +16,6 @@ export const SECTIONS: readonly Tab[] = [
   { href: '/profils', label: 'Profils' },
   { href: '/trading', label: 'Trading' },
   { href: '/marche', label: 'Marché' },
-  { href: '/star', label: 'Star' },
   { href: '/effectif', label: 'Delflacito', sub: [
     { href: '/effectif', label: 'Mon effectif' },
     { href: '/otw', label: 'OTW' },

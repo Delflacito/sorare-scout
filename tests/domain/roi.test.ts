@@ -5,6 +5,7 @@ describe('ROI', () => {
     expect(roiGroupOf('eredivisie')).toBe('eredivisie');
     expect(roiGroupOf('ligue-2-fr')).toBe('contender');
     expect(roiGroupOf('1-hnl')).toBe('contender');
+    expect(roiGroupOf('premiership-gb-sct')).toBe('ecosse');
     expect(roiGroupOf('mlspa')).toBeNull();
     expect(roiGroupOf(null)).toBeNull();
   });

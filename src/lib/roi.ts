@@ -6,12 +6,13 @@ export const ROI_GROUPS = [
   { key: 'primeira', name: 'Primeira Liga' },
   { key: 'ligue1', name: 'Ligue 1' },
   { key: 'jupiler', name: 'Jupiler Pro League' },
+  { key: 'ecosse', name: 'Scottish Premiership' },
   { key: 'contender', name: 'Contender', detail: 'Autriche, 2. Bundesliga, Ligue 2, Liga 2, Croatie' },
 ] as const;
 export type RoiGroup = (typeof ROI_GROUPS)[number]['key'];
 
 const BY_SLUG: Record<string, RoiGroup> = {
-  eredivisie: 'eredivisie', 'primeira-liga-pt': 'primeira', 'ligue-1-fr': 'ligue1', 'jupiler-pro-league': 'jupiler',
+  eredivisie: 'eredivisie', 'primeira-liga-pt': 'primeira', 'ligue-1-fr': 'ligue1', 'jupiler-pro-league': 'jupiler', 'premiership-gb-sct': 'ecosse',
   ...Object.fromEntries(CONTENDER_SLUGS.map((s) => [s, 'contender' as const])),
 };
 
@@ -25,6 +26,9 @@ export function roiGroupOf(leagueSlug: string | null): RoiGroup | null {
 export interface StreakTier { score: number; eur?: number; essence?: number }
 
 // Barème Sorare fourni par l'utilisateur (Pays-Bas, Portugal et Belgique ont le même).
+const CONTENDER: StreakTier[] = [
+  { score: 320, essence: 500 }, { score: 360, essence: 1000 }, { score: 380, eur: 2 }, { score: 410, eur: 10 }, { score: 440, eur: 50 }, { score: 460, eur: 500 },
+];
 const MID: StreakTier[] = [
   { score: 320, essence: 500 }, { score: 360, eur: 3 }, { score: 380, eur: 5 }, { score: 410, eur: 25 }, { score: 440, eur: 100 }, { score: 460, eur: 1000 },
 ];
@@ -36,9 +40,8 @@ export const STREAK_TIERS: Record<RoiGroup, StreakTier[]> = {
     { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 410, eur: 50 }, { score: 440, eur: 300 },
     { score: 460, eur: 1500 }, { score: 550, eur: 8000 },
   ],
-  contender: [
-    { score: 320, essence: 500 }, { score: 360, essence: 1000 }, { score: 380, eur: 2 }, { score: 410, eur: 10 }, { score: 440, eur: 50 }, { score: 460, eur: 500 },
-  ],
+  contender: CONTENDER,
+  ecosse: CONTENDER, // même barème que Contender
 };
 
 const BIG: StreakTier[] = [ // LaLiga et Bundesliga
@@ -52,9 +55,7 @@ const LEAGUE_TIERS: Record<string, StreakTier[]> = {
   ],
   'laliga-es': BIG,
   'bundesliga-de': BIG,
-  // Écosse et Championship : même barème que Contender.
-  'premiership-gb-sct': STREAK_TIERS.contender,
-  'football-league-championship': STREAK_TIERS.contender,
+  'football-league-championship': CONTENDER, // même barème que Contender
 };
 
 /** Barème des streaks d'un championnat (slug Sorare) ; null s'il n'est pas connu (MLS…). */
