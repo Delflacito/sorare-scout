@@ -51,6 +51,8 @@ export interface MarketInputRow {
   teamId: number; clubPpg: number | null; prevGoalsAssists: number; international: boolean; status: string | null;
   /** Ventes de cartes de la saison des 28 derniers jours ; secondary : revente entre managers (les enchères sont des ventes de Sorare). */
   sales: { date: string; eur: number; secondary: boolean }[];
+  /** Dernière vente connue d'une carte de la saison, quel qu'en soit le type ou la date (enchère de Sorare comprise). */
+  lastSale: number | null;
 }
 export interface PlayerMarketRow {
   playerId: number; referencePrice: number; recentPrice: number | null; priceTrend7: number | null; sales30: number;
@@ -475,6 +477,7 @@ function createBaseRepo(sql: Sql) {
         select p.id, p.floor_in_season, s.l15, s.l5, s.all_around15, s.decisive15, s.start_rate15, s.avg_minutes15, p.birth_date::text as birth_date,
           c.slug as league, p.position, s.next_projected, p.team_id, club.ppg, coalesce(ps.goals + ps.assists, 0) as prev_ga,
           p.national_team_id is not null as international, p.playing_status,
+          (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season order by cs.sold_at desc limit 1) as last_sale,
           coalesce((select json_agg(json_build_object('date', cs.sold_at, 'eur', cs.price_eur,
               'secondary', coalesce(cs.deal_type = 'TokenOffer', false))) from card_sales cs
             where cs.player_id = p.id and cs.in_season and cs.sold_at > now() - interval '28 days'), '[]') as sales
@@ -487,7 +490,7 @@ function createBaseRepo(sql: Sql) {
         playerId: r.id, floorInSeason: r.floor_in_season, l15: r.l15, l5: r.l5, allAround: r.all_around15, decisive: r.decisive15, startRate: r.start_rate15,
         minutes: r.avg_minutes15, birthDate: r.birth_date, league: r.league, position: r.position, nextProjected: r.next_projected,
         teamId: r.team_id, clubPpg: r.ppg, prevGoalsAssists: r.prev_ga, international: r.international,
-        status: r.playing_status,
+        status: r.playing_status, lastSale: r.last_sale,
         sales: (r.sales as { date: string; eur: number; secondary: boolean }[]).map((x) => ({ date: new Date(x.date).toISOString(), eur: x.eur, secondary: x.secondary })),
       }));
     },

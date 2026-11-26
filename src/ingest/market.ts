@@ -38,7 +38,7 @@ export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): 
   return { updated, errors };
 }
 
-/** Plancher plus de FLOOR_OUTLIER fois au-dessus de la médiane des 5 dernières reventes : jugé aberrant. */
+/** Plancher plus de FLOOR_OUTLIER fois au-dessus de la médiane des 5 dernières reventes (à défaut de la dernière vente) : jugé aberrant. */
 export const FLOOR_OUTLIER = 5;
 
 /**
@@ -51,9 +51,11 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
     // Reventes entre managers seulement : les enchères (2 € minimum) et ventes directes de Sorare sont au-dessus du marché.
     const resales = r.sales.filter((s) => s.secondary).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
     const recentPrice = median(resales.slice(0, 5).map((s) => s.eur));
-    // Plancher aberrant (une seule carte en vente, hors de prix) : les dernières reventes font foi.
-    const absurd = r.floorInSeason !== null && recentPrice !== null && r.floorInSeason > FLOOR_OUTLIER * recentPrice;
-    return { r, resales, recentPrice, referencePrice: absurd ? recentPrice : r.floorInSeason ?? recentPrice };
+    // Plancher aberrant (une seule carte en vente, hors de prix) : les dernières reventes font foi, à défaut la dernière
+    // vente connue (souvent une enchère de Sorare, un peu au-dessus du marché secondaire).
+    const lastKnown = recentPrice ?? r.lastSale;
+    const absurd = r.floorInSeason !== null && lastKnown !== null && r.floorInSeason > FLOOR_OUTLIER * lastKnown;
+    return { r, resales, recentPrice, referencePrice: absurd ? lastKnown : r.floorInSeason ?? recentPrice };
   }).filter((x): x is typeof x & { referencePrice: number } => x.referencePrice !== null && x.referencePrice > 0);
 
   const toRow = ({ r, referencePrice }: (typeof priced)[number]): MarketRow => ({

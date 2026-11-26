@@ -17,7 +17,7 @@ function inputs(): MarketInputRow[] {
     return {
       playerId: i, floorInSeason: price, l15, l5: l15, allAround: 30, decisive: 35, startRate: 0.9, minutes: 80, birthDate: '2000-01-01',
       league: 'ligue-1-fr', position: 'Forward', nextProjected: l15, teamId: i % 5, clubPpg: 1.5, prevGoalsAssists: 4,
-      international: false, status: 'STARTER',
+      international: false, status: 'STARTER', lastSale: price,
       sales: [daysAgo(1), daysAgo(2), daysAgo(3)].map((date) => ({ date, eur: price, secondary: true })),
     };
   });
@@ -73,6 +73,15 @@ describe('computeMarket', () => {
     const out = computeMarket(rows, NOW);
     expect(out.find((r) => r.playerId === 0)!.referencePrice).toBeCloseTo(0.6);
     expect(out.find((r) => r.playerId === 1)!.referencePrice).toBeCloseTo(rows[1].floorInSeason!);
+  });
+
+  it('plancher aberrant sans aucune revente : comparé à la dernière vente connue (enchère de Sorare)', () => {
+    const rows = inputs();
+    rows[0] = { ...rows[0], floorInSeason: 182, sales: [], lastSale: 1.96 }; // Salas (Famalicão)
+    rows[1] = { ...rows[1], floorInSeason: 182, sales: [], lastSale: null }; // jamais vendu : rien pour en juger
+    const out = computeMarket(rows, NOW);
+    expect(out.find((r) => r.playerId === 0)!.referencePrice).toBeCloseTo(1.96);
+    expect(out.find((r) => r.playerId === 1)!.referencePrice).toBe(182);
   });
 
   it('ventes de Sorare (enchères à 2 € minimum) écartées : dernières reventes et valeur estimée au prix du marché secondaire', () => {
