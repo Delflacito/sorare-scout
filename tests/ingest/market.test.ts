@@ -75,6 +75,16 @@ describe('computeMarket', () => {
     expect(out.find((r) => r.playerId === 1)!.referencePrice).toBeCloseTo(rows[1].floorInSeason!);
   });
 
+  it('ventes de Sorare (enchères à 2 € minimum) écartées : dernières reventes et valeur estimée au prix du marché secondaire', () => {
+    const rows = inputs();
+    const resale = rows[0].sales[0].eur;
+    rows[0] = { ...rows[0], sales: [...rows[0].sales, ...[1, 2, 3, 4, 5, 6].map((d) => ({ date: daysAgo(d / 10), eur: 4 * resale, secondary: false }))] };
+    const before = computeMarket(inputs(), NOW).find((r) => r.playerId === 0)!;
+    const after = computeMarket(rows, NOW).find((r) => r.playerId === 0)!;
+    expect(after.recentPrice).toBeCloseTo(resale);
+    expect(after.fairPrice).toBeCloseTo(before.fairPrice!);
+  });
+
   it('joueur sans prix ignoré ; trop peu de joueurs cotés : pas de valeur estimée', () => {
     const rows = inputs().slice(0, 5);
     rows.push({ ...rows[0], playerId: 99, floorInSeason: null, sales: [] });
@@ -125,7 +135,8 @@ describeDb('importMarket', () => {
 
   it('plancher aberrant : joueur le plus cher et valeur du club pris aux dernières ventes', async () => {
     await importMarket({ sorare: sorare([]), repo }, { season: 2026 });
-    await sql`update card_sales set sold_at = now()`; // ventes dans la fenêtre de 4 semaines, quelle que soit la date du jour
+    // Reventes entre managers dans la fenêtre de 4 semaines, quelle que soit la date du jour
+    await sql`update card_sales set sold_at = now(), deal_type = 'TokenOffer', auction = false`;
     await sql`update players set floor_in_season = 500 where sorare_slug = 'lacazette'`; // seule carte en vente, hors de prix
     await recomputeMarket(repo);
     const ol = (await createQueries(sql).getClubsMarket()).find((c) => c.slug === 'ol');

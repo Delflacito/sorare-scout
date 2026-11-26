@@ -49,7 +49,7 @@ export interface MarketInputRow {
   playerId: number; floorInSeason: number | null; l15: number; l5: number; allAround: number; decisive: number; startRate: number; minutes: number;
   birthDate: string | null; league: string; position: GenericPosition; nextProjected: number | null;
   teamId: number; clubPpg: number | null; prevGoalsAssists: number; international: boolean; status: string | null;
-  /** Ventes de cartes de la saison des 28 derniers jours ; secondary : enchère ou revente entre managers. */
+  /** Ventes de cartes de la saison des 28 derniers jours ; secondary : revente entre managers (les enchères sont des ventes de Sorare). */
   sales: { date: string; eur: number; secondary: boolean }[];
 }
 export interface PlayerMarketRow {
@@ -476,7 +476,7 @@ function createBaseRepo(sql: Sql) {
           c.slug as league, p.position, s.next_projected, p.team_id, club.ppg, coalesce(ps.goals + ps.assists, 0) as prev_ga,
           p.national_team_id is not null as international, p.playing_status,
           coalesce((select json_agg(json_build_object('date', cs.sold_at, 'eur', cs.price_eur,
-              'secondary', coalesce(cs.deal_type in ('TokenAuction', 'TokenOffer'), false))) from card_sales cs
+              'secondary', coalesce(cs.deal_type = 'TokenOffer', false))) from card_sales cs
             where cs.player_id = p.id and cs.in_season and cs.sold_at > now() - interval '28 days'), '[]') as sales
         from players p join player_summary s on s.player_id = p.id
         join teams t on t.id = p.team_id join competitions c on c.id = t.competition_id

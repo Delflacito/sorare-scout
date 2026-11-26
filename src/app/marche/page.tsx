@@ -23,7 +23,7 @@ function ActualVsFair({ history, fair }: { history: ValueSeries; fair: number })
   return (
     <>
       <div className="card"><div className="card-kicker">Valeur actuelle (ventes)</div><strong>{actual === null ? '—' : fmtEur(actual)}</strong>
-        <div className="muted small">dernière vente de chaque joueur</div></div>
+        <div className="muted small">dernière revente de chaque joueur</div></div>
       <div className="card"><div className="card-kicker">Valeur estimée</div><strong>{fmtEur(fair)}</strong>
         {actual ? (
           <div className={`small ${fair > actual ? 'hot' : fair < actual ? 'cold' : 'muted'}`}>{fmtChange(fair / actual - 1)} par rapport à la valeur actuelle</div>
@@ -144,7 +144,7 @@ function ClubPlayers({ players, yy, history, owned }: { players: MarketPlayerVie
         <table aria-label="Prix des cartes du club">
           <thead>
             <tr>
-              <th>Joueur</th><th>Carte</th><th>L10</th><th>Plancher {yy}</th><th>Plancher C</th><th>Dernière enchère</th><th>5 dern. ventes</th>
+              <th>Joueur</th><th>Carte</th><th>L10</th><th>Plancher {yy}</th><th>Plancher C</th><th>Dernière enchère Sorare</th><th>5 dern. reventes</th>
               <th>Valeur estimée</th><th>Écart</th><th>Potentiel GW</th>
             </tr>
           </thead>

@@ -38,21 +38,22 @@ export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): 
   return { updated, errors };
 }
 
-/** Plancher plus de FLOOR_OUTLIER fois au-dessus de la médiane des 5 dernières ventes : jugé aberrant. */
+/** Plancher plus de FLOOR_OUTLIER fois au-dessus de la médiane des 5 dernières reventes : jugé aberrant. */
 export const FLOOR_OUTLIER = 5;
 
 /**
  * Valeur estimée et potentiel de chaque joueur coté (fonction pure) : prix de référence = carte de la saison la moins chère
- * en vente (sauf plancher aberrant), à défaut médiane des 5 dernières ventes ; valeur estimée = modèle prix / performances
+ * en vente (sauf plancher aberrant), à défaut médiane des 5 dernières reventes entre managers ; valeur estimée = modèle prix / performances
  * ajusté sur tout le marché.
  */
 export function computeMarket(inputs: MarketInputRow[], now = Date.now()): PlayerMarketRow[] {
   const priced = inputs.map((r) => {
-    const sorted = [...r.sales].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
-    const recentPrice = median(sorted.slice(0, 5).map((s) => s.eur));
-    // Plancher aberrant (une seule carte en vente, hors de prix) : les dernières ventes font foi.
+    // Reventes entre managers seulement : les enchères (2 € minimum) et ventes directes de Sorare sont au-dessus du marché.
+    const resales = r.sales.filter((s) => s.secondary).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    const recentPrice = median(resales.slice(0, 5).map((s) => s.eur));
+    // Plancher aberrant (une seule carte en vente, hors de prix) : les dernières reventes font foi.
     const absurd = r.floorInSeason !== null && recentPrice !== null && r.floorInSeason > FLOOR_OUTLIER * recentPrice;
-    return { r, recentPrice, referencePrice: absurd ? recentPrice : r.floorInSeason ?? recentPrice };
+    return { r, resales, recentPrice, referencePrice: absurd ? recentPrice : r.floorInSeason ?? recentPrice };
   }).filter((x): x is typeof x & { referencePrice: number } => x.referencePrice !== null && x.referencePrice > 0);
 
   const toRow = ({ r, referencePrice }: (typeof priced)[number]): MarketRow => ({
@@ -65,14 +66,14 @@ export function computeMarket(inputs: MarketInputRow[], now = Date.now()): Playe
   const model = fitPriceModel(priced.filter((x) => x.r.floorInSeason !== null && x.r.sales.length >= 3).map(toRow));
   return priced.map((x) => {
     const row = toRow(x);
-    // Sans offre, le prix vient des ventes (gonflées par les ventes primaires) : pas comparable au modèle.
+    // Sans offre, le prix vient des reventes : pas comparable au modèle, calibré sur les planchers.
     const comparable = model && x.r.floorInSeason !== null ? model : null;
-    // Prix habituel : médiane des enchères et reventes entre managers sur 4 semaines, à défaut le plancher.
-    const usual = median(x.r.sales.filter((s) => s.secondary).map((s) => s.eur)) ?? x.referencePrice;
+    // Prix habituel : médiane des reventes entre managers sur 4 semaines, à défaut le plancher.
+    const usual = median(x.resales.map((s) => s.eur)) ?? x.referencePrice;
     const fair = comparable ? estimatedValue(comparable, row, usual) : null;
     const potential = comparable && x.r.nextProjected !== null ? potentialPrice(comparable, row, x.r.nextProjected) : null;
     return {
-      playerId: x.r.playerId, referencePrice: x.referencePrice, recentPrice: x.recentPrice, priceTrend7: priceTrend(x.r.sales, now),
+      playerId: x.r.playerId, referencePrice: x.referencePrice, recentPrice: x.recentPrice, priceTrend7: priceTrend(x.resales, now),
       sales30: x.r.sales.length, fairPrice: fair, valueRatio: fair ? x.referencePrice / fair : null,
       potentialPrice: potential, potentialGain: potential === null ? null : potential / x.referencePrice - 1,
     };

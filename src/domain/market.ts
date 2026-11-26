@@ -135,7 +135,7 @@ export function fairPrice(m: PriceModel, r: Profile): number {
 export const formFactor = (m: PriceModel, r: Profile) => Math.exp(linear(m, r) - linear(m, { ...r, l5: r.l15 }));
 
 /**
- * Valeur estimée : 70 % prix habituel du joueur (`usual`, médiane de ses enchères et reventes) ajusté à sa forme,
+ * Valeur estimée : 70 % prix habituel du joueur (`usual`, médiane de ses reventes entre managers) ajusté à sa forme,
  * 30 % profil type (moyenne géométrique). Le profil seul ignore la notoriété : Füllkrug y valait ×7 moins que son prix.
  */
 export function estimatedValue(m: PriceModel, r: Profile, usual: number): number {

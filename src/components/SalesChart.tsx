@@ -26,7 +26,7 @@ function ticks(max: number): number[] {
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' });
 
-/** Dernières ventes Limited : un point par vente (saison en cours / Classic) et la médiane glissante de la saison. */
+/** Dernières reventes Limited entre managers : un point par vente (saison en cours / Classic) et la médiane glissante de la saison. */
 export function SalesChart({ sales, season }: { sales: SaleView[]; season: number }) {
   const [filter, setFilter] = useState<Filter>('season');
   const [hover, setHover] = useState<number | null>(null);
@@ -56,11 +56,11 @@ export function SalesChart({ sales, season }: { sales: SaleView[]; season: numbe
   return (
     <figure className="card chart-card">
       <figcaption className="chart-head">
-        <span className="card-title">Dernières ventes <span>Limited</span></span>
+        <span className="card-title">Dernières reventes <span>Limited</span></span>
         <span className="legend">
           <span><i className="swatch start" /> Saison {yy}</span>
           <span><i className="swatch sub" /> Classic</span>
-          <span><i className="swatch line" /> Médiane ({ROLLING} ventes)</span>
+          <span><i className="swatch line" /> Médiane ({ROLLING} reventes)</span>
         </span>
       </figcaption>
       <div className="chart-filters">
@@ -73,7 +73,7 @@ export function SalesChart({ sales, season }: { sales: SaleView[]; season: numbe
       </div>
       <div ref={ref} className="chart-box" style={{ width: '100%' }}>
         {shown.length === 0 ? <p className="empty">Aucune vente pour ces cartes</p> : (
-          <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img" aria-label={`${shown.length} dernières ventes, de ${fmtEur(Math.min(...shown.map((s) => s.eur)))} à ${fmtEur(Math.max(...shown.map((s) => s.eur)))}`}>
+          <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img" aria-label={`${shown.length} dernières reventes, de ${fmtEur(Math.min(...shown.map((s) => s.eur)))} à ${fmtEur(Math.max(...shown.map((s) => s.eur)))}`}>
             {yTicks.map((v) => (
               <g key={v}>
                 <line x1={LEFT} x2={width - RIGHT} y1={y(v)} y2={y(v)} className={v === 0 ? 'axis' : 'grid'} />

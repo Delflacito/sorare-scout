@@ -351,7 +351,7 @@ export function createQueries(sql: postgres.Sql) {
           o.name as next_opponent, o.sorare_slug as next_opponent_slug, n.is_home, cp.index as next_index, cp.low_sample,
           p.picture_url, t.picture_url as team_picture_url, p.playing_status, p.injury_kind, p.suspension_reason, p.sorare_projection,
           s.next_projected, array[p.position] as card_positions, p.card_status, p.floor_in_season,
-          (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season order by cs.sold_at desc limit 1) as last_sale
+          (select cs.price_eur from card_sales cs where cs.player_id = p.id and cs.in_season and cs.deal_type = 'TokenOffer' order by cs.sold_at desc limit 1) as last_sale
         from players p
         join player_summary s on s.player_id = p.id
         left join teams t on t.id = p.team_id
@@ -594,10 +594,10 @@ export function createQueries(sql: postgres.Sql) {
       };
     },
 
-    /** Ventes Limited des 60 derniers jours, de la plus ancienne à la plus récente. */
+    /** Reventes Limited entre managers des 60 derniers jours, de la plus ancienne à la plus récente. */
     async getPlayerSales(slug: string): Promise<SaleView[]> {
       const rows = await sql`select s.sold_at, s.price_eur, s.in_season from card_sales s join players p on p.id = s.player_id
-        where p.sorare_slug = ${slug} order by s.sold_at`;
+        where p.sorare_slug = ${slug} and s.deal_type = 'TokenOffer' order by s.sold_at`;
       return rows.map((r) => ({ date: (r.sold_at as Date).toISOString(), eur: r.price_eur, inSeason: r.in_season }));
     },
 
@@ -901,9 +901,9 @@ export function createQueries(sql: postgres.Sql) {
         join players p on p.id = cs.player_id
         join teams t on t.id = p.team_id
         join competitions c on c.id = t.competition_id
-        -- Enchères et reventes entre managers seulement : les ventes directes de Sorare (TokenPrimaryOffer, ×3,5 le
+        -- Reventes entre managers seulement : les ventes de Sorare (enchères à 2 € minimum, ventes directes ×3,5 le
         -- plancher en moyenne) et les ventes au type inconnu sont écartées.
-        where cs.deal_type in ('TokenAuction', 'TokenOffer') and exists (select 1 from player_summary s where s.player_id = p.id)
+        where cs.deal_type = 'TokenOffer' and exists (select 1 from player_summary s where s.player_id = p.id)
           ${f.team ? sql`and t.sorare_slug = ${f.team}` : sql``}
           ${f.competition ? sql`and c.slug = any(${slugsOf(f.competition)})` : sql``}
         group by 1, 2, 3`;

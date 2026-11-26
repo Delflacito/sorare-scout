@@ -25,7 +25,7 @@ export function MarketCard({ market, season, href }: { market: PlayerMarketView 
             <div><dt><span className="season-chip">{yy}</span> Plancher</dt><dd>{market.floorInSeason === null ? '—' : fmtEur(market.floorInSeason)}</dd></div>
             <div><dt><span className="season-chip classic">C</span> Plancher</dt><dd>{market.floorClassic === null ? '—' : fmtEur(market.floorClassic)}</dd></div>
             <div>
-              <dt>5 dernières ventes {yy}</dt>
+              <dt>5 dernières reventes {yy}</dt>
               <dd>
                 {market.recentPrice === null ? '—' : fmtEur(market.recentPrice)}
                 {market.priceTrend7 !== null && (
@@ -34,7 +34,7 @@ export function MarketCard({ market, season, href }: { market: PlayerMarketView 
               </dd>
             </div>
             <div>
-              <dt>Dernière enchère {yy}</dt>
+              <dt>Dernière enchère Sorare {yy}</dt>
               <dd>
                 {market.lastAuction === null ? '—' : fmtEur(market.lastAuction.eur)}
                 {market.lastAuction && <small className="muted"> {fmtDay(market.lastAuction.date)}</small>}

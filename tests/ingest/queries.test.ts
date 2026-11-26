@@ -380,7 +380,8 @@ describeDb('trading', () => {
   });
 
   it('fiche : marché du joueur et ventes', async () => {
-    await sql`insert into card_sales (player_id, sold_at, price_eur, in_season) values (${ids['nuno-mendes']}, '2026-10-20T10:00:00Z', 9, true)`;
+    await sql`insert into card_sales (player_id, sold_at, price_eur, in_season, deal_type) values
+      (${ids['nuno-mendes']}, '2026-10-20T10:00:00Z', 9, true, 'TokenOffer'), (${ids['nuno-mendes']}, '2026-10-21T10:00:00Z', 2, true, 'TokenAuction')`;
     expect((await q.getPlayer('nuno-mendes'))!.market).toMatchObject({ floorInSeason: 10, fairPrice: 20, valueRatio: 0.5 });
     expect(await q.getPlayerSales('nuno-mendes')).toEqual([{ date: '2026-10-20T10:00:00.000Z', eur: 9, inSeason: true }]);
   });
