@@ -834,16 +834,21 @@ export function createQueries(sql: postgres.Sql) {
       return rows.map((r) => ({ slug: r.sorare_slug, name: r.name, competitionSlug: competitionGroup(r.competition_slug) }));
     },
 
-    /** Valeur des cartes de chaque club suivi (somme des prix planchers de la saison), le plus cher d'abord. */
+    /**
+     * Valeur des cartes de chaque club suivi (somme des prix planchers de la saison, ramenés aux dernières ventes quand le
+     * plancher est aberrant), le plus cher d'abord.
+     */
     async getClubsMarket(competition?: string): Promise<ClubMarketView[]> {
       const rows = await sql`
         select t.sorare_slug, t.name, t.picture_url, c.name as competition, c.slug as competition_slug,
-          count(p.id)::int as players, count(p.floor_in_season)::int as priced, coalesce(sum(p.floor_in_season), 0) as total_floor,
-          (array_agg(p.name order by p.floor_in_season desc nulls last))[1] as top_player, max(p.floor_in_season) as top_price,
+          count(p.id)::int as players, count(v.price)::int as priced, coalesce(sum(v.price), 0) as total_floor,
+          (array_agg(p.name order by v.price desc nulls last))[1] as top_player, max(v.price) as top_price,
           coalesce(sum(pm.fair_price), 0) as total_fair
         from teams t join competitions c on c.id = t.competition_id
         left join players p on p.team_id = t.id and exists (select 1 from player_summary s where s.player_id = p.id)
         left join player_market pm on pm.player_id = p.id
+        -- Prix de référence (≤ plancher) des seuls joueurs ayant une carte en vente.
+        left join lateral (select least(p.floor_in_season, pm.reference_price) as price where p.floor_in_season is not null) v on true
         where true ${competition ? sql`and c.slug = any(${slugsOf(competition)})` : sql``}
         group by t.id, c.id order by total_floor desc, t.name`;
       return rows.map((r) => ({

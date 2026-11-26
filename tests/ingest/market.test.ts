@@ -3,6 +3,7 @@ import { describeDb, freshDb } from '../helpers/db';
 import { seedLeague } from '../helpers/seed';
 import type { MarketInputRow, Repo } from '@/db/repo';
 import { computeMarket, importMarket, recomputeMarket } from '@/ingest/market';
+import { createQueries } from '@/db/queries';
 import type { SorareClient, SorarePlayerMarket } from '@/sources/sorare';
 
 const NOW = Date.parse('2026-10-29T12:00:00Z');
@@ -65,6 +66,15 @@ describe('computeMarket', () => {
     expect(noFloor).toMatchObject({ fairPrice: null, valueRatio: null, potentialPrice: null, potentialGain: null });
   });
 
+  it('plancher aberrant (seule carte en vente hors de prix) : prix de référence = médiane des dernières ventes', () => {
+    const rows = inputs();
+    rows[0] = { ...rows[0], floorInSeason: 180, sales: rows[0].sales.map((s) => ({ ...s, eur: 0.6 })) };
+    rows[1] = { ...rows[1], floorInSeason: 3 * rows[1].sales[0].eur }; // écart ordinaire : le plancher reste la référence
+    const out = computeMarket(rows, NOW);
+    expect(out.find((r) => r.playerId === 0)!.referencePrice).toBeCloseTo(0.6);
+    expect(out.find((r) => r.playerId === 1)!.referencePrice).toBeCloseTo(rows[1].floorInSeason!);
+  });
+
   it('joueur sans prix ignoré ; trop peu de joueurs cotés : pas de valeur estimée', () => {
     const rows = inputs().slice(0, 5);
     rows.push({ ...rows[0], playerId: 99, floorInSeason: null, sales: [] });
@@ -111,6 +121,15 @@ describeDb('importMarket', () => {
     await recomputeMarket(repo); // deuxième calcul le même jour : une seule ligne de journal par joueur
     const [{ n }] = await sql`select count(*)::int as n from daily_snapshot where day = current_date and reference_price = 12.5`;
     expect(n).toBe(4);
+  });
+
+  it('plancher aberrant : joueur le plus cher et valeur du club pris aux dernières ventes', async () => {
+    await importMarket({ sorare: sorare([]), repo }, { season: 2026 });
+    await sql`update card_sales set sold_at = now()`; // ventes dans la fenêtre de 4 semaines, quelle que soit la date du jour
+    await sql`update players set floor_in_season = 500 where sorare_slug = 'lacazette'`; // seule carte en vente, hors de prix
+    await recomputeMarket(repo);
+    const ol = (await createQueries(sql).getClubsMarket()).find((c) => c.slug === 'ol');
+    expect(ol).toMatchObject({ priced: 2, totalFloor: 23.5, topPlayer: 'Nicolás Tagliafico', topPrice: 12.5 });
   });
 
   it('taux de change indisponible : erreur signalée, rien d’autre', async () => {

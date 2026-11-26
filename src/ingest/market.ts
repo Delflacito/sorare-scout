@@ -38,15 +38,21 @@ export async function importMarket(deps: MarketDeps, opts: MarketOptions = {}): 
   return { updated, errors };
 }
 
+/** Plancher plus de FLOOR_OUTLIER fois au-dessus de la médiane des 5 dernières ventes : jugé aberrant. */
+export const FLOOR_OUTLIER = 5;
+
 /**
  * Valeur estimée et potentiel de chaque joueur coté (fonction pure) : prix de référence = carte de la saison la moins chère
- * en vente, à défaut médiane des 5 dernières ventes ; valeur estimée = modèle prix / performances ajusté sur tout le marché.
+ * en vente (sauf plancher aberrant), à défaut médiane des 5 dernières ventes ; valeur estimée = modèle prix / performances
+ * ajusté sur tout le marché.
  */
 export function computeMarket(inputs: MarketInputRow[], now = Date.now()): PlayerMarketRow[] {
   const priced = inputs.map((r) => {
     const sorted = [...r.sales].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
     const recentPrice = median(sorted.slice(0, 5).map((s) => s.eur));
-    return { r, recentPrice, referencePrice: r.floorInSeason ?? recentPrice };
+    // Plancher aberrant (une seule carte en vente, hors de prix) : les dernières ventes font foi.
+    const absurd = r.floorInSeason !== null && recentPrice !== null && r.floorInSeason > FLOOR_OUTLIER * recentPrice;
+    return { r, recentPrice, referencePrice: absurd ? recentPrice : r.floorInSeason ?? recentPrice };
   }).filter((x): x is typeof x & { referencePrice: number } => x.referencePrice !== null && x.referencePrice > 0);
 
   const toRow = ({ r, referencePrice }: (typeof priced)[number]): MarketRow => ({
