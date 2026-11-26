@@ -7,12 +7,16 @@ export const ROI_GROUPS = [
   { key: 'ligue1', name: 'Ligue 1' },
   { key: 'jupiler', name: 'Jupiler Pro League' },
   { key: 'ecosse', name: 'Scottish Premiership' },
+  { key: 'premier', name: 'Premier League' },
+  { key: 'liga', name: 'LaLiga' },
+  { key: 'bundesliga', name: 'Bundesliga' },
   { key: 'contender', name: 'Contender', detail: 'Autriche, 2. Bundesliga, Ligue 2, Liga 2, Croatie' },
 ] as const;
 export type RoiGroup = (typeof ROI_GROUPS)[number]['key'];
 
 const BY_SLUG: Record<string, RoiGroup> = {
   eredivisie: 'eredivisie', 'primeira-liga-pt': 'primeira', 'ligue-1-fr': 'ligue1', 'jupiler-pro-league': 'jupiler', 'premiership-gb-sct': 'ecosse',
+  'premier-league-gb-eng': 'premier', 'laliga-es': 'liga', 'bundesliga-de': 'bundesliga',
   ...Object.fromEntries(CONTENDER_SLUGS.map((s) => [s, 'contender' as const])),
 };
 
@@ -32,6 +36,10 @@ const CONTENDER: StreakTier[] = [
 const MID: StreakTier[] = [
   { score: 320, essence: 500 }, { score: 360, eur: 3 }, { score: 380, eur: 5 }, { score: 410, eur: 25 }, { score: 440, eur: 100 }, { score: 460, eur: 1000 },
 ];
+const BIG: StreakTier[] = [ // LaLiga et Bundesliga
+  { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 420, eur: 50 }, { score: 440, eur: 300 },
+  { score: 470, eur: 1500 }, { score: 550, eur: 8000 },
+];
 export const STREAK_TIERS: Record<RoiGroup, StreakTier[]> = {
   eredivisie: MID,
   primeira: MID,
@@ -42,19 +50,15 @@ export const STREAK_TIERS: Record<RoiGroup, StreakTier[]> = {
   ],
   contender: CONTENDER,
   ecosse: CONTENDER, // même barème que Contender
-};
-
-const BIG: StreakTier[] = [ // LaLiga et Bundesliga
-  { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 420, eur: 50 }, { score: 440, eur: 300 },
-  { score: 470, eur: 1500 }, { score: 550, eur: 8000 },
-];
-const LEAGUE_TIERS: Record<string, StreakTier[]> = {
-  'premier-league-gb-eng': [
+  premier: [
     { score: 320, essence: 500 }, { score: 360, eur: 5 }, { score: 380, eur: 10 }, { score: 400, eur: 50 }, { score: 430, eur: 400 },
     { score: 450, eur: 2000 }, { score: 550, eur: 10000 },
   ],
-  'laliga-es': BIG,
-  'bundesliga-de': BIG,
+  liga: BIG,
+  bundesliga: BIG,
+};
+
+const LEAGUE_TIERS: Record<string, StreakTier[]> = {
   'football-league-championship': CONTENDER, // même barème que Contender
 };
 

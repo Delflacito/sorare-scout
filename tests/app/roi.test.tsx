@@ -11,7 +11,7 @@ describe('page ROI', () => {
     global.fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       if (init?.method === 'PUT') { puts.push(JSON.parse(String(init.body))); return new Response('{"ok":true}'); }
       return new Response(JSON.stringify({
-        owned: { eredivisie: g(100, 60), primeira: g(100, 90), ligue1: g(0, 0), jupiler: g(100, 10), ecosse: g(0, 0), contender: g(50, 50) },
+        owned: { eredivisie: g(100, 60), primeira: g(100, 90), ligue1: g(0, 0), jupiler: g(100, 10), ecosse: g(0, 0), premier: g(0, 0), liga: g(0, 0), bundesliga: g(0, 0), contender: g(50, 50) },
         manual: {},
       }));
     }) as unknown as typeof fetch;
@@ -21,8 +21,7 @@ describe('page ROI', () => {
     expect(names()[0]).toMatch(/^Contender/); // ROI avec cartes 0 %, puis Primeira −10 %
     expect(names()[1]).toMatch(/^Primeira/);
     fireEvent.click(screen.getByRole('button', { name: 'Investi' }));
-    expect(names().at(-2)).toMatch(/^Ligue 1/);
-    expect(names().at(-1)).toMatch(/^Scottish/);
+    expect(names().slice(-5).map((n) => n.split(/\d/)[0])).toEqual(['Ligue ', 'Scottish Premiership', 'Premier League', 'LaLiga', 'Bundesliga']);
     fireEvent.click(screen.getByRole('button', { name: 'ROI avec cartes' }));
 
     fireEvent.click(within(list).getByRole('button', { name: /^Eredivisie/ }));

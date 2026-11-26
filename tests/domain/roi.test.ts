@@ -6,6 +6,9 @@ describe('ROI', () => {
     expect(roiGroupOf('ligue-2-fr')).toBe('contender');
     expect(roiGroupOf('1-hnl')).toBe('contender');
     expect(roiGroupOf('premiership-gb-sct')).toBe('ecosse');
+    expect(roiGroupOf('premier-league-gb-eng')).toBe('premier');
+    expect(roiGroupOf('laliga-es')).toBe('liga');
+    expect(roiGroupOf('bundesliga-de')).toBe('bundesliga');
     expect(roiGroupOf('mlspa')).toBeNull();
     expect(roiGroupOf(null)).toBeNull();
   });
