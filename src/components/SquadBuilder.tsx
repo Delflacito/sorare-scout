@@ -133,7 +133,8 @@ export function SquadBuilder({ competitions, teams }: {
   const [entries, setEntries] = useState<SquadEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [info, setInfo] = useState<Map<string, MarketPlayerView>>(new Map());
-  const [league, setLeague] = useState(competitions[0]?.slug ?? '');
+  // '' : aucun championnat choisi, les tuiles et les cartes portent sur toute la galerie.
+  const [league, setLeague] = useState('');
   const [club, setClub] = useState('');
   const [clubPlayers, setClubPlayers] = useState<MarketPlayerView[]>([]);
   const [pseudo, setPseudo] = useState('');
@@ -145,7 +146,7 @@ export function SquadBuilder({ competitions, teams }: {
   const [clubFilter, setClubFilter] = useState('');
   const [sort, setSort] = useState<Sort>('poste');
 
-  // Effectif enregistré dans ce navigateur ; on ouvre le premier championnat qui contient des cartes.
+  // Effectif enregistré dans ce navigateur.
   useEffect(() => {
     const stored = load();
     setEntries(stored);
@@ -159,8 +160,7 @@ export function SquadBuilder({ competitions, teams }: {
         .then((server) => { if (server) setEntries(server); setSyncedPseudo(storedPseudo); })
         .catch(() => setImportMessage('Effectif en ligne indisponible : copie de ce navigateur affichée'));
     }
-    if (stored.length && !stored.some((e) => e.competition === competitions[0]?.slug)) setLeague(stored[0].competition);
-  }, [competitions]);
+  }, []);
   useEffect(() => { if (loaded) save(entries); }, [entries, loaded]);
   useEffect(() => {
     if (!syncedPseudo) return;
@@ -207,7 +207,7 @@ export function SquadBuilder({ competitions, teams }: {
     fetch(`/api/joueurs?team=${encodeURIComponent(club)}`).then((r) => r.json()).then(setClubPlayers).catch(() => setClubPlayers([]));
   }, [club]);
 
-  const leagueEntries = entries.filter((e) => e.competition === league);
+  const leagueEntries = league ? entries.filter((e) => e.competition === league) : entries;
   const allTotals = useMemo(() => squadTotals(entries, info), [entries, info]);
   const posOf = (e: SquadEntry) => info.get(e.slug)?.cardPositions[0];
   const owned = leagueEntries.filter((e) => e.status === 'owned');
@@ -234,16 +234,16 @@ export function SquadBuilder({ competitions, teams }: {
     setInfo((m) => new Map(m).set(p.slug, p));
     setEntries((es) => [...es.filter((e) => !(e.slug === p.slug && e.competition === league)), { slug: p.slug, competition: league, status, purchasePrice: null }]);
   };
-  const update = (slug: string, patch: Partial<SquadEntry>) =>
-    setEntries((es) => es.map((e) => (e.slug === slug && e.competition === league ? { ...e, ...patch } : e)));
-  const remove = (slug: string) => setEntries((es) => es.filter((e) => !(e.slug === slug && e.competition === league)));
+  const same = (a: SquadEntry, b: SquadEntry) => a.slug === b.slug && a.competition === b.competition;
+  const update = (x: SquadEntry, patch: Partial<SquadEntry>) => setEntries((es) => es.map((e) => (same(e, x) ? { ...e, ...patch } : e)));
+  const remove = (x: SquadEntry) => setEntries((es) => es.filter((e) => !same(e, x)));
   const count = (slug: string) => entries.filter((e) => e.competition === slug).length;
   const withCards = competitions.filter((c) => count(c.slug) > 0).sort((a, b) => count(b.slug) - count(a.slug));
   const withoutCards = competitions.filter((c) => count(c.slug) === 0);
-  const leagueBtn = (c: { slug: string; name: string }) => (
+  const leagueBtn = (c: { slug: string; name: string }, n = count(c.slug)) => (
     <button key={c.slug} type="button" className="club-btn league-btn" aria-current={league === c.slug ? 'page' : undefined}
       onClick={() => { setLeague(c.slug); setClub(''); setClubFilter(''); setPosition(''); }}>
-      {c.name}{count(c.slug) > 0 && <span className="tab-count">{count(c.slug)}</span>}
+      {c.name}{n > 0 && <span className="tab-count">{n}</span>}
     </button>
   );
   const [manualName, setManualName] = useState('');
@@ -291,11 +291,11 @@ export function SquadBuilder({ competitions, teams }: {
       </form>
       {/* Championnats en boutons : ceux où il y a des cartes d'abord (les plus fournis en tête), les autres repliés. */}
       <nav className="league-picker" aria-label="Championnats">
-        <div className="club-grid">{withCards.map(leagueBtn)}</div>
+        <div className="club-grid">{leagueBtn({ slug: '', name: 'Tous les championnats' }, entries.length)}{withCards.map((c) => leagueBtn(c))}</div>
         {withoutCards.length > 0 && (
           <details open={withCards.length === 0 || withoutCards.some((c) => c.slug === league)}>
             <summary>Autres championnats ({withoutCards.length})</summary>
-            <div className="club-grid">{withoutCards.map(leagueBtn)}</div>
+            <div className="club-grid">{withoutCards.map((c) => leagueBtn(c))}</div>
           </details>
         )}
       </nav>
@@ -342,7 +342,8 @@ export function SquadBuilder({ competitions, teams }: {
       )}
 
       {leagueEntries.length === 0 ? (
-        <p className="empty">Aucune carte dans ce championnat : importe ta galerie Sorare, ou choisis un club ci-dessous et ajoute tes joueurs.</p>
+        <p className="empty">{league ? 'Aucune carte dans ce championnat : importe ta galerie Sorare, ou choisis un club ci-dessous et ajoute tes joueurs.'
+          : 'Aucune carte : importe ta galerie Sorare, ou choisis un championnat pour y ajouter tes joueurs.'}</p>
       ) : (
         <>
           <section className="card gw-section" aria-labelledby="mes-cartes">
@@ -354,7 +355,7 @@ export function SquadBuilder({ competitions, teams }: {
                   const paid = e.purchasePrice;
                   const diff = p?.price != null ? p.price - (paid ?? p.price) : null;
                   return (
-                    <li key={e.slug} className="gw-row no-rank squad-row">
+                    <li key={`${e.competition}|${e.slug}`} className="gw-row no-rank squad-row">
                       <PlayerAvatar name={nameOf(e)} url={p?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
                         <div className="gw-name">{isManual(e) ? nameOf(e) : <Link href={`/joueurs/${e.slug}?onglet=marche`}>{nameOf(e)}</Link>}</div>
@@ -363,7 +364,7 @@ export function SquadBuilder({ competitions, teams }: {
                         </div>
                         <label className="squad-paid">Acheté
                           <input key={`${e.slug}-${paid}`} className="price-input" inputMode="decimal" aria-label={`Prix d’achat de ${nameOf(e)}`}
-                            defaultValue={paid ?? ''} placeholder="?" onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value), manualPrice: true })} /> €
+                            defaultValue={paid ?? ''} placeholder="?" onBlur={(ev) => update(e, { purchasePrice: parsePrice(ev.target.value), manualPrice: true })} /> €
                         </label>
                       </div>
                       <div className="gw-score squad-money">
@@ -372,7 +373,7 @@ export function SquadBuilder({ competitions, teams }: {
                           {paid === null || diff === null ? 'prix d’achat ?' : `${diff >= 0 ? '+' : '−'}${fmtEur(Math.abs(diff))}`}
                         </span>
                       </div>
-                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${nameOf(e)}`} onClick={() => remove(e.slug)}>✕</button>
+                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${nameOf(e)}`} onClick={() => remove(e)}>✕</button>
                     </li>
                   );
                 })}
@@ -387,7 +388,7 @@ export function SquadBuilder({ competitions, teams }: {
                 {shownTargets.map((e) => {
                   const p = info.get(e.slug);
                   return (
-                    <li key={e.slug} className="gw-row no-rank squad-row row-target">
+                    <li key={`${e.competition}|${e.slug}`} className="gw-row no-rank squad-row row-target">
                       <PlayerAvatar name={p?.name ?? e.slug} url={p?.pictureUrl ?? null} size={40} />
                       <div className="gw-who">
                         <div className="gw-name"><Link href={`/joueurs/${e.slug}?onglet=marche`}>{p?.name ?? e.slug}</Link></div>
@@ -397,14 +398,14 @@ export function SquadBuilder({ competitions, teams }: {
                         <label className="squad-paid">Prix visé
                           <input key={`${e.slug}-${e.purchasePrice}`} className="price-input" inputMode="decimal" aria-label={`Prix visé pour ${p?.name ?? e.slug}`}
                             defaultValue={e.purchasePrice ?? ''} placeholder={p?.price != null ? String(Math.round(p.price * 100) / 100) : '€'}
-                            onBlur={(ev) => update(e.slug, { purchasePrice: parsePrice(ev.target.value) })} /> €
+                            onBlur={(ev) => update(e, { purchasePrice: parsePrice(ev.target.value) })} /> €
                         </label>
                       </div>
                       <div className="gw-score squad-money">
                         <strong>{p?.price == null ? '—' : fmtEur(p.price)}</strong>
-                        <button type="button" className="squad-bought" onClick={() => update(e.slug, { status: 'owned', purchasePrice: e.purchasePrice ?? p?.price ?? null })}>Acheté ✓</button>
+                        <button type="button" className="squad-bought" onClick={() => update(e, { status: 'owned', purchasePrice: e.purchasePrice ?? p?.price ?? null })}>Acheté ✓</button>
                       </div>
-                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${p?.name ?? e.slug}`} onClick={() => remove(e.slug)}>✕</button>
+                      <button type="button" className="link-btn squad-remove" aria-label={`Retirer ${p?.name ?? e.slug}`} onClick={() => remove(e)}>✕</button>
                     </li>
                   );
                 })}
@@ -414,7 +415,7 @@ export function SquadBuilder({ competitions, teams }: {
         </>
       )}
 
-      <section className="card gw-section squad-add" aria-labelledby="ajouter-carte">
+      {league && <section className="card gw-section squad-add" aria-labelledby="ajouter-carte">
         <h2 className="card-title" id="ajouter-carte">Ajouter une carte<span>choisis un club</span></h2>
         <div className="club-grid" role="group" aria-label="Clubs">
           {teams.filter((t) => t.competitionSlug === league).map((t) => (
@@ -436,7 +437,7 @@ export function SquadBuilder({ competitions, teams }: {
                   </div>
                   <strong className="club-price">{p.price === null ? '—' : fmtEur(p.price)}</strong>
                   <span className="search-actions">
-                    {entry ? <button type="button" className="secondary" onClick={() => remove(p.slug)}>{entry.status === 'owned' ? 'Dans mes cartes ✕' : 'À acheter ✕'}</button> : (
+                    {entry ? <button type="button" className="secondary" onClick={() => remove(entry)}>{entry.status === 'owned' ? 'Dans mes cartes ✕' : 'À acheter ✕'}</button> : (
                       <>
                         <button type="button" onClick={() => add(p, 'owned')} aria-label={`J’ai ${p.name}`}>Je l’ai</button>
                         <button type="button" className="secondary" onClick={() => add(p, 'target')} aria-label={`Acheter ${p.name}`}>À acheter</button>
@@ -448,15 +449,15 @@ export function SquadBuilder({ competitions, teams }: {
             })}
           </ul>
         )}
-      </section>
+      </section>}
 
-      <form className="squad-import squad-manual" onSubmit={addManual}>
+      {league && <form className="squad-import squad-manual" onSubmit={addManual}>
         <input value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={80}
           placeholder="Joueur absent de la liste : son nom" aria-label="Nom d’un joueur absent de la liste" />
         <button type="submit" disabled={!tokens(manualName).length}>Ajouter à mes cartes</button>
-      </form>
+      </form>}
 
-      {entries.length > leagueEntries.length && (
+      {league && entries.length > leagueEntries.length && (
         <p className="note">
           Tous championnats : coût réel {fmtEur(allTotals.cost)} · valeur actuelle {fmtEur(allTotals.value)} · avec achats envisagés {fmtEur(allTotals.costWithTargets)}.
         </p>

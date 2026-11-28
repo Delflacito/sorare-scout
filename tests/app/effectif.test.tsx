@@ -119,6 +119,7 @@ describe('Mon effectif', () => {
 
   it('club puis joueurs cochés, prix d’achat, totaux, enregistrement dans le navigateur', async () => {
     render(<SquadBuilder competitions={competitions} teams={teams} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Eredivisie' }));
     const clubs = screen.getByRole('group', { name: 'Clubs' });
     expect(clubs).not.toHaveTextContent('PSG'); // clubs du championnat affiché
     fireEvent.click(within(clubs).getByRole('button', { name: 'PSV' }));
@@ -165,6 +166,7 @@ describe('Mon effectif', () => {
 
   it('joueur absent de la liste ajouté par son nom, affiché sans lien', async () => {
     render(<SquadBuilder competitions={competitions} teams={teams} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Eredivisie' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Nom d’un joueur absent de la liste' }), { target: { value: 'Stije Resink' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter à mes cartes' }));
     const mine = await screen.findByRole('list', { name: 'Mes cartes' });
@@ -204,5 +206,22 @@ describe('Mon effectif', () => {
     expect(screen.getByRole('button', { name: /Eredivisie/ })).toHaveTextContent('2');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Ligue 1' })); });
     expect(screen.getByText(/Aucune carte dans ce championnat/)).toBeInTheDocument();
+  });
+
+  it('sans championnat choisi : coût réel, valeur actuelle et potentiel de toute la galerie', async () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([
+      { slug: 'a', competition: 'eredivisie', status: 'owned', purchasePrice: 10 },
+      { slug: 'b', competition: 'ligue-1-fr', status: 'owned', purchasePrice: 5 },
+    ]));
+    render(<SquadBuilder competitions={competitions} teams={teams} />);
+    expect(screen.getByRole('button', { name: /Tous les championnats/ })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(screen.getByText('Valeur actuelle').nextSibling).toHaveTextContent('60 €'));
+    expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('15 €');
+    expect(screen.getByText('Valeur potentielle avant la GW').nextSibling).toHaveTextContent('66 €');
+    expect(screen.queryByRole('group', { name: 'Clubs' })).not.toBeInTheDocument(); // ajout : championnat à choisir
+    fireEvent.click(screen.getByRole('button', { name: /Ligue 1/ }));
+    expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('5,00 €');
+    fireEvent.click(screen.getByRole('button', { name: /Tous les championnats/ }));
+    expect(screen.getByText('Coût réel').nextSibling).toHaveTextContent('15 €');
   });
 });
